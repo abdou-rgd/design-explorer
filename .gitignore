@@ -1,0 +1,55 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Fichiers temporaires Claude/superpowers
+.superpowers/
+.claude/
+
+# Données sensibles (jamais committer)
+*.csv
+*.tab
+
+# Fichiers binaires lourds
+*.pdf
+*.docx
+*.html
+*.css
+*.js
+*.png
+*.jpg
+*.exe
+*.obj
+*.f90
+*.dat
+*.bfm
+*.vpd
+*.vpt
+*.phi
+*.cov
+*.cor
+*.cpu
+*.sum
+*.prm
+*.shm
+*.res
+*.clt
+*.coi
+*.ext
+*.shk
+*.ctl
+
+# Dossiers lourds / non essentiels
+docs/inspiration/
+docs/books/
+docs/courses/
+autoresearch/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
