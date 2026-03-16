@@ -94,7 +94,7 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
       fluidRow(
         column(4, metric_card("Type", "NWPRI", prior$raw_prior_line %||% "$PRIOR", "blue")),
         column(4, metric_card("PLEV",
-                              if (!is.null(prior$plev) && !is.na(prior$plev)) prior$plev else "N/A",
+                              if (isTRUE(!is.na(prior$plev))) prior$plev else "N/A",
                               "Niveau d'acceptation", "purple")),
         column(4, metric_card("THETAP", length(prior$thetap),
                               "parametres avec prior", "green"))
