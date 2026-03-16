@@ -243,3 +243,4 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - Recommandation : utiliser $DESIGN pour présélectionner 1-3 designs, puis valider par CTS
 - Chaîner plusieurs `$DESIGN` dans un `$PROB` (RS → STGR → NELDER) pour éviter les minima locaux
 - MU-referencing des THETAs = gain de vitesse majeur avec FIMTYPE=1
+
