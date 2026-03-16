@@ -34,7 +34,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       compare_ui <- NULL
       if (length(all_runs()) > 1) {
         compare_ui <- tagList(
-          div(class = "param-table-wrap",
+          div(class = "surface-card",
             p(class = "section-title", "Comparaison FIM multi-runs"),
             DTOutput(ns("compare_table"))
           ),
@@ -65,21 +65,6 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
             )
           )
         ),
-        if (!is.null(fim)) {
-          tagList(
-            br(),
-            fluidRow(
-              column(6,
-                div(class = "plot-card",
-                  p(class = "section-title", "Matrice de correlation des parametres"),
-                  plotOutput(ns("cor_heatmap"), height = "400px"),
-                  p(style = "font-size:.8rem; color:#6b7280; margin-top:4px;",
-                    "Calculee via FIM^-1 (solve) puis cov2cor. Valeurs dans les cellules.")
-                )
-              )
-            )
-          )
-        }
       )
     })
 
@@ -155,11 +140,6 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       plot_fim_heatmap(fim, labels = param_labels())
     }, res = 110)
 
-    # Correlation matrix heatmap
-    output$cor_heatmap <- renderPlot({
-      fim <- fim_matrix(); req(fim)
-      plot_fim_heatmap(fim, labels = param_labels(),
-                       title = "Matrice de correlation des parametres")
-    }, res = 110)
+
   })
 }

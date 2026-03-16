@@ -5,10 +5,13 @@
 mod_raw_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    div(class = "param-table-wrap",
+    div(class = "surface-card",
       fluidRow(
-        column(9, p(class = "section-title", "Contenu complet du fichier .ext")),
-        column(3, uiOutput(ns("run_selector")))
+        column(8, p(class = "section-title", "Contenu complet du fichier .ext")),
+        column(2, uiOutput(ns("run_selector"))),
+        column(2, downloadButton(ns("export_csv"), "Telecharger CSV",
+                                 class = "btn btn-sm btn-outline-secondary",
+                                 style = "margin-top:22px; width:100%;"))
       ),
       DTOutput(ns("raw_ext"))
     )
@@ -42,5 +45,17 @@ mod_raw_server <- function(id, ext_data, all_runs = reactive(list())) {
         options = list(pageLength = 20, scrollX = TRUE)
       )
     })
+
+    output$export_csv <- downloadHandler(
+      filename = function() paste0("design_", Sys.Date(), ".csv"),
+      content  = function(file) {
+        ext <- selected_ext()
+        req(ext)
+        tryCatch(
+          write.csv(ext, file, row.names = FALSE),
+          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+        )
+      }
+    )
   })
 }
