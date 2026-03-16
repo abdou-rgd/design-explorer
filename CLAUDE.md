@@ -30,6 +30,23 @@
 
 ---
 
+## Commandes rapides
+
+```r
+# Lancer l'app Shiny (depuis la racine ClaudeProjets/)
+shiny::runApp("app/")
+```
+
+```bash
+# Installer les dépendances Shiny
+"/c/Program Files/R/R-4.5.2/bin/Rscript" app/install_deps.R
+
+# Vérifier la syntaxe d'un module R
+"/c/Program Files/R/R-4.5.2/bin/Rscript" check.R   # toujours via fichier, jamais -e
+```
+
+---
+
 ## Contexte du projet
 
 Stage M2 Sciences des données de santé, Sanofi.
@@ -63,10 +80,12 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 
 | Fichier | Description |
 |---------|-------------|
-| `scripts/parse_design_outputs.R` | Parsers R : `read_ext()`, `read_shk()`, `get_rse()`, `get_relativeinf()`, `summary_design()` |
-| `scripts/report_design.R` | Visualisations : `plot_relativeinf()`, `plot_rse()`, `plot_convergence()` |
-| `app/app.R` | Application Shiny post-processing $DESIGN (v1.0) — `shiny::runApp("app/")` depuis la racine |
-| `app/www/styles.css` | Styles CSS de l'app Shiny (metric cards, badges, thème) |
+| `scripts/parse_design_outputs.R` | Parsers R : `read_ext()`, `read_shk()`, `read_coi()`, `read_clt()`, `read_tab()`, `read_prior_nwpri()`, `read_summary_tab()`, `get_rse()`, `get_relativeinf()`, `get_d_criterion()`, `get_cor_matrix()`, `summary_design()` |
+| `scripts/report_design.R` | Visualisations : `plot_relativeinf()`, `plot_rse()`, `plot_se()`, `plot_rse_waterfall()`, `plot_convergence()`, `plot_fim_heatmap()`, `plot_optimal_times()` |
+| `app/app.R` | Application Shiny post-processing $DESIGN (V4) — sidebar nav, drawer, KPI bar — `shiny::runApp("app/")` depuis la racine |
+| `app/R/` | 12 modules : upload, compare, examples, params, rse, relativeinf, fim, times, prior, convergence, raw, helpers_ui |
+| `app/examples/` | Exemples Bauer 2021 intégrés (example1–4, fichiers `.ext`/`.shk`/`.coi`/`.clt`/`.tab`) |
+| `app/www/styles.css` | Styles CSS V4 (CSS variables, sidebar layout, KPI bar, drawer, metric cards) |
 | `app/install_deps.R` | Installe les packages Shiny manquants (shiny, bslib, DT) |
 | `docs/inspiration/PFIM/` | Code source PFIM 7.0 — référence pour plots SE/RSE/shrinkage, rapport HTML, structure FIM |
 | `docs/inspiration/PopED-master/` | Code source PopED — référence pour efficiency(), plot_efficiency_of_windows(), plot_model_prediction() |
@@ -243,4 +262,11 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - Recommandation : utiliser $DESIGN pour présélectionner 1-3 designs, puis valider par CTS
 - Chaîner plusieurs `$DESIGN` dans un `$PROB` (RS → STGR → NELDER) pour éviter les minima locaux
 - MU-referencing des THETAs = gain de vitesse majeur avec FIMTYPE=1
+
+### Gotchas Shiny (app V4)
+
+- **`fileInput` dans `renderUI`** : ne jamais mettre `fileInput` dans un `renderUI` qui dépend de l'état modifié par son propre handler — réinitialise l'input en boucle
+- **`formatStyle` + `colnames=`** : le paramètre `colnames=` de `datatable()` ne mappe pas avec `formatStyle` — toujours renommer les colonnes dans le df avec `rename()` avant `datatable()`
+- **`if_else` vs `ifelse`** : `dplyr::if_else()` exige des conditions vectorisées — pour un check scalaire `!is.null(x)`, utiliser `base::ifelse()` ou un `if/else` ordinaire
+- **Dose row dans `.tab`** : la row 1 est toujours la dose initiale (TIME=0, AMT>0) — l'exclure avec `tab[-1, , drop = FALSE]` avant tout traitement des temps d'échantillonnage
 
