@@ -237,7 +237,10 @@ get_relativeinf <- function(shk, table_no = NULL) {
     pivot_longer(everything(), names_to = "eta", values_to = "relativeinf_pct")
 }
 
-#' Extraire les shrinkages EBV (TYPE 4) depuis read_shk()
+#' Extraire les shrinkages EBV (TYPE 6 = EBVSHRINKSD) depuis read_shk()
+#'
+#' TYPE 6 = EBVSHRINKSD : meaningful en contexte $DESIGN.
+#' TYPE 4 = ETASHRINKSD : toujours 100% en $DESIGN (pas de donnees reelles).
 #'
 #' @param shk      Tibble retourne par read_shk()
 #' @param table_no Numero de table (defaut : dernier)
@@ -246,7 +249,7 @@ get_relativeinf <- function(shk, table_no = NULL) {
 get_shrinkage <- function(shk, table_no = NULL) {
   tbl <- table_no %||% max(shk$table_no)
   shk |>
-    filter(.data$table_no == tbl, type_id == 4L) |>
+    filter(.data$table_no == tbl, type_id == 6L) |>
     select(-c(table_no, type_id, subpop)) |>
     pivot_longer(everything(), names_to = "eta", values_to = "shrinkage_pct")
 }
