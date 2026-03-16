@@ -33,7 +33,8 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
         if (is.null(rse) || nrow(rse) == 0L) return(NULL)
         rse |>
           mutate(
-            label  = ifelse(!is.null(lbls) & param %in% names(lbls), lbls[param], param),
+            label  = if (length(runs) > 1) param
+                     else ifelse(!is.null(lbls) & param %in% names(lbls), lbls[param], param),
             metric = paste0("%RSE(", label, ")"),
             value  = round(rse_pct, 2),
             run    = r$name
@@ -171,7 +172,9 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
       ofv_vals <- vapply(runs, function(r) {
         if (is.null(r$ext_data)) return(NA_real_)
-        round(get_ofv(r$ext_data, tbl), 4)
+        val <- tryCatch(get_ofv(r$ext_data, tbl), error = function(e) NA_real_)
+        if (length(val) == 0L) return(NA_real_)
+        round(val, 4)
       }, numeric(1))
       names(ofv_vals) <- vapply(runs, function(r) r$name, character(1))
 

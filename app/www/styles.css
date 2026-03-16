@@ -76,7 +76,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 
 .nav-section-label {
   padding: 12px 18px 4px;
-  font-size: .65rem;
+  font-size: .72rem;
   font-weight: 700;
   letter-spacing: .1em;
   color: rgba(148,163,184,0.5);
@@ -85,7 +85,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 .nav-item {
   display: block;
   padding: 8px 18px;
-  font-size: .82rem;
+  font-size: .88rem;
   color: var(--sidebar-text);
   cursor: pointer;
   border-radius: 0;
@@ -308,10 +308,10 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 }
 
 /* ── DT table tweaks ───────────────────────────────────────────────────── */
-table.dataTable { font-family:'DM Sans',sans-serif; font-size:.84rem; }
+table.dataTable { font-family:'DM Sans',sans-serif; font-size:.9rem; }
 table.dataTable tbody tr:nth-child(odd)  { background:#f8fafc; }
 table.dataTable tbody tr:hover           { background:#eff6ff; }
-table.dataTable thead th { background:#f1f5f9; font-weight:700; color:var(--text-muted); font-size:.76rem; letter-spacing:.04em; text-transform:uppercase; }
+table.dataTable thead th { background:#f1f5f9; font-weight:700; color:var(--text-muted); font-size:.8rem; letter-spacing:.04em; text-transform:uppercase; }
 
 /* ── Alert ─────────────────────────────────────────────────────────────── */
 .alert-info, .alert-warning { border-radius:8px; font-size:.88rem; }
