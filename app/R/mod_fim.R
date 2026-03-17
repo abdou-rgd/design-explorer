@@ -72,16 +72,17 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
     output$cards <- renderUI({
       ext <- ext_data(); req(ext)
       ofv      <- get_ofv(ext, tbl_no())
+      if (length(ofv) != 1L) ofv <- NA_real_
       rse      <- get_rse(ext, tbl_no())
       n_params <- nrow(rse)
       d_crit   <- get_d_criterion(ofv, n_params)
-      det_fim  <- exp(-ofv)
+      det_fim  <- if (!is.na(ofv)) exp(-ofv) else NA_real_
       cn       <- get_condition_number(ext, tbl_no())
 
       fluidRow(
         column(3, metric_card("D-critere", signif(d_crit, 4),
                               "exp(-OFV/p)", "blue")),
-        column(3, metric_card("Determinant", formatC(det_fim, format = "e", digits = 3),
+        column(3, metric_card("Determinant", if (!is.na(det_fim)) formatC(det_fim, format = "e", digits = 3) else "N/A",
                               "exp(-OFV)", "purple")),
         column(3, metric_card("Cond. # (FE)",
                               if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else "N/A",
@@ -101,18 +102,19 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
         if (is.null(r$ext_data)) return(NULL)
         ext <- r$ext_data
         ofv <- get_ofv(ext, tbl_no())
+        if (length(ofv) != 1L || is.na(ofv)) ofv <- NA_real_
         rse <- get_rse(ext, tbl_no())
         n_params <- nrow(rse)
         d_crit <- get_d_criterion(ofv, n_params)
         cn <- get_condition_number(ext, tbl_no())
         tibble(
           Run = r$name,
-          OFV = round(ofv, 4),
-          `D-critere` = signif(d_crit, 4),
+          OFV = if (!is.na(ofv)) round(ofv, 4) else NA_real_,
+          `D-critere` = if (!is.na(d_crit)) signif(d_crit, 4) else NA_real_,
           `Params` = n_params,
           `Cond. #` = if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else NA,
-          `RSE moy. (%)` = round(mean(rse$rse_pct, na.rm = TRUE), 2),
-          `RSE max (%)` = round(max(rse$rse_pct, na.rm = TRUE), 2)
+          `RSE moy. (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
+          `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_
         )
       })
       datatable(comp_df, rownames = FALSE, class = "stripe hover compact",
