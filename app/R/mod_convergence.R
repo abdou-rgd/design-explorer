@@ -23,24 +23,24 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
       }
 
       # Multi-run: overlay convergence curves
-      combined <- purrr::imap_dfr(runs, function(r, idx) {
+      combined <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$ext_data)) return(NULL)
         r$ext_data |>
           filter(type == "iteration") |>
           select(table_no, ITERATION, OBJ) |>
           filter(!is.na(OBJ), !is.na(ITERATION)) |>
           mutate(run = r$name)
-      })
+      }) |> purrr::list_rbind()
 
-      if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de convergence") + theme_bw())
+      if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de convergence") + .theme_design())
 
       p <- ggplot(combined, aes(x = ITERATION, y = OBJ, color = run)) +
         geom_line(linewidth = 0.75, alpha = 0.9) +
         scale_color_manual(values = .RUN_COLORS, name = NULL) +
         labs(title = "Convergence -- Comparaison multi-runs",
-             x = "Iteration", y = "OFV") +
-        theme_bw(base_size = 11) +
-        theme(legend.position = "bottom")
+             x = "Iteration ($DESIGN)", y = "OFV (-log det FIM)",
+             caption = "Source : .ext") +
+        .theme_design()
 
       if (log_conv()) p <- p + scale_x_log10()
       p

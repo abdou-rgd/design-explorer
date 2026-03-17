@@ -56,14 +56,14 @@ render_kpi_bar <- function(run_name, file_name, d_crit, rse_mean,
 # -- RSE badge ---------------------------------------------------------------
 rse_badge <- function(x) {
   if (is.na(x)) return(span("\u2014", class = "ri-na"))
-  cls <- if (x < 20) "rse-good" else if (x < 50) "rse-moderate" else "rse-poor"
+  cls <- if (x < RSE_THRESHOLDS[1]) "rse-good" else if (x < RSE_THRESHOLDS[2]) "rse-moderate" else "rse-poor"
   span(sprintf("%.2f%%", x), class = cls)
 }
 
 # -- RelInf badge ------------------------------------------------------------
 ri_badge <- function(x) {
   if (is.na(x)) return(span("\u2014", class = "ri-na"))
-  cls <- if (x >= 50) "ri-good" else if (x >= 20) "ri-moderate" else "ri-poor"
+  cls <- if (x >= RELINF_THRESHOLDS[2]) "ri-good" else if (x >= RELINF_THRESHOLDS[1]) "ri-moderate" else "ri-poor"
   span(sprintf("%.2f%%", x), class = cls)
 }
 

@@ -245,7 +245,12 @@ server <- function(input, output, session) {
   merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
   merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
   merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
-  merged_summary <- reactive({ examples$summary_data() })
+  merged_summary <- reactive({
+    upload_summary  <- upload$summary_data()
+    example_summary <- examples$summary_data()
+    if (!is.null(upload_summary) && nrow(upload_summary) > 0) upload_summary
+    else example_summary
+  })
 
   # -- all_runs ---------------------------------------------------------------
   all_runs <- reactive({
@@ -282,11 +287,14 @@ server <- function(input, output, session) {
   param_labels_r <- reactive({
     raw <- trimws(input$param_labels)
     if (raw == "") return(NULL)
-    lines <- strsplit(raw, "\n")[[1]]
-    lines <- lines[str_detect(lines, "=")]
-    parts <- str_split_fixed(lines, "=", 2)
-    lbl   <- setNames(trimws(parts[,2]), trimws(parts[,1]))
-    lbl[nchar(names(lbl)) > 0 & nchar(lbl) > 0]
+    lbl <- tibble::tibble(raw = stringr::str_split_1(raw, "\n")) |>
+      dplyr::filter(stringr::str_detect(raw, "=")) |>
+      tidyr::separate_wider_delim(raw, "=", names = c("key", "val"), too_many = "merge") |>
+      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
+      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
+      tibble::deframe()
+    if (length(lbl) == 0L) return(NULL)
+    lbl
   })
   se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
   log_conv_r <- reactive({ input$log_conv })

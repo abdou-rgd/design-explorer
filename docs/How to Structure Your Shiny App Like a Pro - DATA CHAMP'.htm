@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta charset="UTF-8">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<title>How to Structure Your Shiny App Like a Pro - DATA CHAMP'</title>
+<meta name="description" content="A practical guide to structuring R Shiny applications like a seasoned developer. Discover how to organize files, modularize your code, and adopt development best practices honed over years of experience. Perfect for R users ready to take their Shiny projects to the next level and avoid the pitfalls of messy code.">
+
+
+    <meta name="author" content="Charles Bordet">
+
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en">
+<meta property="og:site_name" content="DATA CHAMP'">
+<meta property="og:title" content="How to Structure Your Shiny App Like a Pro">
+<meta property="og:url" content="https://www.datachamp.fr/en/posts/good-development-practices/">
+
+
+    <meta property="og:description" content="A practical guide to structuring R Shiny applications like a seasoned developer. Discover how to organize files, modularize your code, and adopt development best practices honed over years of experience. Perfect for R users ready to take their Shiny projects to the next level and avoid the pitfalls of messy code.">
+
+
+
+
+
+    <meta name="twitter:site" content="@CharlesBordet">
+    <meta name="twitter:title" content="How to Structure Your Shiny App Like a Pro">
+    <meta name="twitter:description" content="A practical guide to structuring R Shiny applications like a seasoned developer. Discover how to organize files, modularize your code, and adopt development best practices honed over years of experience. Perfect for R users ready to take their Shiny projects to the next level and avoid the pitfalls of messy code.">
+    <meta name="twitter:url" content="https://www.datachamp.fr/en/posts/good-development-practices/">
+    
+    
+        <meta name="twitter:creator" content="@CharlesBordet">
+    
+
+
+
+    <meta property="article:published_time" content="2025-05-05T00:00:00+00:00">
+
+
+
+    <meta property="article:modified_time" content="2025-05-05T00:00:00+00:00">
+
+
+<link rel="canonical" href="https://www.datachamp.fr/en/posts/good-development-practices/">
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="/assets/css/typo.css">
+    <link rel="stylesheet" href="/assets/css/main.css">
+
+
+
+
+	<link rel="stylesheet" href="/assets/css/article.css">
+	<link rel="stylesheet" href="/assets/css/pygments-default.css">
+	<link rel="stylesheet" href="/assets/css/glightbox.min.css">
+
+
+<!-- favicons -->
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon/favicon-16x16.png">
+<link rel="manifest" href="/assets/favicon/site.webmanifest">
+<link rel="mask-icon" href="/assets/favicon/safari-pinned-tab.svg" color="#5bbad5">
+
+<!-- POLICE  -->
+
+<script type="text/javascript">
+    var MTUserId='5e6af777-dfca-45f3-a3b8-0c07aec78d52';
+    var MTFontIds = new Array();
+
+    MTFontIds.push("1475738"); // Frutiger® W01 55 Roman 
+    MTFontIds.push("1475742"); // Frutiger® W01 56 Italic 
+    MTFontIds.push("1475746"); // Frutiger® W01 65 Bold 
+    MTFontIds.push("1475750"); // Frutiger® W01 66 Bold Italic 
+    (function() {
+        var mtTracking = document.createElement('script');
+        mtTracking.type='text/javascript';
+        mtTracking.async='true';
+        mtTracking.src='/assets/fonts/mtiFontTrackingCode.js';
+
+        (document.getElementsByTagName('head')[0]||document.getElementsByTagName('body')[0]).appendChild(mtTracking);
+    })();
+</script>
+</head>
+<body>
+	<header id="masthead" class="header">
+		<div class="container header-container">
+	<div class="header-logo">
+		
+			<a href="https://www.datachamp.fr/en/">
+				<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="360" height="99" version="1.1" viewBox="0 0 877.38 241.14">
+					<path d="M121.94 241.05 2.76 38.31l25.63-15.06 134.33 217.89z" class="logo-r" fill="#80ED99"/>
+					<path d="M.05 5.77h29.73v235.18H.05z" fill="#80ED99"  class="logo-r"/>
+					<path d="M143.31 218.26h-27.28v-24.29c0-20.39-16.53-36.91-36.91-36.91h-8.01c-20.39 0-36.91 16.53-36.91 36.91v24.29H6.92v-88.48h81.03c30.58 0 55.37 24.79 55.37 55.37v33.11zM87.95 118.21H6.92V0h108.41c15.45 0 27.98 12.53 27.98 27.98v34.86c0 30.58-24.78 55.37-55.36 55.37zM71.11 90.93h8.01c20.39 0 36.91-16.53 36.91-36.91V36.51c0-5.1-4.13-9.23-9.23-9.23H34.2v26.74c0 20.38 16.53 36.91 36.91 36.91z" fill="#023364"/>
+				    <path class="text" fill="#ff7043" d="M876.74 83.55c-.61 2.21-1.68 4.11-3.22 5.72-1.53 1.61-3.16 2.9-4.88 3.88-1.72.98-3.29 1.7-4.72 2.16-1.43.46-2.42.63-2.96.5-.41-.09-.84-.48-1.3-1.17-.46-.69-.59-1.4-.38-2.14.03-.12.42-.49 1.17-1.1.75-.61 1.64-1.35 2.68-2.23 1.04-.87 2.02-1.95 2.96-3.24.93-1.29 1.62-2.73 2.07-4.32.88-3.19 1.33-6.11 1.35-8.78.01-2.66-.18-5.34-.59-8.04-.04-.4-.08-.87-.15-1.4-.07-.53-.07-.92 0-1.17.24-.86.7-1.34 1.38-1.45.68-.11 1.36-.08 2.04.07.95.21 1.83 1.23 2.63 3.03.8 1.81 1.42 3.87 1.86 6.18.44 2.32.67 4.74.69 7.28.02 2.56-.19 4.63-.63 6.22z"/>
+				    <path class="text" d="M236.97 89.87c18.78 0 28.31 9.61 28.31 30.3s-9.26 30.3-28.05 30.3h-21.55V99.31c0-5.19 4.33-9.43 9.61-9.43h11.68zm-11.26 3.64c-3.29 0-5.8 2.68-5.8 5.8v47.52h17.05c15.75 0 23.72-7.96 23.72-26.66s-7.96-26.66-23.72-26.66h-11.25zM287.52 150.47h-4.07l21.9-58.78c.52-1.38 1.82-2.34 3.29-2.34 1.64 0 2.94 1.04 3.38 2.34l22.33 58.78h-4.67l-6.41-16.88h-29.43l-6.32 16.88zm7.62-20.52h26.75l-13.33-35.06h-.35l-13.07 35.06zM343.96 93.51v-3.63h42.33v3.63h-19.04v56.96H363V93.51h-19.04zM399.87 150.47h-4.07l21.9-58.78c.52-1.38 1.82-2.34 3.29-2.34 1.64 0 2.94 1.04 3.38 2.34l22.33 58.78h-4.67l-6.41-16.88h-29.43l-6.32 16.88zm7.62-20.52h26.75l-13.33-35.06h-.35l-13.07 35.06zM496.13 120.17c0-18.96 11.34-31.25 28.65-31.25 5.63 0 10.3.95 14.72 2.25v4.16h-.35c-4.42-1.64-9.18-2.77-14.37-2.77-14.37 0-24.06 11.08-24.06 27.61 0 16.97 9.7 27.61 24.06 27.61 5.37 0 10.04-1.04 14.63-3.2h.35v4.5c-4.76 1.73-9.78 2.34-14.98 2.34-16.88 0-28.65-12.29-28.65-31.25zM605.46 116.53V89.87h4.24v60.59h-4.24v-30.3h-38.09v30.3h-4.24V89.87h4.24v26.66h38.09zM634.54 150.47h-4.07l21.9-58.78c.52-1.38 1.82-2.34 3.29-2.34 1.64 0 2.94 1.04 3.38 2.34l22.33 58.78h-4.67l-6.41-16.88h-29.43l-6.32 16.88zm7.62-20.52h26.75l-13.33-35.06h-.35l-13.07 35.06zM751.59 93.51c.78-2.42 1.82-4.33 4.5-4.33 2.77 0 4.07 1.91 4.16 4.76l2.08 56.53H758l-2-56.1h-.35l-18.7 56.09h-5.8l-18.7-56.09h-.35l-1.99 56.09h-4.33l2.08-56.53c.09-2.86 1.38-4.76 4.16-4.76 2.68 0 3.72 1.91 4.5 4.33l17.31 52.11h.43l17.33-52.1zM796.1 125.1v25.36h-4.24V99.22c0-5.11 4.24-9.35 9.44-9.35h11.43c13.59 0 21.47 4.41 21.47 17.66s-7.88 17.57-21.47 17.57H796.1zm16.27-3.63c11.86 0 17.23-3.64 17.23-13.94s-5.19-14.02-17.05-14.02H801.9c-3.2 0-5.8 2.42-5.8 5.71v22.25h16.27z" fill="#023364"/>
+				</svg>
+			</a>
+		
+	</div>
+	<nav class="header-nav">
+		<div class="header-nav-toggle" id="togglerMain" aria-expanded="false">
+			<span></span>
+			<span></span>
+			<span></span>
+		</div>
+		<div class="header-nav-menu" id="navMain">
+			<ul class="header-nav-menu-list nav-menu">
+
+				
+					
+					<li class="header-nav-menu-item ">
+							<a href="/en/testimonials/" >Testimonials</a>
+						</li><li class="header-nav-menu-item ">
+							<a href="/en/team/" >Team</a>
+						</li><li class="header-nav-menu-item ">
+							<a href="/en/posts/" >Articles</a>
+						</li><li class="header-nav-menu-item ">
+							<a href="/en/case-study/debtwatchr/" >Case study</a>
+						</li><li class="header-nav-menu-item highlighted">
+							<a href="/en/contact/" >Book a call</a>
+						</li>
+				
+				<li class="header-nav-menu-item header-nav-menu-item-lang">
+					
+					
+					
+					
+					
+					
+						<a href="/en/posts/good-development-practices/"class="active">en</a>
+						<span>/</span>
+					
+						<a href="/fr/posts/good-development-practices/">fr</a>
+						<span>/</span>
+					
+					
+					
+				</li>
+			</ul>
+		</div>
+	</nav>
+</div>
+	</header>
+	
+	<section id="page">
+		
+<!-- HERO SECTION -->
+<section class="section-hero section-hero-small">
+	<div class="container">
+		<div>
+			<h1 class="h1">How to Structure Your Shiny App Like a Pro</h1>
+		</div>
+        <div class="tags text-center">
+            <span class="tags-item"><strong>Author</strong>: Charles Bordet</span>
+            <span class="tags-item"><strong>Last update</strong>: 05 May 2025</span>
+        </div>
+	</div>
+</section>
+<!-- END HERO SECTION -->
+
+<main class="container article article-with-toc">
+	
+		<aside class="table-of-content col active" id="tableOfContent">
+  <div class="table-of-content-title">
+    
+      Table of contents
+    
+  </div>
+  <nav class="table-of-content-nav">
+    <div class="table-of-content-nav-content">
+      <ul class="table-of-content-nav-list"><li><a href="#bisou-1-should-you-make-your-shiny-app-as-an-r-package">1. Should you make your Shiny app as an R package?</a></li><li><a href="#bisou-2-the-three-core-files-globalr-uir-and-serverr">2. The Three Core Files: global.R, ui.R, and server.R</a><ul class="child"><li><a href="#bisou-the-globalr-file">The <code class="language-plaintext highlighter-rouge">global.R</code> file</a></li><li><a href="#bisou-the-uir-file">The <code class="language-plaintext highlighter-rouge">ui.R</code> file</a></li><li><a href="#bisou-the-serverr-file">The <code class="language-plaintext highlighter-rouge">server.R</code> file</a></li></ul></li><li><a href="#bisou-3-modularizing-your-app-with-shiny-modules">3. Modularizing your app with Shiny modules</a><ul class="child"><li><a href="#bisou-modularizing-made-simple">Modularizing made simple</a></li><li><a href="#bisou-module-ui-file">Module UI file</a></li><li><a href="#bisou-module-server-file">Module server file</a></li><li><a href="#bisou-module-functions-file">Module functions file</a></li><li><a href="#bisou-naming-module-files">Naming module files</a></li></ul></li><li><a href="#bisou-4-structuring-the-rest-of-your-files">4. Structuring the rest of your files</a><ul class="child"><li><a href="#bisou-data">Data</a></li><li><a href="#bisou-data-preparation">Data preparation</a></li><li><a href="#bisou-the-www-resources-folder">The <code class="language-plaintext highlighter-rouge">www/</code> resources folder</a></li><li><a href="#bisou-organizing-your-css">Organizing your CSS</a></li><li><a href="#bisou-root-level-files">Root-level files</a></li><li><a href="#bisou-test-files">Test files</a></li><li><a href="#bisou-final-project-structure">Final project structure</a></li></ul></li></ul>
+    </div>
+  </nav>
+</aside>
+	
+    <article class="article-content">
+        
+	    <p>On May 18, 2021, I get an email from a potential client. No small talk, straight to the point. He needs help, and he needs it fast.</p>
+
+<p class="border-primary center"><img src="/assets/images/posts/good-development-practices/email-prospect-Shiny.webp" alt="Email from a Shiny app prospect" loading="lazy" /></p>
+
+<p>Clear, conside, and, of course, urgent.</p>
+
+<p>We quickly set up a call to clarify what’s needed. The client walks me through the app’s features, then shares his screen to show me the code.</p>
+
+<p>He keeps talking, but my attention is already caught by something on the screen. <strong>I can’t even focus on what he’s saying</strong></p>
+
+<p><img src="/assets/images/posts/good-development-practices/file-with-39043-lines.webp" alt="File with 39,043 lines" loading="lazy" /></p>
+
+<p>The file he’s showing me, just one module among several, clocks in at <strong>39,043 lines of code</strong>.</p>
+
+<p>I’d never seen anything like it.</p>
+
+<p>I’d never even IMAGINED it.</p>
+
+<p>How do you find your way around a file that size?</p>
+
+<p>And did I mention he wanted to add <strong>new features, urgently</strong>?</p>
+
+<p>A nightmare.</p>
+
+<p>It’s not unusual for us to get codebases that are, let’s say, <em>less than organized</em>.</p>
+
+<p>Most R users aren’t full-time developers. For many, R is just another tool in the box.</p>
+
+<p>And R scripts? They’re often written for one-off analyses, then abandoned.</p>
+
+<p>So, it’s no surprise we regularly inherit code that’s, well, a bit of a mess.</p>
+
+<p>I’ve written my share of messy code too, especially in my early years.</p>
+
+<p>But over time, I got better.</p>
+
+<p>Messy code is fine at first. You move fast, things work, so you keep going.</p>
+
+<p>But eventually…</p>
+
+<p>It becomes unmanageable.</p>
+
+<p>Every change is a slog. The app slows down. You start thinking about a rewrite, but that’s weeks of work.</p>
+
+<p>And with Shiny, you’re not building something disposable. <strong>You want your app to last for years</strong>, to evolve, maybe even to be handed off to other developers.</p>
+
+<p>Letting the code rot isn’t an option.</p>
+
+<p>So I learned best practices. Read books. Tried frameworks like <a href="https://engineering-shiny.org/golem.html">golem</a> or <a href="https://appsilon.github.io/rhino/">rhino</a>.</p>
+
+<p>Over the years, picking up what worked, discarding what didn’t, and learning from a few painful mistakes, <strong>I built my own approach</strong>.</p>
+
+<p>It’s the method we use at Data Champ’ today, a product of years of trial, error, and refinement.</p>
+
+<p>If you’ve:</p>
+
+<ul>
+  <li>already <strong>built a few Shiny apps</strong>,</li>
+  <li>want to <strong>structure your code</strong> more professionally,</li>
+  <li>care about <strong>maintainability</strong> and <strong>code quality</strong>,</li>
+  <li>and want to set up <strong>good collaboration practices</strong> for your team,</li>
+</ul>
+
+<p>this article is for you.</p>
+
+<p>You know the <strong>Shiny basics</strong>. Now it’s time to leve up.</p>
+
+<p>The approach I will share breaks downe into four main steps:</p>
+
+<ul>
+  <li><strong>1. Structuring the project</strong>: How to organize your files and folders, break your app into modules, and keep every line of code where it belongs.</li>
+  <li><strong>2. Managing the environment</strong>: Using <code class="language-plaintext highlighter-rouge">renv</code> for reproducibility, securing sensitive variables, and making sure your app runs everywhere it needs to.</li>
+  <li><strong>3. Ensuring code quality</strong>: Clean code, standards, general programming principles, and how to write robust, maintainable code (including tests).</li>
+  <li><strong>4. Making collaboration and deployment easier</strong>: Using Git, automating with CI/CD pipelines, and documenting your project so others can jump in.</li>
+</ul>
+
+<p>There’s a lot to cover. So in this article, we’ll focus on the first part: <strong>Structuring an R Shiny project</strong>.</p>
+
+<p>The goal of this series is to give you a big-picture view, how all the pieces fit together in the way our team builds Shiny apps.</p>
+
+<p>Not every recommendation will fit your needs, and that’s fine.</p>
+
+<p>Take what’s useful. Leave the rest. Or come back to it later.</p>
+
+<p>Recently, at the <a href="https://www.appsilon.com/post/tiny-shiny-hackathon">Shiny Tiny Hackathon</a> organized by Appsilon, I put most of these principles into practice. “Most” because we only had four hours, so not everything made it in. But it’s close.</p>
+
+<p>You can check out the code here:</p>
+
+<p><a href="https://gitlab.datachamp.fr/charles/shiny-tiny-hackathon">https://gitlab.datachamp.fr/charles/shiny-tiny-hackathon</a></p>
+
+<p>And here’s what the app looked like:</p>
+
+<p><img src="/assets/images/posts/good-development-practices/shiny-tiny-hackathon-result.webp" alt="Résultat du Shiny Tiny Hackathon" loading="lazy" /></p>
+
+<p>Step by step, I will walk you through the structural choices we made, and more importantly, why we made them.</p>
+
+<h2 id="bisou-1-should-you-make-your-shiny-app-as-an-r-package">1. Should you make your Shiny app as an R package?</h2>
+
+<p>The first Shiny app I built, back in 2016, was a rewrite of an existing project. At the time, nobody really knew what they were doing with Shiny development. The tech was only four years old.</p>
+
+<p>I’d read here and there that the best way to structure your app was to turn it into a <strong>package</strong>.</p>
+
+<p>There were plenty of upsides:</p>
+
+<ul>
+  <li>It <strong>standardizes</strong> your project structure (<code class="language-plaintext highlighter-rouge">R/</code>, <code class="language-plaintext highlighter-rouge">inst/</code>, <code class="language-plaintext highlighter-rouge">man/</code>, etc.)</li>
+  <li>You get a framework for writing <strong>proper documentation</strong> for your functions with <code class="language-plaintext highlighter-rouge">roxygen2</code></li>
+  <li><strong>Dependencies</strong> are listed in the <code class="language-plaintext highlighter-rouge">Imports</code> field of the <code class="language-plaintext highlighter-rouge">DESCRIPTION</code> file, so you don’t forget anything</li>
+  <li><strong>Unit tests</strong> are integrated with <code class="language-plaintext highlighter-rouge">testthat</code></li>
+  <li>You can set a <strong>version number</strong> for your app/package</li>
+  <li>You can put your app/package on <strong>Github</strong> so anyone can install it easily</li>
+</ul>
+
+<p>A lot of advantages. I especially liked the idea of standardization and universality. Using a package structure meant other developers could jump into my code and feel at home right away.</p>
+
+<p>A few years later, I tried out <code class="language-plaintext highlighter-rouge">golem</code>, the tool from the <a href="https://thinkr.fr/">ThinkR</a> team. Same idea: you build a package.</p>
+
+<p>But, as always, there are trade-offs:</p>
+
+<ul>
+  <li>You have to <strong>stick to the package structure</strong>: No <code class="language-plaintext highlighter-rouge">app.R</code>, definitely no <code class="language-plaintext highlighter-rouge">global.R</code>, <code class="language-plaintext highlighter-rouge">ui.R</code>, or <code class="language-plaintext highlighter-rouge">server.R</code> at the root. Everything has to be wrapped in functions.</li>
+  <li><strong>No <code class="language-plaintext highlighter-rouge">www/</code> folder</strong> for your app’s resources (images, etc.). You can use <code class="language-plaintext highlighter-rouge">inst/www/</code> and declare it with <code class="language-plaintext highlighter-rouge">shiny::addResourcePath()</code>, but it’s not standard.</li>
+  <li>The package approach brings <strong>more than you need</strong>, and those extras come with <strong>constraints</strong>. For example, you don’t always need documentation as formal as what <code class="language-plaintext highlighter-rouge">roxygen2</code> expects. Same for the <code class="language-plaintext highlighter-rouge">DESCRIPTION</code> and <code class="language-plaintext highlighter-rouge">NAMESPACE</code> files.</li>
+  <li>You have to manage <strong>building</strong> and <strong>installing</strong> the package.</li>
+</ul>
+
+<p>These drawbacks made me realize I liked the idea of a package structure, but didn’t need all the complexity.</p>
+
+<p>So I landed on a middle ground: <strong>I kept everything I liked from the package structure, and ditched the rest.</strong></p>
+
+<p>In the end, I get all the benefits, none of the hassle.</p>
+
+<p>Is it a real package? No. I don’t need it to be.</p>
+
+<ul>
+  <li>At the project root, I keep my <strong>core files</strong>: <code class="language-plaintext highlighter-rouge">global.R</code>, <code class="language-plaintext highlighter-rouge">ui.R</code>, <code class="language-plaintext highlighter-rouge">server.R</code>, which the package approach doesn’t allow.</li>
+  <li>All other <strong>R scripts</strong> are function files, stored in an <code class="language-plaintext highlighter-rouge">R/</code> folder.</li>
+  <li>All my <strong>resources</strong> (images, CSS, etc.) go in the <code class="language-plaintext highlighter-rouge">www/</code> folder, just as Shiny expects.</li>
+  <li>I don’t need <code class="language-plaintext highlighter-rouge">DESCRIPTION</code> to manage dependencies, because I use <code class="language-plaintext highlighter-rouge">renv</code>, which is better for <strong>reproducibility</strong>.</li>
+  <li><strong>Tests</strong> don’t need a package structure to run across the whole project.</li>
+</ul>
+
+<p>With Shiny, you don’t need a package for functions in the <code class="language-plaintext highlighter-rouge">R/</code> folder to be available. Since version 1.5, Shiny automatically sources them.</p>
+
+<p class="border-primary center"><img src="/assets/images/posts/good-development-practices/shiny-source-r-automatically.webp" alt="Shiny source R/ automatically" loading="lazy" /></p>
+
+<p>Building a package is a perfectionist’s trap.</p>
+
+<p>You can have a solid, maintainable, scalable, and standardized project structure without ticking every box of the “perfect package.”</p>
+
+<p>For me, the three files <code class="language-plaintext highlighter-rouge">global.R</code>, <code class="language-plaintext highlighter-rouge">ui.R</code>, and <code class="language-plaintext highlighter-rouge">server.R</code>, are the foundation. Everything else in the app is built on top of them. They belong at the root.</p>
+
+<p>Why three files? Let’s get into that.</p>
+
+<h2 id="bisou-2-the-three-core-files-globalr-uir-and-serverr">2. The Three Core Files: global.R, ui.R, and server.R</h2>
+
+<p>An <code class="language-plaintext highlighter-rouge">app.R</code> file is fine when you’re starting out or learning, but it doesn’t scale. The last time someone sent me a Shiny app that fit in a single <code class="language-plaintext highlighter-rouge">app.R</code>, the file was 5,000 lines long and impossible to follow.</p>
+
+<p>So, before you can do any real work, you end up spending hours just cleaning things up.</p>
+
+<p>The first step is to break that <code class="language-plaintext highlighter-rouge">app.R</code> into three separate files:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">global.R</code>: Everything that needs to be <strong>initialized</strong> when the app starts. Loading packages, loading data, setting R options, and so on. This file should stay short.</li>
+  <li><code class="language-plaintext highlighter-rouge">ui.R</code>: The <strong>user interface</strong> code.</li>
+  <li><code class="language-plaintext highlighter-rouge">server.R</code>: The <strong>server logic</strong>, the classic <code class="language-plaintext highlighter-rouge">function(input, output, session) { ... } </code>.</li>
+</ul>
+
+<p>This simple split already gives you:</p>
+
+<ul>
+  <li>Lighter, <strong>easier-to-maintain</strong> files</li>
+  <li>A clear <strong>separation of concerns</strong>: Initialization, UI, and server logic are different concepts and shouldn’t be mixed</li>
+</ul>
+
+<p>These three files are the backbone of your Shiny app. They go at the root of your project. Every other file in the app gets called from one of these.</p>
+
+<div class="box box-primary" id="soc">
+    <div class="box-content">
+        <p class="h4">Separation of Concerns</p>
+        <p>In software development, "separation of concerns" means splitting your code into distinct parts, each with a clear, limited role.</p>
+        <p>This principle applies at every level:</p>
+        <ul>
+            <li><strong>Function level</strong>: Each function does one thing, and does it well.</li>
+            <li><strong>File level</strong>: Each file groups together code with a shared responsibility (UI, business logic, etc.).</li>
+            <li><strong>Project level</strong>: You separate modules, tests, resources, and so on.</li>
+        </ul>
+        <p>The goal?</p>
+        <ul>
+            <li>Make code <strong>stronger to read and maintain</strong>.</li>
+            <li><strong>Limit side effects</strong> (a local change doesn't break things elsewhere).</li>
+            <li><strong>Make teamwork easier</strong>, no one steps on anyone else's toes.</li>
+        </ul>
+        <p>Bottom line: <strong>Every piece of code should have a clear job</strong>, and stick to it.</p>
+    </div>
+</div>
+
+<h3 id="bisou-the-globalr-file">The <code class="language-plaintext highlighter-rouge">global.R</code> file</h3>
+
+<p>If you’re not used to it, it’s not always obvious what belongs in <code class="language-plaintext highlighter-rouge">global.R</code>. Here are a few examples:</p>
+
+<p><strong>Loading packages</strong></p>
+
+<p>We keep it simple: avoid loading entire packages unless you really need them. But some, like <code class="language-plaintext highlighter-rouge">data.table</code> or <code class="language-plaintext highlighter-rouge">ggplot2</code>, are almost always there.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">data.table</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">shiny</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span></code></pre></figure>
+
+<p><strong>Loading data</strong></p>
+
+<p>Whether it’s from a database, an RDS file, Excel, or something else, you almost always need to load some data at startup.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">data</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">readRDS</span><span class="p">(</span><span class="s2">"data/data.rds"</span><span class="p">)</span></code></pre></figure>
+
+<p><strong>Defining global variables</strong></p>
+
+<p>Global variables are constants you’ll use throughout the app. For example, hardcoding a production year.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">production_year</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">2025</span></code></pre></figure>
+
+<p><strong>Setting R options</strong></p>
+
+<p>Options let you tweak how certain packages behave. For example, turning off scientific notation, or setting up a spinner for <code class="language-plaintext highlighter-rouge">shinycssloaders</code>.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">options</span><span class="p">(</span><span class="w">
+    </span><span class="n">scipen</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1000</span><span class="p">,</span><span class="w">
+    </span><span class="n">spinner.type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w">
+    </span><span class="n">spinner.color.background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"#FFFFFF"</span><span class="p">,</span><span class="w">
+    </span><span class="n">spinner.color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"#2D2264"</span><span class="p">,</span><span class="w">
+</span><span class="p">)</span></code></pre></figure>
+
+<p>And that’s about it. This file should stay lean.</p>
+
+<p>No function definitions. They go in their own files.</p>
+
+<p>No heavy data prep. Do that before the app starts.</p>
+
+<div class="box box-primary" id="soc">
+    <div class="box-content">
+        <p class="h4">Why a global file?</p>
+        <p>In a Shiny app, all users connect to the same R process, the same "R session".</p>
+        <p>If you load a variable in the <em>global environment</em>, it's available to every user.</p>
+        <p>Is that risky? Useful? Both.</p>
+        <p>Anything you load in <code>global.R</code> is shared across users. That can be a big win for memory optimization.</p>
+        <p>But if you're not careful, it can also be a security risk: users might see data they shouldn't.</p>
+        <p>On the other hand, anything loaded inside the <code>server</code> function is specific to each user session.</p>
+        <p>More info: <a href="https://shiny.posit.co/r/articles/improve/scoping/" target="_blank">Scoping rules for Shiny apps</a></p>
+    </div>
+</div>
+
+<p>Here’s a real-world example of a <code class="language-plaintext highlighter-rouge">global.R</code> file I used at the Shiny Hackathon:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">library</span><span class="p">(</span><span class="n">data.table</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">shiny</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">ggplot2</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># ------ Global variables ------------------------------------------------------</span><span class="w">
+</span><span class="n">ref_files</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">list.files</span><span class="p">(</span><span class="s2">"data/refs"</span><span class="p">,</span><span class="w"> </span><span class="n">full.names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">ref_list</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">ref_files</span><span class="p">,</span><span class="w"> </span><span class="n">data.table</span><span class="o">::</span><span class="n">fread</span><span class="p">)</span><span class="w">
+</span><span class="nf">names</span><span class="p">(</span><span class="n">ref_list</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">stringr</span><span class="o">::</span><span class="n">str_remove</span><span class="p">(</span><span class="n">basename</span><span class="p">(</span><span class="n">ref_files</span><span class="p">),</span><span class="w"> </span><span class="s2">".csv"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">custom_palette</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="w">
+    </span><span class="s2">"#023364"</span><span class="p">,</span><span class="w"> </span><span class="c1"># dark-blue (primary) - anchor the palette with your primary brand color</span><span class="w">
+    </span><span class="s2">"#FF7043"</span><span class="p">,</span><span class="w"> </span><span class="c1"># orange - strong contrast to blue for clear category separation</span><span class="w">
+    </span><span class="s2">"#80ED99"</span><span class="p">,</span><span class="w"> </span><span class="c1"># green - complementary to the blues and orange</span><span class="w">
+    </span><span class="s2">"#B05617"</span><span class="p">,</span><span class="w"> </span><span class="c1"># warning amber - earthy tone that contrasts with previous colors</span><span class="w">
+    </span><span class="s2">"#0466C8"</span><span class="p">,</span><span class="w"> </span><span class="c1"># light-blue - return to the brand family but visually distinct</span><span class="w">
+    </span><span class="s2">"#B71B1B"</span><span class="p">,</span><span class="w"> </span><span class="c1"># danger red - high contrast</span><span class="w">
+    </span><span class="s2">"#FFD4C7"</span><span class="p">,</span><span class="w"> </span><span class="c1"># orange-30 - soft tone for variety</span><span class="w">
+    </span><span class="s2">"#1F6F31"</span><span class="w">  </span><span class="c1"># success green - darker than the first green for distinction</span><span class="w">
+</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># ------ Load data -------------------------------------------------------------</span><span class="w">
+</span><span class="n">data_files</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">list.files</span><span class="p">(</span><span class="s2">"data"</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*.csv"</span><span class="p">,</span><span class="w"> </span><span class="n">full.names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span><span class="n">data_list</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lapply</span><span class="p">(</span><span class="n">data_files</span><span class="p">,</span><span class="w"> </span><span class="n">data.table</span><span class="o">::</span><span class="n">fread</span><span class="p">)</span><span class="w">
+</span><span class="nf">names</span><span class="p">(</span><span class="n">data_list</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">stringr</span><span class="o">::</span><span class="n">str_remove</span><span class="p">(</span><span class="n">basename</span><span class="p">(</span><span class="n">data_files</span><span class="p">),</span><span class="w"> </span><span class="s2">".csv"</span><span class="p">)</span></code></pre></figure>
+
+<p>You’ll see:</p>
+
+<ul>
+  <li><strong>Loading packages</strong></li>
+  <li><strong>Defining global variables</strong> (reference tables, color palette)</li>
+  <li><strong>Loading data</strong></li>
+</ul>
+
+<p>That’s it. This is typical for our apps.</p>
+
+<p>Notice the use of <strong>structured comments</strong> to organize the file. Another one of our style rules: six dashes, a title, fill the file to 80 characters.</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="c1"># ------ Global variables ------------------------------------------------------</span></code></pre></figure>
+
+<p>These comments let you quickly build an outline in RStudio or VSCode</p>
+
+<p class="text-center"><img src="/assets/images/posts/good-development-practices/vscode-outline-for-R-file.webp" alt="VSCode outline for an R file" loading="lazy" /></p>
+
+<p>Now, let’s move on to <code class="language-plaintext highlighter-rouge">ui.R</code>.</p>
+
+<h3 id="bisou-the-uir-file">The <code class="language-plaintext highlighter-rouge">ui.R</code> file</h3>
+
+<p>This one is straightforward: it holds the user interface. Usually, it’s short and just calls Shiny modules.</p>
+
+<p>Here’s the Hackathon example:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">bslib</span><span class="o">::</span><span class="n">page_fluid</span><span class="p">(</span><span class="w">
+    </span><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Shiny App"</span><span class="p">,</span><span class="w">
+    </span><span class="n">theme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bslib</span><span class="o">::</span><span class="n">bs_theme</span><span class="p">(</span><span class="w">
+        </span><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="p">,</span><span class="w">
+        </span><span class="n">primary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"#023364"</span><span class="w">
+    </span><span class="p">),</span><span class="w">
+    </span><span class="n">shinyjs</span><span class="o">::</span><span class="n">useShinyjs</span><span class="p">(),</span><span class="w">
+    </span><span class="n">includeCSS</span><span class="p">(</span><span class="s2">"www/css/main.min.css"</span><span class="p">),</span><span class="w">
+    </span><span class="n">includeScript</span><span class="p">(</span><span class="s2">"www/js/shiny_custom_message.js"</span><span class="p">),</span><span class="w">
+    </span><span class="n">fluidRow</span><span class="p">(</span><span class="w">
+        </span><span class="n">column</span><span class="p">(</span><span class="w">
+            </span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">12</span><span class="p">,</span><span class="w">
+            </span><span class="n">class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"header"</span><span class="p">,</span><span class="w">
+            </span><span class="n">tags</span><span class="o">$</span><span class="n">img</span><span class="p">(</span><span class="w">
+                </span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"img/logo.png"</span><span class="p">,</span><span class="w">
+                </span><span class="n">alt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Logo Data Champ’"</span><span class="p">,</span><span class="w">
+                </span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"50px"</span><span class="w">
+            </span><span class="p">),</span><span class="w">
+            </span><span class="n">h3</span><span class="p">(</span><span class="s2">"FDA Adverse Events Reporting System (FAERS) Public Dashboard"</span><span class="p">)</span><span class="w">
+        </span><span class="p">)</span><span class="w">
+    </span><span class="p">),</span><span class="w">
+    </span><span class="n">home_ui</span><span class="p">(</span><span class="s2">"home"</span><span class="p">)</span><span class="w">
+</span><span class="p">)</span></code></pre></figure>
+
+<p>Modern tools like <code class="language-plaintext highlighter-rouge">bslib</code> and <code class="language-plaintext highlighter-rouge">shinyjs</code> are in play. Here we:</p>
+
+<ul>
+  <li>Load a <strong>CSS</strong> file and a <strong>JavaScript</strong> file</li>
+  <li>Build a <strong>header</strong></li>
+  <li>Load a first <strong>module</strong> with <code class="language-plaintext highlighter-rouge">home_ui("home")</code></li>
+</ul>
+
+<p>This app is simple, so modularization might seem overkill. But if you add more pages or tabs later, you’ll be glad you started this way.</p>
+
+<p>Again: no function definitions, no variables that belong in <code class="language-plaintext highlighter-rouge">global.R</code>. Everything in its place.</p>
+
+<h3 id="bisou-the-serverr-file">The <code class="language-plaintext highlighter-rouge">server.R</code> file</h3>
+
+<p>Finally, the server part handles all the interactive logic.</p>
+
+<p>It’s just a function, ready to be filled in:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+
+</span><span class="p">}</span></code></pre></figure>
+
+<p>All your code goes inside. You’ll call modules here, too.</p>
+
+<p>This file tends to grow faster than <code class="language-plaintext highlighter-rouge">ui.R</code>. Our rule is simple:</p>
+
+<p><strong>No file should go over 500 lines.</strong></p>
+
+<p>If it does, split it up.</p>
+
+<p>Here’s the hackathon example:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+
+    </span><span class="c1"># ------ INITIALIZE --------------------------------------------------------</span><span class="w">
+    </span><span class="c1"># Initialize session variables</span><span class="w">
+    </span><span class="n">session</span><span class="o">$</span><span class="n">userData</span><span class="o">$</span><span class="n">disclaimer_accepted</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="kc">FALSE</span><span class="w">
+
+    </span><span class="c1"># ------ MODULES -----------------------------------------------------------</span><span class="w">
+
+    </span><span class="c1"># ------ * Disclaimer ------------------------------------------------------</span><span class="w">
+    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">Sys.getenv</span><span class="p">(</span><span class="s2">"HIDE_DISCLAIMER"</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s2">"true"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="n">showModal</span><span class="p">(</span><span class="n">modalDialog</span><span class="p">(</span><span class="w">
+            </span><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">,</span><span class="w">
+            </span><span class="n">footer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">NULL</span><span class="p">,</span><span class="w">
+            </span><span class="n">easyClose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w">
+            </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"l"</span><span class="p">,</span><span class="w">
+            </span><span class="n">disclaimer_ui</span><span class="p">(</span><span class="s2">"disclaimer"</span><span class="p">)</span><span class="w">
+        </span><span class="p">))</span><span class="w">
+        </span><span class="n">disclaimer_server</span><span class="p">(</span><span class="s2">"disclaimer"</span><span class="p">)</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+
+    </span><span class="c1"># ------ * Home ------------------------------------------------------------</span><span class="w">
+    </span><span class="n">home_server</span><span class="p">(</span><span class="s2">"home"</span><span class="p">)</span><span class="w">
+
+</span><span class="p">}</span></code></pre></figure>
+
+<p>In short:</p>
+
+<ul>
+  <li>Initialize a <strong>session variable</strong>: <code class="language-plaintext highlighter-rouge">session$userData$disclaimer_accepted</code></li>
+  <li>Call two <strong>modules</strong></li>
+</ul>
+
+<p>That’s it.</p>
+
+<p>Notice the structured comments again. I use uppercase for main sections, an asterisk for code blocks. This structure shows up in the IDE outline, making the hierarchy clear.</p>
+
+<p class="text-center"><img src="/assets/images/posts/good-development-practices/vscode-outline-server.webp" alt="VSCode outline for a server file" loading="lazy" /></p>
+
+<p>At this point, you’ve got three files:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>my-shiny-project/
+├── global.R
+├── ui.R
+└── server.R
+</code></pre></div></div>
+
+<p>Next step: <strong>break things into Shiny modules</strong>.</p>
+
+<h2 id="bisou-3-modularizing-your-app-with-shiny-modules">3. Modularizing your app with Shiny modules</h2>
+
+<p>Intimidated by modules?</p>
+
+<p>You shouldn’t be.</p>
+
+<p>People often think modules are some “advanced” Shiny feature. That’s a myth.</p>
+
+<p>A module is just a function. You wrap up code that would normally go in <code class="language-plaintext highlighter-rouge">ui.R</code> or <code class="language-plaintext highlighter-rouge">server.R</code>, and call that function instead.</p>
+
+<p>Just like a function can call other functions, a module can call other modules.</p>
+
+<p>You can build out a whole hierarchy that mirrors your app’s structure.</p>
+
+<p>Here’s a sample architecture with two levels of modules:</p>
+
+<p><img src="/assets/images/posts/good-development-practices/shiny-architecture-two-levels-modules.webp" alt="Shiny Architecture Two Levels Modules" loading="lazy" /></p>
+
+<p>Here’s another, more complex example from a real project:</p>
+
+<p class="glightbox"><a href="/assets/images/posts/good-development-practices/shiny-architecture-modules.webp"><img src="/assets/images/posts/good-development-practices/shiny-architecture-modules.webp" alt="Shiny app module architecture" loading="lazy" /></a></p>
+
+<p>That’s all you need to follow the rest of this section.</p>
+
+<p>If you want to see how it works under the hood, check out: <a href="https://shiny.posit.co/r/articles/improve/modules/">Modularizing Shiny app code</a>.</p>
+
+<p>The key point: modules are functions. So, they go in the <code class="language-plaintext highlighter-rouge">R/</code> folder.</p>
+
+<p>The goal is to keep your code organized and avoid files with thousands of lines.</p>
+
+<p>My rule is simple:</p>
+
+<p><strong>No file should ever go over 500 lines.</strong></p>
+
+<p>Even 500 is a lot.</p>
+
+<p>If a file gets bigger than that, it’s probably mixing too many concepts and b reaking the <a href="#soc">Separation of Concerns</a> principle.</p>
+
+<p>That’s your cue to split it up.</p>
+
+<h3 id="bisou-modularizing-made-simple">Modularizing made simple</h3>
+
+<p>The classic approach: one module per screen.</p>
+
+<p><img src="/assets/images/posts/good-development-practices/dashboard-mockup-one-module-per-tab.webp" alt="Shiny Dashboard mockup one module per tab" loading="lazy" /></p>
+
+<p>Use <code class="language-plaintext highlighter-rouge">bslib::navset_bar()</code> with one screen per tab, and you get a logical one-module-per-screen split.</p>
+
+<p>Sometimes a screen is too busy. In that case, break it down into modular zones.</p>
+
+<p><img src="/assets/images/posts/good-development-practices/dashboard-mockup-submodules.webp" alt="Shiny Dashboard mockup with submodules" loading="lazy" /></p>
+
+<p>A module is split into three files:</p>
+
+<ul>
+  <li><strong>UI file</strong>: The UI part of the module.</li>
+  <li><strong>Server file</strong>: The server function for the module.</li>
+  <li><strong>Functions file</strong>: Optional, for functions used only by this module.</li>
+</ul>
+
+<h3 id="bisou-module-ui-file">Module UI file</h3>
+
+<p>Here is a basic template:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">module_name_ui</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">ns</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">NS</span><span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="w">
+    </span><span class="n">div</span><span class="p">(</span><span class="w">
+        </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ns</span><span class="p">(</span><span class="s2">"main"</span><span class="p">)</span><span class="w">
+    </span><span class="p">)</span><span class="w">
+</span><span class="p">}</span></code></pre></figure>
+
+<p>You need an <code class="language-plaintext highlighter-rouge">id</code> argument and the <code class="language-plaintext highlighter-rouge">ns</code> object (namespace). Then fill in the UI as usual.</p>
+
+<p>Naming rule: <code class="language-plaintext highlighter-rouge">module_name_ui</code>, all in snake_case. For example: <code class="language-plaintext highlighter-rouge">home_ui()</code>, <code class="language-plaintext highlighter-rouge">search_ui()</code>, <code class="language-plaintext highlighter-rouge">disclaimer_ui()</code>.</p>
+
+<p>Here is a more complete example from the Shiny hackathon:</p>
+
+<p class="text-center"><a href="https://gitlab.datachamp.fr/charles/shiny-tiny-hackathon/-/blob/main/R/100_home_ui.R">R/100_home_ui.R</a></p>
+
+<p class="text-center"><img src="/assets/images/posts/good-development-practices/shiny-hackathon-module-ui-home.webp" alt="Shiny Tiny Hackathon - home module UI file" loading="lazy" /></p>
+
+<h3 id="bisou-module-server-file">Module server file</h3>
+
+<p>The server side is a bit more involved:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">module_name_server</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="w">
+    </span><span class="n">id</span><span class="w">
+</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">moduleServer</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">ns</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">session</span><span class="o">$</span><span class="n">ns</span><span class="w">
+
+    </span><span class="c1"># ------ REACTIVE ----------------------------------------------------------</span><span class="w">
+
+    </span><span class="c1"># ------ MODULES -----------------------------------------------------------</span><span class="w">
+
+    </span><span class="c1"># ------ OUTPUT ------------------------------------------------------------</span><span class="w">
+
+    </span><span class="nf">return</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="w">
+</span><span class="p">})}</span></code></pre></figure>
+
+<p>You might wonder about the formatting. Why not write it like this?</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">module_name_server</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="w">
+    </span><span class="n">id</span><span class="w">
+</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> 
+    </span><span class="n">moduleServer</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="c1"># code</span><span class="w">
+    </span><span class="p">})</span><span class="w">
+</span><span class="p">}</span></code></pre></figure>
+
+<p>If you do that, your code is always <strong>double-indented</strong>. Not ideal, especially if you use four spaces per indent and keep lines under 80 characters, like we do.</p>
+
+<p>That’s why I use the single-indent style from above:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">module_name_server</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="w">
+    </span><span class="n">id</span><span class="w">
+</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">moduleServer</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="c1"># blabla</span><span class="w">
+</span><span class="p">})}</span></code></pre></figure>
+
+<p>Notice also the structured comments for the usual server-side sections.</p>
+
+<p>Finally, the naming mirrors the UI: <code class="language-plaintext highlighter-rouge">home_server()</code>, <code class="language-plaintext highlighter-rouge">search_server()</code>, <code class="language-plaintext highlighter-rouge">disclaimer_server()</code>.</p>
+
+<p>Here is the Shiny hackathon example:</p>
+
+<p class="text-center"><a href="https://gitlab.datachamp.fr/charles/shiny-tiny-hackathon/-/blob/main/R/100_home_server.R">R/100_home_server.R</a></p>
+
+<p class="text-center"><img src="/assets/images/posts/good-development-practices/shiny-hackathon-module-server-home.webp" alt="Shiny Tiny Hackathon - home module server file" loading="lazy" /></p>
+
+<h3 id="bisou-module-functions-file">Module functions file</h3>
+
+<p>One last file: <strong>the functions file</strong>.</p>
+
+<p>This one is optional. Use it if you need functions specific to this module. Otherwise, put general-purpose functions elsewhere.</p>
+
+<h3 id="bisou-naming-module-files">Naming module files</h3>
+
+<p>One last point: <strong>file naming</strong></p>
+
+<p>It matches the function names: for a <code class="language-plaintext highlighter-rouge">home_ui()</code> module, the file is <code class="language-plaintext highlighter-rouge">home_ui.R</code>.</p>
+
+<p>But we go further: modules are <strong>numbered</strong> to reflect their order in the app. Usually, you have tabs, so number modules by tab order:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">10_home_ui.R</code> for the first tab</li>
+  <li><code class="language-plaintext highlighter-rouge">20_search_ui.R</code> for the second</li>
+  <li>and so on</li>
+</ul>
+
+<p>Why 10, 20, and not just 1, 2?</p>
+
+<p>Because of submodules. The <code class="language-plaintext highlighter-rouge">10_home_ui</code> module might have three submodules:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">11_title_ui.R</code> for the title</li>
+  <li><code class="language-plaintext highlighter-rouge">12_graph_ui.R</code> for the plot</li>
+  <li><code class="language-plaintext highlighter-rouge">13_table_ui.R</code> for the table</li>
+</ul>
+
+<p>At first, I thought numbering would be a pain, that I would waste time constantly renaming files. In practice, it’s rare, especially if you plan your app’s architecture a bit.</p>
+
+<p>And it’s worth it: files are automatically sorted in a logical order, so you don’t wast time searching.</p>
+
+<p>Even better: in VSCode, I hit Ctrl+P, type the number, and open the file in seconds.</p>
+
+<p class="text-center"><img src="/assets/images/posts/good-development-practices/vscode-open-file.webp" alt="Ouvrir un fichier avec VSCode" loading="lazy" /></p>
+
+<p>You might have noticed the module architectures above use this numbering scheme:</p>
+
+<p class="glightbox"><a href="/assets/images/posts/good-development-practices/shiny-architecture-modules.webp"><img src="/assets/images/posts/good-development-practices/shiny-architecture-modules.webp" alt="Shiny app module architecture" loading="lazy" /></a></p>
+
+<p>At this point, your project structure is taking shape:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>my-shiny-project/
+├── R/
+    ├── 100_home_server.R
+    ├── 100_home_ui.R
+    ├── 200_search_server.R
+    └── 200_search_ui.R
+    ├── 300_disclaimer_server.R
+    └── 300_disclaimer_ui.R
+├── global.R
+├── server.R
+└── ui.R
+</code></pre></div></div>
+
+<p>Next: how to structure the rest of your files.</p>
+
+<h2 id="bisou-4-structuring-the-rest-of-your-files">4. Structuring the rest of your files</h2>
+
+<p>What about everything else? Depending on the project, your folder tree can get pretty deep.</p>
+
+<h3 id="bisou-data">Data</h3>
+
+<p>If your app uses data files (CSV, Excel, RDS, etc.), put them in a <code class="language-plaintext highlighter-rouge">data/</code> folder.</p>
+
+<p><strong>Note</strong>: Usually, don’t version data files with Git.</p>
+
+<p><strong>Another note</strong>: Never put data in the <code class="language-plaintext highlighter-rouge">www/</code> folder. That folder is served by Shiny, meaning anything inside is accessible from the web. You probably don’t want your raw data  public.</p>
+
+<p>For the hackathon, I prepped a few CSVs and a reference table. Everything went in <code class="language-plaintext highlighter-rouge">data/</code> and <code class="language-plaintext highlighter-rouge">data/refs/</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>data/
+├── refs/
+    ├── report_categories.csv
+├── age_group.csv
+├── report_type.csv
+├── reporter.csv
+├── reporter_region.csv
+├── seriousness.csv
+└── sex.csv
+</code></pre></div></div>
+
+<h3 id="bisou-data-preparation">Data preparation</h3>
+
+<p>Sometimes, your data changes regularly and needs to be pre-processed before the app can use it.</p>
+
+<p>Rule: avoid heavy data processing inside the Shiny app. It just slows things down.</p>
+
+<p>Instead, do the prep outside the app. Store your data prep scripts in a <code class="language-plaintext highlighter-rouge">data_prep/</code> folder.</p>
+
+<p>Then use a scheduler (like cron) to run those scripts as needed.</p>
+
+<p>### renv</p>
+
+<p>We use <code class="language-plaintext highlighter-rouge">renv</code> to manage R packages and guarantee reproducibility across environments.</p>
+
+<p>To a full <code class="language-plaintext highlighter-rouge">renv</code> tutorial here, just know it creates:</p>
+
+<ul>
+  <li>The <code class="language-plaintext highlighter-rouge">renv/</code> folder for installed packages</li>
+  <li>The <code class="language-plaintext highlighter-rouge">renv.lock</code> file</li>
+  <li>An <code class="language-plaintext highlighter-rouge">.Rprofile</code> file (if it doesn’t exist) to auto-load renv</li>
+</ul>
+
+<p>More details: <a href="https://rstudio.github.io/renv/articles/renv.html">Introduction to renv</a></p>
+
+<h3 id="bisou-the-www-resources-folder">The <code class="language-plaintext highlighter-rouge">www/</code> resources folder</h3>
+
+<p>The <code class="language-plaintext highlighter-rouge">www/</code> folder holds everything your app needs that isn’t R code:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">www/css/</code> for CSS files</li>
+  <li><code class="language-plaintext highlighter-rouge">www/html/</code> for HTML templates</li>
+  <li><code class="language-plaintext highlighter-rouge">www/img/</code> for images</li>
+  <li><code class="language-plaintext highlighter-rouge">www/js/</code> for JavaScript</li>
+  <li><code class="language-plaintext highlighter-rouge">www/sass/</code> for SASS if you use the <code class="language-plaintext highlighter-rouge">sass</code> package</li>
+</ul>
+
+<p>You don’t have to use all these, but Shiny serves files from <code class="language-plaintext highlighter-rouge">www/</code> by default.</p>
+
+<p>If you want to use a different folder, you’ll need to declare it with <code class="language-plaintext highlighter-rouge">shiny::addResourcePath()</code>.</p>
+
+<h3 id="bisou-organizing-your-css">Organizing your CSS</h3>
+
+<p>I like to use <strong>SASS</strong> for all CSS. SASS is a preprocessor that gives you variables, functions, loops, and more.</p>
+
+<p>More info: <a href="https://sass-lang.com/libsass/">libSass</a> and <a href="https://rstudio.github.io/sass/">R sass package</a>.</p>
+
+<p>Most apps we get have a single <code class="language-plaintext highlighter-rouge">style.css</code> file with thousands of lines. Not great.</p>
+
+<p>Here’s our approach:</p>
+
+<p>Split CSS  into four sections:</p>
+
+<ul>
+  <li><strong>Base CSS</strong>: Main colors, fonts, text sizes, etc.</li>
+  <li><strong>Components</strong>: One file per component (table, selectInput, etc.)</li>
+  <li><strong>Layout</strong>: The app’s skeleton (header, footer, tabs, etc.)</li>
+  <li><strong>Pages</strong>: CSS specific to certain pages</li>
+</ul>
+
+<p>Each section gets its own subfolder in <code class="language-plaintext highlighter-rouge">www/sass</code>, with multiple files as needed. For example, <code class="language-plaintext highlighter-rouge">www/sass/components</code> has one file per component.</p>
+
+<p>Then, <code class="language-plaintext highlighter-rouge">www/sass/main.scss</code> pulls everything together. Here’s an example from the Shiny hackathon:</p>
+
+<figure class="highlight"><pre><code class="language-scss" data-lang="scss"><span class="c1">// Base</span>
+<span class="k">@import</span> <span class="s2">"base/variables"</span><span class="p">;</span>
+
+<span class="c1">// Components</span>
+<span class="k">@import</span> <span class="s2">"components/grid-table"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"components/select-input"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"components/value-box"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"components/checkbox"</span><span class="p">;</span>
+
+<span class="c1">// Layout</span>
+<span class="k">@import</span> <span class="s2">"layout/body"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"layout/footer"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"layout/header"</span><span class="p">;</span>
+<span class="k">@import</span> <span class="s2">"layout/modal"</span><span class="p">;</span></code></pre></figure>
+
+<p>Finally, we have a standard <code class="language-plaintext highlighter-rouge">R/sass.R</code> file in every project:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">sass</span><span class="o">::</span><span class="n">sass</span><span class="p">(</span><span class="w">
+    </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="w">
+        </span><span class="n">sass</span><span class="o">::</span><span class="n">sass_file</span><span class="p">(</span><span class="s2">"www/sass/main.scss"</span><span class="p">)</span><span class="w">
+    </span><span class="p">),</span><span class="w">
+    </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"www/css/main.min.css"</span><span class="p">,</span><span class="w">
+    </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sass</span><span class="o">::</span><span class="n">sass_options</span><span class="p">(</span><span class="n">output_style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"compressed"</span><span class="p">)</span><span class="w">
+</span><span class="p">)</span></code></pre></figure>
+
+<p>All SASS code is precompiled into a compressed CSS file: <code class="language-plaintext highlighter-rouge">www/css/main.min.css</code>, which you load in <code class="language-plaintext highlighter-rouge">ui.R</code> with <code class="language-plaintext highlighter-rouge">includeCSS("www/css/main.min.css")</code>.</p>
+
+<p>If you want to dig deeper, check out the <a href="https://gitlab.datachamp.fr/charles/shiny-tiny-hackathon/-/tree/main/www/sass">Shiny hackathon code</a>.</p>
+
+<h3 id="bisou-root-level-files">Root-level files</h3>
+
+<p>You will also find a handful of files at the project root:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">.gitignore</code> for Git exclusions</li>
+  <li><code class="language-plaintext highlighter-rouge">.gitlab-ci.yml</code> for Gitlab CI/CD pipelines</li>
+  <li><code class="language-plaintext highlighter-rouge">.lintr</code> for the <code class="language-plaintext highlighter-rouge">lintr</code> package that checks code quality</li>
+  <li><code class="language-plaintext highlighter-rouge">.Renviron</code> for environment variables</li>
+  <li><code class="language-plaintext highlighter-rouge">README.md</code> for general project documentation</li>
+</ul>
+
+<p>Each of these is important and we will cover them in future articles.</p>
+
+<h3 id="bisou-test-files">Test files</h3>
+
+<p>Finally, a <code class="language-plaintext highlighter-rouge">tests/</code> folder holds all project tests.</p>
+
+<p>Inside, you’ll find <code class="language-plaintext highlighter-rouge">tests/testthat.R</code>, usually very short, just enough to run all tests, for example:</p>
+
+<figure class="highlight"><pre><code class="language-r" data-lang="r"><span class="n">shinytest2</span><span class="o">::</span><span class="n">test_app</span><span class="p">()</span></code></pre></figure>
+
+<p>Here, we run all end-to-end tests with the <code class="language-plaintext highlighter-rouge">shinytest2</code> package.</p>
+
+<p>And actual test files go in <code class="language-plaintext highlighter-rouge">tests/testthat/</code>.</p>
+
+<h3 id="bisou-final-project-structure">Final project structure</h3>
+
+<p>Here’s what a typical Shiny project looks like:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>my-shiny-project/
+├── data/
+    ├── refs/
+        ├── report_categories.csv
+    ├── age_group.csv
+    ├── report_type.csv
+    ├── reporter.csv
+    ├── reporter_region.csv
+    ├── seriousness.csv
+    └── sex.csv
+├── data_prep/
+    ├── data_prep.R
+├── R/
+    ├── 100_home_server.R
+    ├── 100_home_ui.R
+    ├── 200_search_server.R
+    └── 200_search_ui.R
+    ├── 300_disclaimer_server.R
+    └── 300_disclaimer_ui.R
+├── renv/
+├── tests/
+    ├── testthat.R
+    └── testthat/
+├── .gitignore
+├── .Renviron
+├── global.R
+├── README.md
+├── renv.lock
+├── server.R
+└── ui.R
+</code></pre></div></div>
+
+<p>You now have a complete overview of how to properly structure a Shiny app:</p>
+
+<ul>
+  <li>The <strong>three core files</strong> at the root (<code class="language-plaintext highlighter-rouge">global.R</code>, <code class="language-plaintext highlighter-rouge">ui.R</code>, <code class="language-plaintext highlighter-rouge">server.R</code>)</li>
+  <li><strong>Modular code</strong> (no more 39,000-line monsters)</li>
+  <li>A <strong>coherent folder structure</strong> with a place for everything</li>
+  <li><strong>Simple rules</strong>: no file over 500 lines</li>
+</ul>
+
+<p>This method is designed to be simple, avoid unnecessary constraints, and make your apps easy to maintain.</p>
+
+<p>And this is just the first step.</p>
+
+<p>In future articles, we’ll cover <strong>environment management</strong>, <strong>code quality</strong>, and <strong>collaborating</strong> with other developers.</p>
+
+        <footer><script src="https://f.convertkit.com/ckjs/ck.5.js"></script>
+            <form action="https://app.kit.com/forms/9156211/subscriptions"
+                  class="seva-form formkit-form"
+                  method="post"
+                  data-sv-form="9156211"
+                  data-uid="e438226842"
+                  data-format="inline"
+                  data-version="5"
+                  data-options='{"settings":{"after_subscribe":{"action":"message","success_message":"Success!\nCheck your email to confirm your subscription.","redirect_url":""},"analytics":{"google":null,"fathom":null,"facebook":null,"segment":null,"pinterest":null,"sparkloop":null,"googletagmanager":null},"modal":{"trigger":"timer","scroll_percentage":null,"timer":5,"devices":"all","show_once_every":15},"powered_by":{"show":false,"url":"https://kit.com/features/forms?utm_campaign=poweredby&utm_content=form&utm_medium=referral&utm_source=dynamic"},"recaptcha":{"enabled":false},"return_visitor":{"action":"show","custom_content":""},"slide_in":{"display_in":"bottom_right","trigger":"timer","scroll_percentage":null,"timer":5,"devices":"all","show_once_every":15},"sticky_bar":{"display_in":"top","trigger":"timer","scroll_percentage":null,"timer":5,"devices":"all","show_once_every":15}},"version":"5"}'
+                  min-width="400 500 600 700 800">
+                <div data-style="full">
+                    <div data-element="column" class="formkit-column newsletter-header">
+                        <div class="formkit-background"></div>
+                        <div class="formkit-header" data-element="header">
+                            <h2><strong>Charles Bordet's Newsletter</strong></h2>
+                        </div>
+                        <div class="formkit-subheader newsletter-subheader" data-element="subheader">
+                            <p><strong>Master R and Shiny in production.</strong></p>
+                            <p>Best practices, field-tested feedback, and practical tips to avoid common pitfalls.</p>
+                            <p>Each week, Charles shares concrete cases, his technical choices, and the methods he applies in real projects.</p>
+                        </div>
+                    </div>
+                    <div data-element="column" class="formkit-column newsletter-form-col">
+                        <ul class="formkit-alert formkit-alert-error" data-element="errors" data-group="alert"></ul>
+                        <div data-element="fields" class="seva-fields formkit-fields">
+                            <div class="formkit-field">
+                                <input class="formkit-input"
+                                       name="email_address"
+                                       aria-label="Email Address"
+                                       placeholder="Email Address"
+                                       required=""
+                                       type="email">
+                            </div>
+                            <button data-element="submit" class="formkit-submit">
+                                <div class="formkit-spinner"><div></div><div></div><div></div></div>
+                                <span>Subscribe</span>
+                            </button>
+                        </div>
+                        <div class="formkit-guarantee" data-element="guarantee">
+                            <p>No spam, promise. You can unsubscribe at any time.</p>
+                        </div>
+                    </div>
+                </div>
+            </form></footer>
+    </article>
+</main>
+
+
+<section class="container article  article-with-toc commentaires">
+    <h2 class="h6">Comments</h2>
+    
+    
+    </section>
+
+<section id="commentaire" class="container article  article-with-toc commentaires-form">
+    <h2 class="h6">Leave a comment</h2>
+    <div id="comment-alert" class="alert" role="alert" aria-live="polite" style="display: none;">
+        <span class="alert-message"></span>
+        <button class="alert-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="box box-primary">
+        <div class="box-content">
+            <p>The required fields are marked with an asterisk *</p>
+            <form method="post" action="https://comment.datachamp.fr/comment">
+                <input type="hidden" name="ref" value="good-development-practices">
+                <input type="hidden" name="lang" value="en">
+                <input type="hidden" name="permalink" value="/en/posts/good-development-practices/">
+                <input type="hidden" name="source" value="datachamp.fr">
+                <div class="form-group">
+                    <label for="comment">Comment *</label>
+                    <textarea type="text" rows="5" name="comment" required></textarea>
+                    <a href="https://daringfireball.net/projects/markdown/" target="_blank" rel="noopener noreferrer">Markdown accepted<i class="fa fa-external-link" aria-hidden="true"></i></a>
+                </div>
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="site">Website (spam detection - do not fill in !)</label>
+                    <input type="text" name="site">
+                </div>
+                <div class="commentaires-form-submit">
+                    <div>
+                        <p>Comments are manually validated.<br />
+                            The page will refresh after sending.</p>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary hover">Send</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+
+
+<script src="/assets/js/article.js"></script>
+
+
+    <script src="/assets/js/glightbox.min.js"></script>
+
+
+<script>
+    // Handle URL parameters for comment notifications
+    document.addEventListener("DOMContentLoaded", function () {
+        // Handle URL parameters for comment notifications
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+        const message = urlParams.get('message');
+        
+        if (status && message) {
+            const alert = document.getElementById('comment-alert');
+            const messageElement = alert.querySelector('.alert-message');
+            
+            alert.classList.add(`alert-${status}`);
+            messageElement.textContent = decodeURIComponent(message);
+            alert.style.display = 'flex';
+            
+            // Add close button functionality
+            alert.querySelector('.alert-close').addEventListener('click', () => {
+                alert.style.display = 'none';
+            });
+        }
+    });
+</script>
+
+
+	</section>
+	
+	<footer id="footer" class="footer">
+		<div class="footer-container">
+	<div class="footer-logo">
+		<svg xmlns="http://www.w3.org/2000/svg" width="40"  viewBox="0 0 93.002 137.871">
+		  <path fill="#fff" d="M16.2 13.293 93 137.87l-23.313-.047-63.136-107.4" opacity=".45"/>
+		  <path fill="#fff" d="M0 3.296h16.997v134.462H0z" opacity=".35"/>
+		  <path fill="#fff" d="M81.904 124.791h-15.6v-16.534a18.458 18.458 0 0 0-18.458-18.458h-9.873a18.458 18.458 0 0 0-18.458 18.458v16.534h-15.6V74.203H56.15A25.747 25.747 0 0 1 81.897 99.95Z" />
+		  <path fill="#fff" d="M56.162 67.584H3.927V.003h61.986a16 16 0 0 1 16 16v25.841a25.747 25.747 0 0 1-25.751 25.74Zm-20.817-15.6h15.147a15.821 15.821 0 0 0 15.821-15.821V15.592H19.524v20.571a15.821 15.821 0 0 0 15.82 15.825Z"/>
+		</svg>
+	</div>
+	<ul class="footer-menu">
+		
+			
+			
+				<li><a href="/en/contact/">Book a call</a></li>
+			
+				<li><a href="/en/legals/">Legal Notice</a></li>
+			
+				<li><a href="/en/privacy/">Privacy Policy</a></li>
+			
+		
+	</ul>
+	<ul class="footer-social">
+		<li>
+			<a href="https://www.linkedin.com/company/data-champ" class="Datachamp' LinkedIn">
+				<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 51 51">
+				  <path fill="#80ed99" stroke="#707070" d="M25.5.5a25 25 0 1 0 25 25 25 25 0 0 0-25-25Zm-7.265 37.793h-6.088V19.975h6.089Zm-3.044-20.819h-.04a3.173 3.173 0 1 1 .08-6.329 3.175 3.175 0 1 1-.04 6.329Zm25 20.819H34.1v-9.8c0-2.463-.882-4.142-3.085-4.142a3.333 3.333 0 0 0-3.124 2.227 4.17 4.17 0 0 0-.2 1.486v10.229H21.6s.08-16.6 0-18.318h6.088v2.594a6.045 6.045 0 0 1 5.487-3.024c4.006 0 7.01 2.618 7.01 8.244Zm0 0"/>
+				</svg>
+			</a>
+		</li>
+        <!--
+		<li>
+			<a href="#" title="Datachamp' Twitter">
+				<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 50 50">
+				  <path fill="#80ed99" d="M25 0a25 25 0 1 0 25 25A25 25 0 0 0 25 0Zm11.415 19.492q.017.369.016.742c0 7.582-5.772 16.326-16.327 16.327a16.242 16.242 0 0 1-8.8-2.578 11.67 11.67 0 0 0 1.369.079 11.514 11.514 0 0 0 7.127-2.456 5.745 5.745 0 0 1-5.361-3.986 5.719 5.719 0 0 0 2.592-.1 5.74 5.74 0 0 1-4.6-5.625v-.073a5.7 5.7 0 0 0 2.6.718 5.743 5.743 0 0 1-1.777-7.661 16.292 16.292 0 0 0 11.828 6 5.741 5.741 0 0 1 9.778-5.233 11.509 11.509 0 0 0 3.644-1.393 5.761 5.761 0 0 1-2.523 3.174 11.444 11.444 0 0 0 3.3-.9 11.661 11.661 0 0 1-2.862 2.972Zm0 0"/>
+				</svg>
+			</a>
+		</li>
+		<li>
+			<a href="#" title="Datachamp' Github">
+				<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 50 49.009">
+				  <path fill="#80ed99" d="M49.995 26.367c-.092.788-.171 1.576-.279 2.362a24.364 24.364 0 0 1-3.6 9.807 24.541 24.541 0 0 1-9.354 8.714 34.083 34.083 0 0 1-3.7 1.623c-1.09.422-1.857-.165-1.858-1.358 0-2.149.022-4.3.026-6.444a7.373 7.373 0 0 0-.681-3.461 15.083 15.083 0 0 0-.893-1.4c.873-.157 1.773-.279 2.654-.482a10.608 10.608 0 0 0 6.306-3.695 10.9 10.9 0 0 0 2.079-5.09 16 16 0 0 0 .13-4.617 9.186 9.186 0 0 0-2.128-4.839.842.842 0 0 1-.17-.909 9.027 9.027 0 0 0-.356-5.922.629.629 0 0 0-.541-.251 9.807 9.807 0 0 0-2.367.5c-1.247.536-2.418 1.251-3.636 1.86a1.277 1.277 0 0 1-.8.122 24.327 24.327 0 0 0-11.691 0 1.08 1.08 0 0 1-.755-.122 15.994 15.994 0 0 0-4.562-2.162 11.094 11.094 0 0 0-1.59-.212c-.245-.023-.4.1-.489.367a9.4 9.4 0 0 0-.232 6.04.624.624 0 0 1-.094.51c-2.117 2.456-2.593 5.343-2.269 8.455a13.87 13.87 0 0 0 1.136 4.465 9.393 9.393 0 0 0 5.234 4.844 17.735 17.735 0 0 0 4.343 1.065c.159.022.317.057.432.078-.341.6-.7 1.167-1 1.764a2.828 2.828 0 0 0-.3.972.954.954 0 0 1-.79.9 5.571 5.571 0 0 1-4.583-.219 5.294 5.294 0 0 1-1.909-1.924 6.069 6.069 0 0 0-2.151-2.216 3.341 3.341 0 0 0-2.319-.524.862.862 0 0 0-.57.36c-.057.122.136.4.268.569a1.825 1.825 0 0 0 .489.406 7.476 7.476 0 0 1 2.907 3.751 5.721 5.721 0 0 0 5.392 3.669 27.012 27.012 0 0 0 3.009-.149.719.719 0 0 1 .034.182c.017 1.252.043 2.506.04 3.758 0 1.223-.794 1.75-1.957 1.333a24.747 24.747 0 0 1-14-12.125A23.983 23.983 0 0 1 .084 23.381 24.5 24.5 0 0 1 11.788 3.85 23.221 23.221 0 0 1 28.308.298c10.258 1.6 17.05 7.477 20.5 17.228a21.232 21.232 0 0 1 1.1 5.626 3.716 3.716 0 0 0 .087.475Z"/>
+				</svg>
+			</a>
+		</li>
+        -->
+	</ul>
+</div>
+	</footer>
+	<script src="/assets/js/navigation.js" defer></script>
+<script src="/assets/js/main.js" defer></script>
+<script src="/assets/js/matomo.js" async defer></script>
+</body>
+</html>

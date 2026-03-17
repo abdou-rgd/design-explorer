@@ -103,7 +103,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       }
       ofv   <- get_ofv(ext, tbl_no())
       rse   <- tryCatch(get_rse(ext, tbl_no()), error = function(e) NULL)
-      lines <- ext_lines()
+      lines <- ext_lines() %||% attr(ext, "ext_lines")
       crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
       n_blocs <- n_distinct(ext$table_no)
 
@@ -178,7 +178,8 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       }, numeric(1))
       names(ofv_vals) <- vapply(runs, function(r) r$name, character(1))
 
-      lines <- ext_lines()
+      ext_for_crit <- ext_data()
+      lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
       crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
 
       df <- as.data.frame(
@@ -198,19 +199,25 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       long <- rse_long()
       req(nrow(long) > 0L)
 
-      rnms <- run_names()
+      rnms      <- run_names()
+      safe_rnms <- make.names(rnms)
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
         rename(Parametre = metric) |>
         select(Parametre, any_of(rnms))
 
+      # Sanitiser les noms de colonnes runs pour que formatStyle fonctionne
+      # meme quand les noms contiennent des espaces ou caracteres speciaux
+      names(wide)[match(rnms[rnms %in% names(wide)], names(wide))] <-
+        safe_rnms[rnms %in% names(wide)]
+
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
         options = list(pageLength = 30, dom = "tip", ordering = FALSE)
       )
 
-      for (col in rnms) {
+      for (col in safe_rnms) {
         if (col %in% names(wide)) {
           dt <- dt |>
             formatStyle(col,
@@ -229,19 +236,25 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       long <- shk_long()
       req(nrow(long) > 0L)
 
-      rnms <- run_names()
+      rnms      <- run_names()
+      safe_rnms <- make.names(rnms)
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
         rename(ETA = metric) |>
         select(ETA, any_of(rnms))
 
+      # Sanitiser les noms de colonnes runs pour que formatStyle fonctionne
+      # meme quand les noms contiennent des espaces ou caracteres speciaux
+      names(wide)[match(rnms[rnms %in% names(wide)], names(wide))] <-
+        safe_rnms[rnms %in% names(wide)]
+
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
         options = list(dom = "t", ordering = FALSE)
       )
 
-      for (col in rnms) {
+      for (col in safe_rnms) {
         if (col %in% names(wide)) {
           dt <- dt |>
             formatStyle(col,

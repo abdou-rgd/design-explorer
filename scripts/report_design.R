@@ -23,23 +23,27 @@ library(purrr)
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
+# Seuils de qualité — partagés avec l'application Shiny
+RSE_THRESHOLDS    <- c(20, 50)   # bon < 20%, acceptable < 50%, mauvais >= 50%
+RELINF_THRESHOLDS <- c(20, 50)   # même logique pour l'information relative
+
 # Palette qualité RelInf : rouge (bas) → orange → vert (élevé)
 .ri_quality <- function(ri_pct) {
   case_when(
-    is.na(ri_pct)  ~ "Inconnu",
-    ri_pct >= 50   ~ "> 50% (bon)",
-    ri_pct >= 20   ~ "20-50% (acceptable)",
-    TRUE           ~ "< 20% (insuffisant)"
+    is.na(ri_pct)               ~ "Inconnu",
+    ri_pct >= RELINF_THRESHOLDS[2] ~ "> 50% (bon)",
+    ri_pct >= RELINF_THRESHOLDS[1] ~ "20-50% (acceptable)",
+    TRUE                        ~ "< 20% (insuffisant)"
   )
 }
 
 # Palette qualité RSE : vert (bon) → orange → rouge (médiocre)
 .rse_quality <- function(rse_pct) {
   case_when(
-    is.na(rse_pct) ~ "Inconnu",
-    rse_pct < 20   ~ "< 20% (bon)",
-    rse_pct < 50   ~ "20-50% (acceptable)",
-    TRUE           ~ "> 50% (médiocre)"
+    is.na(rse_pct)              ~ "Inconnu",
+    rse_pct < RSE_THRESHOLDS[1] ~ "< 20% (bon)",
+    rse_pct < RSE_THRESHOLDS[2] ~ "20-50% (acceptable)",
+    TRUE                        ~ "> 50% (médiocre)"
   )
 }
 

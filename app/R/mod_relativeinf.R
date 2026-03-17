@@ -27,12 +27,9 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
         if (is.null(shk)) {
           return(ggplot() + labs(title = "Chargez un fichier .shk pour afficher RELATIVEINF(%)") + theme_bw())
         }
-        lbls <- param_labels()
-        eta_labels <- NULL
-        if (!is.null(lbls)) {
-          eta_labels <- setNames(lbls, paste0("ETA", seq_along(lbls)))
-        }
-        return(plot_relativeinf(shk, table_no = tbl_no(), param_labels = eta_labels))
+        # B1: ETAs have their own numbering independent from THETAs — do not map
+        # THETA labels onto ETAs. Pass NULL so plot_relativeinf uses raw ETA names.
+        return(plot_relativeinf(shk, table_no = tbl_no(), param_labels = NULL))
       }
 
       # Multi-run
@@ -40,17 +37,22 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
         if (is.null(r$shk_data)) return(NULL)
         ri <- get_relativeinf(r$shk_data, tbl_no())
         if (nrow(ri) == 0) return(NULL)
-        lbls <- param_labels()
-        if (!is.null(lbls)) {
-          eta_labels <- setNames(lbls, paste0("ETA", seq_along(lbls)))
-          ri <- ri |> mutate(eta = if_else(eta %in% names(eta_labels), eta_labels[eta], eta))
-        }
+        # B1: Do not map THETA labels onto ETAs — ETAs use their raw names (ETA1, ETA2, ...)
         ri |> mutate(run = r$name)
       })
 
       if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de RELATIVEINF") + theme_bw())
 
-      ggplot(combined, aes(x = reorder(eta, relativeinf_pct), y = relativeinf_pct, fill = run)) +
+      # C9: Deterministic ordering based on the primary run (first run) to avoid
+      # non-deterministic sort when multiple runs share the same eta names.
+      primary_run_name <- runs[[1]]$name
+      eta_order <- combined |>
+        dplyr::filter(run == primary_run_name) |>
+        dplyr::arrange(relativeinf_pct) |>
+        dplyr::pull(eta)
+      combined <- combined |> dplyr::mutate(eta = factor(eta, levels = eta_order))
+
+      ggplot(combined, aes(x = eta, y = relativeinf_pct, fill = run)) +
         geom_col(position = position_dodge(width = 0.75), width = 0.65,
                  color = "white", linewidth = 0.3) +
         geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", linewidth = 0.45) +

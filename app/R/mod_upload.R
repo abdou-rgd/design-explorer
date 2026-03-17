@@ -22,9 +22,13 @@ mod_upload_ui <- function(id) {
 mod_upload_server <- function(id) {
   moduleServer(id, function(input, output, session) {
 
+    # Limite de taille de requete : 100 MB
+    options(shiny.maxRequestSize = 100 * 1024^2)
+
     # Chemins fichiers detectes
     file_paths <- reactiveVal(list(
-      ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL
+      ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL,
+      summary_tab = NULL
     ))
 
     # Lignes brutes .ext (pour detect_criterion)
@@ -34,7 +38,22 @@ mod_upload_server <- function(id) {
       files <- input$upload
       req(files)
 
-      paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL)
+      # Validation taille fichier (50 MB max par fichier)
+      oversized <- files$name[file.info(files$datapath)$size > 50 * 1024^2]
+      if (length(oversized) > 0) {
+        showNotification(
+          paste("Fichier(s) trop volumineux (max 50 MB) :", paste(oversized, collapse = ", ")),
+          type = "error"
+        )
+        return()
+      }
+
+      showNotification("Chargement en cours...", id = "upload_loading",
+                       duration = NULL, type = "message")
+      on.exit(removeNotification("upload_loading"), add = TRUE)
+
+      paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL,
+                    summary_tab = NULL)
 
       if (nrow(files) == 1L && grepl("\\.(tar\\.gz|tgz)$", files$name, ignore.case = TRUE)) {
         # tar.gz : extraire dans un dossier temporaire
@@ -45,12 +64,14 @@ mod_upload_server <- function(id) {
         all_files <- list.files(tmp, recursive = TRUE, full.names = TRUE)
         all_names <- basename(all_files)
 
-        ext_i <- which(grepl("\\.ext$", all_names, ignore.case = TRUE))[1]
-        shk_i <- which(grepl("\\.shk$", all_names, ignore.case = TRUE))[1]
-        coi_i <- which(grepl("\\.coi$", all_names, ignore.case = TRUE))[1]
-        clt_i <- which(grepl("\\.clt$", all_names, ignore.case = TRUE))[1]
-        tab_i <- which(grepl("\\.tab$", all_names, ignore.case = TRUE))[1]
-        ctl_i <- which(grepl("\\.ctl$", all_names, ignore.case = TRUE))[1]
+        ext_i     <- which(grepl("\\.ext$", all_names, ignore.case = TRUE))[1]
+        shk_i     <- which(grepl("\\.shk$", all_names, ignore.case = TRUE))[1]
+        coi_i     <- which(grepl("\\.coi$", all_names, ignore.case = TRUE))[1]
+        clt_i     <- which(grepl("\\.clt$", all_names, ignore.case = TRUE))[1]
+        ctl_i     <- which(grepl("\\.ctl$", all_names, ignore.case = TRUE))[1]
+        # summary.tab detecte en priorite, sinon premier .tab
+        sum_i     <- which(grepl("summary.*\\.tab$", all_names, ignore.case = TRUE))[1]
+        tab_i     <- if (!is.na(sum_i)) NA_integer_ else which(grepl("\\.tab$", all_names, ignore.case = TRUE))[1]
 
         if (!is.na(ext_i)) paths$ext <- all_files[ext_i]
         if (!is.na(shk_i)) paths$shk <- all_files[shk_i]
@@ -58,6 +79,7 @@ mod_upload_server <- function(id) {
         if (!is.na(clt_i)) paths$clt <- all_files[clt_i]
         if (!is.na(tab_i)) paths$tab <- all_files[tab_i]
         if (!is.na(ctl_i)) paths$ctl <- all_files[ctl_i]
+        if (!is.na(sum_i)) paths$summary_tab <- all_files[sum_i]
 
       } else {
         # Fichiers multiples : matcher par nom original
@@ -68,8 +90,13 @@ mod_upload_server <- function(id) {
           if (grepl("\\.shk$", nm, ignore.case = TRUE)) paths$shk <- dp
           if (grepl("\\.coi$", nm, ignore.case = TRUE)) paths$coi <- dp
           if (grepl("\\.clt$", nm, ignore.case = TRUE)) paths$clt <- dp
-          if (grepl("\\.tab$", nm, ignore.case = TRUE)) paths$tab <- dp
           if (grepl("\\.ctl$", nm, ignore.case = TRUE)) paths$ctl <- dp
+          # summary.tab prioritaire sur .tab ordinaire
+          if (grepl("summary.*\\.tab$", nm, ignore.case = TRUE)) {
+            paths$summary_tab <- dp
+          } else if (grepl("\\.tab$", nm, ignore.case = TRUE)) {
+            paths$tab <- dp
+          }
         }
       }
 
@@ -130,6 +157,14 @@ mod_upload_server <- function(id) {
       })
     })
 
+    summary_data <- reactive({
+      p <- file_paths()$summary_tab
+      if (is.null(p)) return(NULL)
+      tryCatch(read_summary_tab(p), error = function(e) {
+        showNotification(paste("Erreur summary.tab :", e$message), type = "error"); NULL
+      })
+    })
+
     # Status fichiers
     output$file_status <- renderUI({
       p <- file_paths()
@@ -154,14 +189,15 @@ mod_upload_server <- function(id) {
 
     # Retourner les reactives
     list(
-      ext_data   = ext_data,
-      shk_data   = shk_data,
-      coi_data   = coi_data,
-      clt_data   = clt_data,
-      tab_data   = tab_data,
-      ctl_data   = ctl_data,
-      ext_lines  = ext_lines_raw,
-      file_paths = file_paths
+      ext_data     = ext_data,
+      shk_data     = shk_data,
+      coi_data     = coi_data,
+      clt_data     = clt_data,
+      tab_data     = tab_data,
+      ctl_data     = ctl_data,
+      summary_data = summary_data,
+      ext_lines    = ext_lines_raw,
+      file_paths   = file_paths
     )
   })
 }

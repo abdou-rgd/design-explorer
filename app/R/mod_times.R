@@ -62,15 +62,12 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       runs <- all_runs()
       if (length(runs) <= 1) return(plot_optimal_times(tab))
 
-      combined <- purrr::imap_dfr(runs, function(r, idx) {
+      combined <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$tab_data)) return(NULL)
-        obs <- r$tab_data
-        if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-        if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]  # exclure ligne dose (TIME=0, AMT>0)
-        if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1
+        obs <- prepare_tab_obs(r$tab_data)
         obs |> mutate(run = r$name) |>
           select(any_of(c("TSTRAT", "TIME", "run")))
-      })
+      }) |> purrr::list_rbind()
       if (nrow(combined) == 0) return(plot_optimal_times(tab))
 
       combined <- combined |>
@@ -82,17 +79,15 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
                    position = position_dodge(width = 0.4)) +
         scale_color_manual(values = .RUN_COLORS, name = NULL) +
         labs(title = "Temps d'echantillonnage -- Comparaison multi-runs",
-             x = "Temps", y = NULL) +
-        theme_bw(base_size = 11) +
-        theme(legend.position = "bottom",
-              panel.grid.major.y = element_blank())
+             x = "Temps (source : .tab)", y = "Strate",
+             caption = "Source : .tab") +
+        .theme_design() +
+        theme(panel.grid.major.y = element_blank())
     }, res = 110)
 
     output$times_table <- renderDT({
       tab <- tab_data(); req(tab)
-      obs <- tab
-      if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-      if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]  # exclure ligne dose (TIME=0, AMT>0)
+      obs <- prepare_tab_obs(tab)
 
       cols_show <- intersect(
         c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),

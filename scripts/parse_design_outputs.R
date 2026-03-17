@@ -82,6 +82,20 @@ library(tidyr)
   map(seq_along(table_idx), parse_one) |> compact()
 }
 
+#' Prépare les observations d'un fichier .tab pour l'analyse des temps
+#'
+#' Filtre les doses (EVID != 0 si la colonne existe), exclut la première
+#' ligne (dose initiale TIME=0), et ajoute TSTRAT=1 si absent.
+#'
+#' @param tab data.frame lu par read_tab()
+#' @return data.frame nettoyé, sans ligne de dose
+prepare_tab_obs <- function(tab) {
+  if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
+  if (nrow(tab) > 1L) tab <- tab[-1L, , drop = FALSE]
+  if (!"TSTRAT" %in% names(tab)) tab$TSTRAT <- 1L
+  tab
+}
+
 
 # =============================================================================
 # read_ext() — Lecture du fichier .ext NONMEM $DESIGN
@@ -104,7 +118,7 @@ read_ext <- function(file, sentinel = 1e10) {
   blocks <- .parse_table_blocks(lines, "^\\s*ITERATION\\b")
   if (length(blocks) == 0L) stop("Aucun bloc TABLE NO. valide dans : ", file)
 
-  map(blocks, function(dat) {
+  result <- map(blocks, function(dat) {
     dat |>
       mutate(
         type = case_when(
@@ -129,6 +143,10 @@ read_ext <- function(file, sentinel = 1e10) {
       )
   }) |>
     bind_rows()
+
+  # Stocker les lignes brutes comme attribut pour detect_criterion() en aval
+  attr(result, "ext_lines") <- lines
+  result
 }
 
 

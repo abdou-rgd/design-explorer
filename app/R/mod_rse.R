@@ -39,16 +39,16 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
 
       # Multi-run: build combined data
       show_se <- (!is.null(mode) && mode == "SE absolues")
-      combined <- purrr::imap_dfr(runs, function(r, idx) {
+      combined <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$ext_data)) return(NULL)
         rse <- get_rse(r$ext_data, tbl_no())
         if (nrow(rse) == 0) return(NULL)
         lbls <- param_labels()
         if (!is.null(lbls)) {
-          rse <- rse |> mutate(param = if_else(param %in% names(lbls), lbls[param], param))
+          rse <- rse |> mutate(param = ifelse(param %in% names(lbls), lbls[param], param))
         }
         rse |> mutate(run = r$name)
-      })
+      }) |> purrr::list_rbind()
 
       if (nrow(combined) == 0) return(NULL)
 
@@ -62,9 +62,8 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
                                    color = "grey40", linewidth = 0.45)} +
         scale_fill_manual(values = .RUN_COLORS, name = NULL) +
         labs(title = paste(y_lab, "-- Comparaison multi-runs"), x = NULL, y = y_lab) +
-        theme_bw(base_size = 11) +
-        theme(legend.position = "bottom", panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank(),
+        .theme_design() +
+        theme(panel.grid.major.x = element_blank(),
               axis.text.x = element_text(angle = 30, hjust = 1, size = 9))
     }, res = 110)
   })

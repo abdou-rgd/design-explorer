@@ -98,7 +98,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
     # Multi-run comparison table
     output$compare_table <- renderDT({
       runs <- all_runs(); req(length(runs) > 1)
-      comp_df <- purrr::imap_dfr(runs, function(r, idx) {
+      comp_df <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$ext_data)) return(NULL)
         ext <- r$ext_data
         ofv <- get_ofv(ext, tbl_no())
@@ -116,7 +116,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
           `RSE moy. (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
           `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_
         )
-      })
+      }) |> purrr::list_rbind()
       datatable(comp_df, rownames = FALSE, class = "stripe hover compact",
                 options = list(pageLength = 5, dom = "t"))
     })

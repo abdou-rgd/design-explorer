@@ -22,18 +22,23 @@ mod_compare_server <- function(id) {
     run_ids   <- reactiveVal(character())   # drives UI rendering
     run_names <- reactiveValues()            # editable names
     run_data  <- reactiveValues()            # parsed data (does NOT drive UI)
-    run_counter <- reactiveVal(0L)
+    id_counter  <- reactiveVal(0L)   # always-increasing ID generator (never decremented)
+    run_count   <- reactiveVal(0L)   # number of currently active runs (increments/decrements)
+
+    # Mutable list of observers keyed by run_id (use <<- from handlers)
+    run_observers <- list()
 
     observeEvent(input$add_run, {
-      n <- run_counter() + 1L
-      if (n > 3L) {
+      if (run_count() >= 3L) {
         showNotification("Maximum 3 runs de comparaison (4 total)",
                          type = "warning")
         return()
       }
-      run_counter(n)
-      rid <- paste0("run_", n)
-      default_name <- c("Run B", "Run C", "Run D")[n]
+      new_id <- id_counter() + 1L
+      id_counter(new_id)
+      run_count(run_count() + 1L)
+      rid <- paste0("run_", new_id)
+      default_name <- c("Run B", "Run C", "Run D")[run_count()]
 
       run_names[[rid]] <- default_name
       run_data[[rid]] <- list(
@@ -87,7 +92,7 @@ mod_compare_server <- function(id) {
           local_rid <- rid
 
           # File upload observer
-          observeEvent(input[[paste0("upload_", local_rid)]], {
+          obs_upload <- observeEvent(input[[paste0("upload_", local_rid)]], {
             files <- input[[paste0("upload_", local_rid)]]
             req(files)
             paths <- list(ext = NULL, shk = NULL, coi = NULL,
@@ -152,18 +157,32 @@ mod_compare_server <- function(id) {
           }, ignoreInit = TRUE)
 
           # Name edit observer
-          observeEvent(input[[paste0("name_", local_rid)]], {
+          obs_name <- observeEvent(input[[paste0("name_", local_rid)]], {
             run_names[[local_rid]] <-
               input[[paste0("name_", local_rid)]]
           }, ignoreInit = TRUE)
 
           # Remove observer
-          observeEvent(input[[paste0("rm_", local_rid)]], {
+          obs_remove <- observeEvent(input[[paste0("rm_", local_rid)]], {
+            # Destroy observers for this run before removing it
+            if (!is.null(run_observers[[local_rid]])) {
+              run_observers[[local_rid]]$upload$destroy()
+              run_observers[[local_rid]]$name$destroy()
+              run_observers[[local_rid]]$remove$destroy()
+              run_observers[[local_rid]] <<- NULL
+            }
             run_ids(setdiff(run_ids(), local_rid))
             run_data[[local_rid]] <- NULL
             run_names[[local_rid]] <- NULL
-            run_counter(max(0L, run_counter() - 1L))
+            run_count(run_count() - 1L)
           }, ignoreInit = TRUE)
+
+          # Register observers so they can be destroyed later
+          run_observers[[local_rid]] <<- list(
+            upload = obs_upload,
+            name   = obs_name,
+            remove = obs_remove
+          )
         })
       }
 
