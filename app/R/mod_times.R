@@ -66,6 +66,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         if (is.null(r$tab_data)) return(NULL)
         obs <- r$tab_data
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
+        if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]  # exclure ligne dose (TIME=0, AMT>0)
         if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1
         obs |> mutate(run = r$name) |>
           select(any_of(c("TSTRAT", "TIME", "run")))
@@ -91,6 +92,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       tab <- tab_data(); req(tab)
       obs <- tab
       if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
+      if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]  # exclure ligne dose (TIME=0, AMT>0)
 
       cols_show <- intersect(
         c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),

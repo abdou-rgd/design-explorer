@@ -124,7 +124,7 @@ read_ext <- function(file, sentinel = 1e10) {
       mutate(
         across(
           -c(table_no, type, ITERATION, OBJ),
-          ~ if_else(abs(.x - sentinel) / sentinel < 1e-4, NA_real_, .x)
+          ~ if_else(abs(.x - sentinel) < 1, NA_real_, .x)
         )
       )
   }) |>
@@ -160,8 +160,8 @@ read_shk <- function(file) {
     dat |>
       rename(type_id = TYPE, subpop = SUBPOP) |>
       rename_with(
-        ~ str_replace_all(.x, "ETA\\((\\d+)\\)", "ETA\\1"),
-        starts_with("ETA(")
+        ~ str_replace_all(.x, "ETA\\(\\s*(\\d+)\\s*\\)", "ETA\\1"),
+        starts_with("ETA")
       ) |>
       mutate(type_id = as.integer(type_id), subpop = as.integer(subpop))
   }) |>
@@ -188,7 +188,9 @@ get_final_params <- function(ext, table_no = NULL) {
 #' @export
 get_se <- function(ext, table_no = NULL) {
   tbl <- table_no %||% max(ext$table_no)
-  ext |> filter(type == "se", .data$table_no == tbl)
+  result <- ext |> filter(type == "se", .data$table_no == tbl)
+  if (nrow(result) == 0L) return(tibble())
+  result
 }
 
 #' Extraire la valeur du critère d'optimalité final
@@ -196,7 +198,9 @@ get_se <- function(ext, table_no = NULL) {
 #' @param table_no Numéro de table (défaut : dernier)
 #' @export
 get_ofv <- function(ext, table_no = NULL) {
-  get_final_params(ext, table_no)$OBJ
+  result <- get_final_params(ext, table_no)
+  if (nrow(result) == 0L) return(NA_real_)
+  result$OBJ
 }
 
 #' Calculer les RSE (%) prédits par la FIM
@@ -210,17 +214,23 @@ get_ofv <- function(ext, table_no = NULL) {
 get_rse <- function(ext, table_no = NULL) {
   tbl <- table_no %||% max(ext$table_no)
 
-  params <- get_final_params(ext, tbl) |>
+  fp <- get_final_params(ext, tbl)
+  if (nrow(fp) == 0L) return(tibble(param = character(), estimate = numeric(), se = numeric(), rse_pct = numeric()))
+
+  params <- fp |>
     select(-c(table_no, type, ITERATION, OBJ)) |>
     pivot_longer(everything(), names_to = "param", values_to = "estimate")
 
-  se_vals <- get_se(ext, tbl) |>
+  se_row <- get_se(ext, tbl)
+  if (nrow(se_row) == 0L) return(tibble(param = character(), estimate = numeric(), se = numeric(), rse_pct = numeric()))
+
+  se_vals <- se_row |>
     select(-c(table_no, type, ITERATION, OBJ)) |>
     pivot_longer(everything(), names_to = "param", values_to = "se")
 
   left_join(params, se_vals, by = "param") |>
     filter(!is.na(estimate), !is.na(se)) |>
-    mutate(rse_pct = abs(se / estimate) * 100)
+    mutate(rse_pct = if_else(abs(estimate) < 1e-12, NA_real_, abs(se / estimate) * 100))
 }
 
 #' Extraire les informations relatives (%) depuis read_shk()
@@ -420,7 +430,11 @@ read_coi <- function(file, table_no = 1L) {
   for (i in seq_along(data_lines)) {
     tokens <- str_split(str_trim(data_lines[i]), "\\s+")[[1L]]
     vals   <- as.numeric(tokens[-1L])  # drop row name
-    if (length(vals) == n) mat[i, ] <- vals
+    if (length(vals) == n) {
+      mat[i, ] <- vals
+    } else {
+      warning("read_coi() ligne ", i, " : ", length(vals), " valeurs au lieu de ", n, " attendues — ligne ignorée")
+    }
   }
 
   mat
