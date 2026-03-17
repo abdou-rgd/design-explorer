@@ -20,7 +20,8 @@ mod_rse_ui <- function(id) {
 mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     output$plot <- renderPlot({
-      ext <- ext_data(); req(ext)
+      ext <- ext_data()
+      if (is.null(ext)) return(NULL)
       runs <- all_runs()
       mode <- se_mode()
 

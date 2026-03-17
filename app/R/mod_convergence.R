@@ -18,7 +18,8 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
       runs <- all_runs()
 
       if (length(runs) <= 1) {
-        ext <- ext_data(); req(ext)
+        ext <- ext_data()
+        if (is.null(ext)) return(NULL)
         return(plot_convergence(ext, log_iter = log_conv()))
       }
 

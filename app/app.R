@@ -118,6 +118,7 @@ ui <- fluidPage(
   div(id = "drawer-panel", class = "",
     tags$button(id = "drawer-close", onclick = "Shiny.setInputValue('drawer_close_trigger', Math.random())", "\u2715"),
     div(class = "drawer-title", "Gestion des runs"),
+    uiOutput("reset_run_btn"),
     mod_examples_ui("examples"),
     mod_upload_ui("upload"),
     mod_compare_ui("compare"),
@@ -186,10 +187,13 @@ server <- function(input, output, session) {
     ")
   }, ignoreNULL = TRUE)
 
+  # -- Reset trigger (universal) ----------------------------------------------
+  reset_trigger <- reactiveVal(0L)
+
   # -- Upload module ----------------------------------------------------------
-  upload   <- mod_upload_server("upload")
+  upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
   compare  <- mod_compare_server("compare")
-  examples <- mod_examples_server("examples", session)
+  examples <- mod_examples_server("examples", reset_trigger = reset_trigger)
 
   # -- Example data loading --------------------------------------------------
   example_ext      <- reactiveVal(NULL)
@@ -324,6 +328,26 @@ server <- function(input, output, session) {
       n_total   = n_est
     )
   })
+
+  # -- Universal reset button -------------------------------------------------
+  output$reset_run_btn <- renderUI({
+    if (is.null(merged_ext())) return(NULL)
+    actionButton("reset_run", "Retirer la run",
+      icon  = icon("xmark"),
+      class = "btn-sm btn-danger w-100",
+      style = "margin-bottom: 8px;"
+    )
+  })
+
+  observeEvent(input$reset_run, {
+    reset_trigger(reset_trigger() + 1L)
+    updateTextAreaInput(session, "param_labels", value = "")
+    showNotification("Run retiree", type = "message")
+  })
+
+  observeEvent(reset_trigger(), {
+    updateSelectInput(session, "table_no", choices = "1", selected = "1")
+  }, ignoreInit = TRUE)
 
   # -- Guide banner -----------------------------------------------------------
   output$guide_banner <- renderUI({

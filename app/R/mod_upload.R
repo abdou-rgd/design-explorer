@@ -19,7 +19,7 @@ mod_upload_ui <- function(id) {
   )
 }
 
-mod_upload_server <- function(id) {
+mod_upload_server <- function(id, reset_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
 
     # Limite de taille de requete : 100 MB
@@ -33,6 +33,15 @@ mod_upload_server <- function(id) {
 
     # Lignes brutes .ext (pour detect_criterion)
     ext_lines_raw <- reactiveVal(NULL)
+
+    # Universal reset from app.R
+    if (!is.null(reset_trigger)) {
+      observeEvent(reset_trigger(), {
+        file_paths(list(ext = NULL, shk = NULL, coi = NULL, clt = NULL,
+                        tab = NULL, ctl = NULL, summary_tab = NULL))
+        ext_lines_raw(NULL)
+      })
+    }
 
     observe({
       files <- input$upload

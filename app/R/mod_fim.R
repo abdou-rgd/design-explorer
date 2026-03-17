@@ -70,7 +70,8 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
 
     # Metric cards FIM
     output$cards <- renderUI({
-      ext <- ext_data(); req(ext)
+      ext <- ext_data()
+      if (is.null(ext)) return(NULL)
       ofv      <- get_ofv(ext, tbl_no())
       if (length(ofv) != 1L) ofv <- NA_real_
       rse      <- get_rse(ext, tbl_no())
@@ -123,7 +124,8 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
 
     # Eigenvalues table
     output$eigen_table <- renderDT({
-      ext <- ext_data(); req(ext)
+      ext <- ext_data()
+      if (is.null(ext)) return(NULL)
       eig <- get_eigenvalues(ext, tbl_no())
       if (nrow(eig) == 0L) return(NULL)
 
@@ -138,7 +140,8 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
 
     # FIM heatmap
     output$heatmap <- renderPlot({
-      fim <- fim_matrix(); req(fim)
+      fim <- fim_matrix()
+      if (is.null(fim)) return(NULL)
       plot_fim_heatmap(fim, labels = param_labels())
     }, res = 110)
 

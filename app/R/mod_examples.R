@@ -77,12 +77,11 @@ mod_examples_ui <- function(id) {
   tagList(
     actionButton(ns("open_examples"), "Exemples", icon = icon("book-open"),
                  class = "btn-sm btn-outline-secondary w-100",
-                 style = "margin-bottom: 8px;"),
-    uiOutput(ns("reset_btn"))
+                 style = "margin-bottom: 8px;")
   )
 }
 
-mod_examples_server <- function(id, session_main) {
+mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -93,23 +92,17 @@ mod_examples_server <- function(id, session_main) {
       summary_data = NULL
     )
 
-    # Reset button (only visible when an example is loaded)
-    output$reset_btn <- renderUI({
-      if (is.null(selected$file_paths)) return(NULL)
-      actionButton(ns("reset_example"), "Retirer l'exemple", icon = icon("xmark"),
-                   class = "btn-sm btn-outline-danger w-100",
-                   style = "margin-bottom: 8px;")
-    })
-
-    observeEvent(input$reset_example, {
-      selected$file_paths <- NULL
-      selected$labels <- NULL
-      selected$guide <- NULL
-      selected$compare_paths <- NULL
-      selected$compare_name <- NULL
-      selected$summary_data <- NULL
-      showNotification("Exemple retire", type = "message")
-    })
+    # Universal reset from app.R
+    if (!is.null(reset_trigger)) {
+      observeEvent(reset_trigger(), {
+        selected$file_paths   <- NULL
+        selected$labels       <- NULL
+        selected$guide        <- NULL
+        selected$compare_paths <- NULL
+        selected$compare_name <- NULL
+        selected$summary_data <- NULL
+      })
+    }
 
     observeEvent(input$open_examples, {
       showModal(modalDialog(

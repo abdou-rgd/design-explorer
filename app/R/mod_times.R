@@ -53,12 +53,14 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
 
     # -- Standard .tab outputs ------------------------------------------------
     output$prediction <- renderPlot({
-      tab <- tab_data(); req(tab)
+      tab <- tab_data()
+      if (is.null(tab)) return(NULL)
       plot_model_prediction(tab)
     }, res = 110)
 
     output$gantt <- renderPlot({
-      tab <- tab_data(); req(tab)
+      tab <- tab_data()
+      if (is.null(tab)) return(NULL)
       runs <- all_runs()
       if (length(runs) <= 1) return(plot_optimal_times(tab))
 
@@ -86,7 +88,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
     }, res = 110)
 
     output$times_table <- renderDT({
-      tab <- tab_data(); req(tab)
+      tab <- tab_data()
+      if (is.null(tab)) return(NULL)
       obs <- prepare_tab_obs(tab)
 
       cols_show <- intersect(
