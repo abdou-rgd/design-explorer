@@ -82,53 +82,21 @@ mod_upload_server <- function(id) {
     })
 
     # Donnees parsees (reactives)
-    ext_data <- reactive({
-      p <- file_paths()$ext
-      if (is.null(p)) return(NULL)
-      tryCatch(read_ext(p), error = function(e) {
-        showNotification(paste("Erreur .ext :", e$message), type = "error"); NULL
+    .safe_parse <- function(parser, path, label) {
+      if (is.null(path)) return(NULL)
+      tryCatch(parser(path), error = function(e) {
+        log_error("Parse ", label, " [", basename(path), "]: ", e$message)
+        showNotification(paste0("Erreur ", label, " : ", e$message), type = "error")
+        NULL
       })
-    })
+    }
 
-    shk_data <- reactive({
-      p <- file_paths()$shk
-      if (is.null(p)) return(NULL)
-      tryCatch(read_shk(p), error = function(e) {
-        showNotification(paste("Erreur .shk :", e$message), type = "error"); NULL
-      })
-    })
-
-    coi_data <- reactive({
-      p <- file_paths()$coi
-      if (is.null(p)) return(NULL)
-      tryCatch(read_coi(p), error = function(e) {
-        showNotification(paste("Erreur .coi :", e$message), type = "error"); NULL
-      })
-    })
-
-    clt_data <- reactive({
-      p <- file_paths()$clt
-      if (is.null(p)) return(NULL)
-      tryCatch(read_clt(p), error = function(e) {
-        showNotification(paste("Erreur .clt :", e$message), type = "error"); NULL
-      })
-    })
-
-    tab_data <- reactive({
-      p <- file_paths()$tab
-      if (is.null(p)) return(NULL)
-      tryCatch(read_tab(p), error = function(e) {
-        showNotification(paste("Erreur .tab :", e$message), type = "error"); NULL
-      })
-    })
-
-    ctl_data <- reactive({
-      p <- file_paths()$ctl
-      if (is.null(p)) return(NULL)
-      tryCatch(read_prior_nwpri(p), error = function(e) {
-        showNotification(paste("Erreur .ctl :", e$message), type = "error"); NULL
-      })
-    })
+    ext_data <- reactive(.safe_parse(read_ext,          file_paths()$ext, ".ext"))
+    shk_data <- reactive(.safe_parse(read_shk,          file_paths()$shk, ".shk"))
+    coi_data <- reactive(.safe_parse(read_coi,          file_paths()$coi, ".coi"))
+    clt_data <- reactive(.safe_parse(read_clt,          file_paths()$clt, ".clt"))
+    tab_data <- reactive(.safe_parse(read_tab,          file_paths()$tab, ".tab"))
+    ctl_data <- reactive(.safe_parse(read_prior_nwpri,  file_paths()$ctl, ".ctl"))
 
     # Status fichiers
     output$file_status <- renderUI({

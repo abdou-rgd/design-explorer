@@ -117,7 +117,7 @@ read_ext <- function(file, sentinel = 1e10) {
           ITERATION == .EXT_ITER$fixed_flags ~ "fixed_flags",
           ITERATION == .EXT_ITER$termination ~ "termination",
           ITERATION == .EXT_ITER$gradient    ~ "gradient",
-          .default = "iteration"
+          TRUE ~ "iteration"
         ),
         .after = table_no
       ) |>
