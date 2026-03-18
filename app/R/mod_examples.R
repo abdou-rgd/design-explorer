@@ -96,7 +96,7 @@ mod_examples_server <- function(id, session_main) {
     # Reset button (only visible when an example is loaded)
     output$reset_btn <- renderUI({
       if (is.null(selected$file_paths)) return(NULL)
-      actionButton(ns("reset_example"), "Retirer l'exemple", icon = icon("xmark"),
+      actionButton(ns("reset_example"), "Retirer l'exemple", icon = icon("times"),
                    class = "btn-sm btn-outline-danger w-100",
                    style = "margin-bottom: 8px;")
     })

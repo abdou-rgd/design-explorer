@@ -61,7 +61,7 @@ mod_compare_server <- function(id) {
             column(8, textInput(ns(paste0("name_", rid)), NULL,
                                 value = rname, width = "100%")),
             column(4, actionButton(ns(paste0("rm_", rid)), NULL,
-                                   icon = icon("xmark"),
+                                   icon = icon("times"),
                                    class = "btn-sm btn-outline-danger"))
           ),
           fileInput(ns(paste0("upload_", rid)), NULL, multiple = TRUE,
