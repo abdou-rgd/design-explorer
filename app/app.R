@@ -144,6 +144,7 @@ ui <- fluidPage(
   div(id = "drawer-panel", class = "",
     tags$button(id = "drawer-close", onclick = "Shiny.setInputValue('drawer_close_trigger', Math.random())", "\u2715"),
     div(class = "drawer-title", "Gestion des runs"),
+    uiOutput("reset_run_btn"),
     mod_examples_ui("examples"),
     mod_upload_ui("upload"),
     mod_compare_ui("compare"),
@@ -222,10 +223,13 @@ server <- function(input, output, session) {
     ")
   }, ignoreNULL = TRUE)
 
+  # -- Reset trigger (universal) ----------------------------------------------
+  reset_trigger <- reactiveVal(0L)
+
   # -- Upload module ----------------------------------------------------------
-  upload   <- mod_upload_server("upload")
+  upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
   compare  <- mod_compare_server("compare")
-  examples <- mod_examples_server("examples", session)
+  examples <- mod_examples_server("examples", reset_trigger = reset_trigger)
 
   # -- Example data loading --------------------------------------------------
   example_ext      <- reactiveVal(NULL)
@@ -281,7 +285,12 @@ server <- function(input, output, session) {
   merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
   merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
   merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
-  merged_summary <- reactive({ examples$summary_data() })
+  merged_summary <- reactive({
+    upload_summary  <- upload$summary_data()
+    example_summary <- examples$summary_data()
+    if (!is.null(upload_summary) && nrow(upload_summary) > 0) upload_summary
+    else example_summary
+  })
 
   # -- all_runs ---------------------------------------------------------------
   all_runs <- reactive({
@@ -318,11 +327,14 @@ server <- function(input, output, session) {
   param_labels_r <- reactive({
     raw <- trimws(input$param_labels)
     if (raw == "") return(NULL)
-    lines <- strsplit(raw, "\n")[[1]]
-    lines <- lines[str_detect(lines, "=")]
-    parts <- str_split_fixed(lines, "=", 2)
-    lbl   <- setNames(trimws(parts[,2]), trimws(parts[,1]))
-    lbl[nchar(names(lbl)) > 0 & nchar(lbl) > 0]
+    lbl <- tibble::tibble(raw = stringr::str_split_1(raw, "\n")) |>
+      dplyr::filter(stringr::str_detect(raw, "=")) |>
+      tidyr::separate_wider_delim(raw, "=", names = c("key", "val"), too_many = "merge") |>
+      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
+      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
+      tibble::deframe()
+    if (length(lbl) == 0L) return(NULL)
+    lbl
   })
   se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
   log_conv_r <- reactive({ input$log_conv })
@@ -352,6 +364,26 @@ server <- function(input, output, session) {
       n_total   = n_est
     )
   })
+
+  # -- Universal reset button -------------------------------------------------
+  output$reset_run_btn <- renderUI({
+    if (is.null(merged_ext())) return(NULL)
+    actionButton("reset_run", "Retirer la run",
+      icon  = icon("xmark"),
+      class = "btn-sm btn-danger w-100",
+      style = "margin-bottom: 8px;"
+    )
+  })
+
+  observeEvent(input$reset_run, {
+    reset_trigger(reset_trigger() + 1L)
+    updateTextAreaInput(session, "param_labels", value = "")
+    showNotification("Run retiree", type = "message")
+  })
+
+  observeEvent(reset_trigger(), {
+    updateSelectInput(session, "table_no", choices = "1", selected = "1")
+  }, ignoreInit = TRUE)
 
   # -- Guide banner -----------------------------------------------------------
   output$guide_banner <- renderUI({
