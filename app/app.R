@@ -51,7 +51,7 @@ ui <- fluidPage(
 
       div(id = "sidebar-logo",
         div(class = "app-title",   "$DESIGN Explorer"),
-        div(class = "app-subtitle", "NONMEM 7.5+ · Post-processing")
+        div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
       ),
 
       tags$button(id = "btn-runs", onclick = "Shiny.setInputValue('open_drawer', Math.random())",
@@ -124,6 +124,10 @@ ui <- fluidPage(
     mod_compare_ui("compare"),
     tags$hr(),
     div(class = "upload-box",
+      tags$h6("Nom du run principal"),
+      textInput("primary_run_name", NULL, value = "Run A", width = "100%")
+    ),
+    div(class = "upload-box",
       tags$h6("Labels parametres (THETA)"),
       textAreaInput("param_labels", NULL,
         placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
@@ -143,9 +147,17 @@ ui <- fluidPage(
       checkboxInput("log_conv", "Axe X log (Convergence)", FALSE)
     ),
     div(class = "upload-box",
-      tags$p(style = "font-size:.76rem; color:#64748b; margin:0;",
-        "RSE : < 20% bon / 20-50% acceptable / > 50% mediocre", tags$br(),
-        "RelInf : > 50% bon / 20-50% acceptable / < 20% insuffisant"
+      tags$p(style = "font-size:.78rem; color:#64748b; margin:0;",
+        tags$strong("Seuils indicatifs RSE :"), tags$br(),
+        "< 20% bon / 20-50% acceptable / > 50% mediocre", tags$br(),
+        tags$strong("RelInf :"),
+        " > 50% bon / 20-50% acceptable / < 20% insuffisant", tags$br(),
+        tags$br(),
+        tags$em(style = "font-size:.72rem;",
+          "Ref. : Bauer 2021, Ex. 5 : \u00ab RSE no larger than 20% \u00bb.",
+          " Mentens (PFIM) : \u00ab SE < 20-30% pour chaque parametre cle \u00bb.",
+          " Ces seuils sont indicatifs et dependent du contexte de l'etude."
+        )
       )
     )
   ),
@@ -257,9 +269,11 @@ server <- function(input, output, session) {
   })
 
   # -- all_runs ---------------------------------------------------------------
+  primary_name <- reactive({ input$primary_run_name %||% "Run A" })
+
   all_runs <- reactive({
     primary <- list(
-      name = "Run A", ext_data = merged_ext(), shk_data = merged_shk(),
+      name = primary_name(), ext_data = merged_ext(), shk_data = merged_shk(),
       coi_data = merged_coi(), clt_data = merged_clt(), tab_data = merged_tab()
     )
     runs <- list(primary = primary)
@@ -320,7 +334,7 @@ server <- function(input, output, session) {
     d_crit   <- if (!is.na(ofv)) exp(-ofv / n_params) else NA_real_
 
     render_kpi_bar(
-      run_name  = "Run A",
+      run_name  = primary_name(),
       file_name = "",
       d_crit    = if (!is.na(d_crit)) d_crit else ifelse(!is.na(ofv), ofv, 0),
       rse_mean  = if (!is.na(rse_mean)) rse_mean else 0,
