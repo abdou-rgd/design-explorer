@@ -105,7 +105,9 @@ read_ext <- function(file, sentinel = 1e10) {
   if (length(blocks) == 0L) stop("Aucun bloc TABLE NO. valide dans : ", file)
 
   # Lookup vectorisé : itération spéciale → type (compatible dplyr < 1.1)
-  .iter_to_type <- setNames(names(.EXT_ITER), as.character(unlist(.EXT_ITER)))
+  # as.numeric() ensures consistent character representation regardless of
+  # integer vs double storage in .EXT_ITER (e.g. "-1e+09" not "-1000000000")
+  .iter_to_type <- setNames(names(.EXT_ITER), as.character(as.numeric(unlist(.EXT_ITER))))
 
   map(blocks, function(dat) {
     types <- .iter_to_type[as.character(dat$ITERATION)]
