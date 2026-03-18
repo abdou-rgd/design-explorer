@@ -47,7 +47,6 @@
 !app/examples/**/*.coi
 !app/examples/**/*.clt
 !app/examples/**/*.tab
-!app/examples/**/*.ctl
 !app/www/styles.css
 
 # Dossiers lourds / non essentiels
