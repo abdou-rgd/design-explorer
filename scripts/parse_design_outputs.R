@@ -118,23 +118,17 @@ read_ext <- function(file, sentinel = 1e10) {
   blocks <- .parse_table_blocks(lines, "^\\s*ITERATION\\b")
   if (length(blocks) == 0L) stop("Aucun bloc TABLE NO. valide dans : ", file)
 
+  # Lookup vectorisé : itération spéciale → type (compatible dplyr < 1.1)
+  # as.numeric() ensures consistent character representation regardless of
+  # integer vs double storage in .EXT_ITER (e.g. "-1e+09" not "-1000000000")
+  .iter_to_type <- setNames(names(.EXT_ITER), as.character(as.numeric(unlist(.EXT_ITER))))
+
   result <- map(blocks, function(dat) {
+    types <- .iter_to_type[as.character(dat$ITERATION)]
+    types[is.na(types)] <- "iteration"
+
     dat |>
-      mutate(
-        type = case_when(
-          ITERATION == .EXT_ITER$final       ~ "final",
-          ITERATION == .EXT_ITER$se          ~ "se",
-          ITERATION == .EXT_ITER$eigenvalues ~ "eigenvalues",
-          ITERATION == .EXT_ITER$condition   ~ "condition",
-          ITERATION == .EXT_ITER$sd_corr     ~ "sd_corr",
-          ITERATION == .EXT_ITER$se_sd_corr  ~ "se_sd_corr",
-          ITERATION == .EXT_ITER$fixed_flags ~ "fixed_flags",
-          ITERATION == .EXT_ITER$termination ~ "termination",
-          ITERATION == .EXT_ITER$gradient    ~ "gradient",
-          .default = "iteration"
-        ),
-        .after = table_no
-      ) |>
+      mutate(type = types, .after = table_no) |>
       mutate(
         across(
           -c(table_no, type, ITERATION, OBJ),

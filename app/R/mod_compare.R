@@ -22,23 +22,18 @@ mod_compare_server <- function(id) {
     run_ids   <- reactiveVal(character())   # drives UI rendering
     run_names <- reactiveValues()            # editable names
     run_data  <- reactiveValues()            # parsed data (does NOT drive UI)
-    id_counter  <- reactiveVal(0L)   # always-increasing ID generator (never decremented)
-    run_count   <- reactiveVal(0L)   # number of currently active runs (increments/decrements)
-
-    # Mutable list of observers keyed by run_id (use <<- from handlers)
-    run_observers <- list()
+    run_counter <- reactiveVal(0L)
 
     observeEvent(input$add_run, {
-      if (run_count() >= 3L) {
+      n <- run_counter() + 1L
+      if (n > 3L) {
         showNotification("Maximum 3 runs de comparaison (4 total)",
                          type = "warning")
         return()
       }
-      new_id <- id_counter() + 1L
-      id_counter(new_id)
-      run_count(run_count() + 1L)
-      rid <- paste0("run_", new_id)
-      default_name <- c("Run B", "Run C", "Run D")[run_count()]
+      run_counter(n)
+      rid <- paste0("run_", n)
+      default_name <- c("Run B", "Run C", "Run D")[n]
 
       run_names[[rid]] <- default_name
       run_data[[rid]] <- list(
@@ -66,7 +61,7 @@ mod_compare_server <- function(id) {
             column(8, textInput(ns(paste0("name_", rid)), NULL,
                                 value = rname, width = "100%")),
             column(4, actionButton(ns(paste0("rm_", rid)), NULL,
-                                   icon = icon("xmark"),
+                                   icon = icon("times"),
                                    class = "btn-sm btn-outline-danger"))
           ),
           fileInput(ns(paste0("upload_", rid)), NULL, multiple = TRUE,
@@ -92,7 +87,7 @@ mod_compare_server <- function(id) {
           local_rid <- rid
 
           # File upload observer
-          obs_upload <- observeEvent(input[[paste0("upload_", local_rid)]], {
+          observeEvent(input[[paste0("upload_", local_rid)]], {
             files <- input[[paste0("upload_", local_rid)]]
             req(files)
             paths <- list(ext = NULL, shk = NULL, coi = NULL,
@@ -157,32 +152,18 @@ mod_compare_server <- function(id) {
           }, ignoreInit = TRUE)
 
           # Name edit observer
-          obs_name <- observeEvent(input[[paste0("name_", local_rid)]], {
+          observeEvent(input[[paste0("name_", local_rid)]], {
             run_names[[local_rid]] <-
               input[[paste0("name_", local_rid)]]
           }, ignoreInit = TRUE)
 
           # Remove observer
-          obs_remove <- observeEvent(input[[paste0("rm_", local_rid)]], {
-            # Destroy observers for this run before removing it
-            if (!is.null(run_observers[[local_rid]])) {
-              run_observers[[local_rid]]$upload$destroy()
-              run_observers[[local_rid]]$name$destroy()
-              run_observers[[local_rid]]$remove$destroy()
-              run_observers[[local_rid]] <<- NULL
-            }
+          observeEvent(input[[paste0("rm_", local_rid)]], {
             run_ids(setdiff(run_ids(), local_rid))
             run_data[[local_rid]] <- NULL
             run_names[[local_rid]] <- NULL
-            run_count(run_count() - 1L)
+            run_counter(max(0L, run_counter() - 1L))
           }, ignoreInit = TRUE)
-
-          # Register observers so they can be destroyed later
-          run_observers[[local_rid]] <<- list(
-            upload = obs_upload,
-            name   = obs_name,
-            remove = obs_remove
-          )
         })
       }
 
