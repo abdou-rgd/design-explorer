@@ -41,6 +41,15 @@
 *.shk
 *.ctl
 
+# Exception : exemples intégrés dans l'app Shiny (Bauer 2021)
+!app/examples/**/*.ext
+!app/examples/**/*.shk
+!app/examples/**/*.coi
+!app/examples/**/*.clt
+!app/examples/**/*.tab
+!app/examples/**/*.ctl
+!app/www/styles.css
+
 # Dossiers lourds / non essentiels
 docs/inspiration/
 docs/books/

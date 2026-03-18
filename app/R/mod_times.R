@@ -17,8 +17,18 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       tab <- tab_data()
 
       if (is.null(tab)) {
-        return(div(class = "alert alert-warning",
-                   "Fichier .tab requis pour cet onglet."))
+        return(div(class = "alert alert-info", style = "border-radius:10px; margin:16px 0;",
+          tags$strong("Onglet Temps optimaux"),
+          tags$p(style = "margin:6px 0 0;",
+            "Disponible quand :",
+            tags$ul(style = "margin:4px 0;",
+              tags$li("Un fichier ", tags$code(".tab"), " est charge (genere par ",
+                      tags$code("$TABLE"), " dans le fichier de controle)"),
+              tags$li("Le .tab contient les temps de sampling optimises (",
+                      tags$code("TIME"), ", ", tags$code("TSTRAT"), ")")
+            )
+          )
+        ))
       }
 
       # Standard .tab section
@@ -27,8 +37,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
           column(12,
             div(class = "plot-card",
               p(class = "section-title",
-                "Prediction du modele et temps de sampling"),
-              plotOutput(ns("prediction"), height = "350px")
+                "Courbe predite et points de sampling"),
+              plotOutput(ns("prediction"), height = "400px")
             )
           )
         ),
@@ -37,7 +47,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
           column(7,
             div(class = "plot-card",
               p(class = "section-title",
-                "Temps d'echantillonnage optimaux par groupe"),
+                "Temps de sampling optimaux par strate (TSTRAT)"),
               plotOutput(ns("gantt"), height = "380px")
             )
           ),
@@ -74,16 +84,16 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       if (nrow(combined) == 0) return(plot_optimal_times(tab))
 
       combined <- combined |>
-        mutate(group = factor(paste0("Groupe ", TSTRAT)))
+        mutate(group = factor(paste0("Strate ", TSTRAT)))
 
       ggplot(combined, aes(x = TIME, y = group,
                            color = run, shape = run)) +
         geom_point(size = 3, alpha = 0.85,
                    position = position_dodge(width = 0.4)) +
         scale_color_manual(values = .RUN_COLORS, name = NULL) +
-        labs(title = "Temps d'echantillonnage -- Comparaison multi-runs",
-             x = "Temps", y = NULL) +
-        theme_bw(base_size = 11) +
+        labs(title = "Temps de sampling -- Comparaison multi-runs",
+             x = "Temps (h)", y = NULL) +
+        theme_bw(base_size = 12) +
         theme(legend.position = "bottom",
               panel.grid.major.y = element_blank())
     }, res = 110)
