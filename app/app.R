@@ -14,6 +14,32 @@ library(stringr)
 library(purrr)
 library(readr)
 
+# =============================================================================
+# Logger — écrit dans la console R et dans app/logs/app.log
+# Usage : log_info("message"), log_warn("..."), log_error("...")
+# =============================================================================
+.LOG_DIR <- file.path(getwd(), "logs")
+if (!dir.exists(.LOG_DIR)) dir.create(.LOG_DIR, recursive = TRUE)
+.LOG_FILE <- file.path(.LOG_DIR, "app.log")
+
+.log_write <- function(level, ...) {
+  msg <- paste0(
+    format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "),
+    sprintf("%-5s ", level),
+    paste0(..., collapse = "")
+  )
+  message(msg)
+  cat(msg, "\n", file = .LOG_FILE, append = TRUE)
+}
+
+log_info  <- function(...) .log_write("INFO",  ...)
+log_warn  <- function(...) .log_write("WARN",  ...)
+log_error <- function(...) .log_write("ERROR", ...)
+
+log_info("App demarree — R ", R.version.string,
+         ", dplyr ", packageVersion("dplyr"),
+         ", shiny ", packageVersion("shiny"))
+
 source("../scripts/parse_design_outputs.R", local = TRUE)
 source("../scripts/report_design.R",        local = TRUE)
 
@@ -184,6 +210,16 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  # -- Helper: safe parse with logging ----------------------------------------
+  .safe_load <- function(parser, path, label) {
+    if (is.null(path)) return(NULL)
+    tryCatch(parser(path), error = function(e) {
+      log_error("Parse ", label, " [", basename(path), "]: ", e$message)
+      showNotification(paste0("Erreur ", label, " : ", e$message), type = "error")
+      NULL
+    })
+  }
+
   # -- Drawer open/close ------------------------------------------------------
   observeEvent(input$open_drawer, {
     session$sendCustomMessage("evalJS", "
@@ -225,16 +261,16 @@ server <- function(input, output, session) {
       updateTextAreaInput(session, "param_labels", value = "")
       return()
     }
-    if (!is.null(paths$ext)) example_ext(tryCatch(read_ext(paths$ext),  error = function(e) NULL))
-    if (!is.null(paths$shk)) example_shk(tryCatch(read_shk(paths$shk),  error = function(e) NULL))
-    if (!is.null(paths$coi)) example_coi(tryCatch(read_coi(paths$coi),  error = function(e) NULL))
-    if (!is.null(paths$clt)) example_clt(tryCatch(read_clt(paths$clt),  error = function(e) NULL))
-    if (!is.null(paths$tab)) example_tab(tryCatch(read_tab(paths$tab),  error = function(e) NULL))
+    example_ext(.safe_load(read_ext, paths$ext, ".ext"))
+    example_shk(.safe_load(read_shk, paths$shk, ".shk"))
+    example_coi(.safe_load(read_coi, paths$coi, ".coi"))
+    example_clt(.safe_load(read_clt, paths$clt, ".clt"))
+    example_tab(.safe_load(read_tab, paths$tab, ".tab"))
     if (!is.null(paths$ext)) {
       ctl_path <- file.path(dirname(paths$ext),
         paste0(tools::file_path_sans_ext(basename(paths$ext)), ".ctl"))
       if (file.exists(ctl_path))
-        example_ctl(tryCatch(read_prior_nwpri(ctl_path), error = function(e) NULL))
+        example_ctl(.safe_load(read_prior_nwpri, ctl_path, ".ctl"))
     }
     lbl <- examples$labels()
     if (!is.null(lbl)) updateTextAreaInput(session, "param_labels", value = lbl)
@@ -245,11 +281,11 @@ server <- function(input, output, session) {
     if (is.null(comp_paths)) return()
     comp_data <- list(
       id = "example_comp", name = examples$compare_name() %||% "Run B",
-      ext_data = if (!is.null(comp_paths$ext)) tryCatch(read_ext(comp_paths$ext), error = function(e) NULL) else NULL,
-      shk_data = if (!is.null(comp_paths$shk)) tryCatch(read_shk(comp_paths$shk), error = function(e) NULL) else NULL,
-      coi_data = if (!is.null(comp_paths$coi)) tryCatch(read_coi(comp_paths$coi), error = function(e) NULL) else NULL,
-      clt_data = if (!is.null(comp_paths$clt)) tryCatch(read_clt(comp_paths$clt), error = function(e) NULL) else NULL,
-      tab_data = if (!is.null(comp_paths$tab)) tryCatch(read_tab(comp_paths$tab), error = function(e) NULL) else NULL
+      ext_data = .safe_load(read_ext, comp_paths$ext, ".ext (comp)"),
+      shk_data = .safe_load(read_shk, comp_paths$shk, ".shk (comp)"),
+      coi_data = .safe_load(read_coi, comp_paths$coi, ".coi (comp)"),
+      clt_data = .safe_load(read_clt, comp_paths$clt, ".clt (comp)"),
+      tab_data = .safe_load(read_tab, comp_paths$tab, ".tab (comp)")
     )
     example_comp_run(comp_data)
   })
