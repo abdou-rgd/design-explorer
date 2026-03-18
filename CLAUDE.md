@@ -66,13 +66,25 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 - **Logiciel source** : NONMEM 7.5+ (sorties texte brut)
 - **Python** : disponible à `C:/Users/abdou/AppData/Local/Python/pythoncore-3.14-64/python.exe` (PyMuPDF installé pour lire les PDFs)
 - **Packages R courants** :
-  - `ggplot2` — visualisations
-  - `dplyr`, `tidyr` — manipulation de données
-  - `stringr` — parsing de fichiers texte
-  - `readr` — lecture de fichiers
-  - `purrr` — itération fonctionnelle
   - `xpose` / `xpose4` — diagnostics graphiques NONMEM
-  - `shiny`, `bslib`, `DT` — application Shiny post-processing (installer via `app/install_deps.R`)
+  - Voir tableau ci-dessous pour les versions exactes du serveur cible
+
+### Versions serveur cible (R 4.2.0 — Sanofi RStudio Server)
+
+> **IMPORTANT** : toujours coder pour ces versions. Ne pas utiliser les fonctionnalités listées dans "À NE PAS utiliser".
+
+| Package  | Version | À NE PAS utiliser (trop récent)                                                  |
+|----------|---------|----------------------------------------------------------------------------------|
+| R        | 4.2.0   | pipe natif `|>` OK (4.1+), mais pas `_` placeholder (4.2+ partiel, 4.3 stable)  |
+| shiny    | 1.7.1   | Font Awesome 6 (`icon("xmark")` → utiliser `icon("times")`)                     |
+| bslib    | 0.3.1   | `card()`, `sidebar()`, `layout_sidebar()`, `page_sidebar()` (≥ 0.4)             |
+| DT       | 0.23    | OK                                                                                |
+| ggplot2  | 3.3.6   | `linewidth=` (≥ 3.4.0, utiliser `size=`), `geom_sf_label()` coord changes       |
+| dplyr    | 1.0.9   | `.default` dans `case_when()`, `.by=`, `reframe()`, `pick()`, `.env` (≥ 1.1.0)  |
+| tidyr    | 1.2.0   | OK                                                                                |
+| stringr  | 1.4.0   | `str_equal()`, `str_like()`, `str_width()` rewrite (≥ 1.5.0)                    |
+| purrr    | 0.3.4   | `list_c()`, `list_rbind()`, `list_flatten()`, `map_vec()` (≥ 1.0.0)             |
+| readr    | 2.1.2   | OK                                                                                |
 
 ---
 
