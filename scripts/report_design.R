@@ -23,27 +23,23 @@ library(purrr)
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-# Seuils de qualité — partagés avec l'application Shiny
-RSE_THRESHOLDS    <- c(20, 50)   # bon < 20%, acceptable < 50%, mauvais >= 50%
-RELINF_THRESHOLDS <- c(20, 50)   # même logique pour l'information relative
-
 # Palette qualité RelInf : rouge (bas) → orange → vert (élevé)
 .ri_quality <- function(ri_pct) {
   case_when(
-    is.na(ri_pct)               ~ "Inconnu",
-    ri_pct >= RELINF_THRESHOLDS[2] ~ "> 50% (bon)",
-    ri_pct >= RELINF_THRESHOLDS[1] ~ "20-50% (acceptable)",
-    TRUE                        ~ "< 20% (insuffisant)"
+    is.na(ri_pct)  ~ "Inconnu",
+    ri_pct >= 50   ~ "> 50% (bon)",
+    ri_pct >= 20   ~ "20-50% (acceptable)",
+    TRUE           ~ "< 20% (insuffisant)"
   )
 }
 
 # Palette qualité RSE : vert (bon) → orange → rouge (médiocre)
 .rse_quality <- function(rse_pct) {
   case_when(
-    is.na(rse_pct)              ~ "Inconnu",
-    rse_pct < RSE_THRESHOLDS[1] ~ "< 20% (bon)",
-    rse_pct < RSE_THRESHOLDS[2] ~ "20-50% (acceptable)",
-    TRUE                        ~ "> 50% (médiocre)"
+    is.na(rse_pct) ~ "Inconnu",
+    rse_pct < 20   ~ "< 20% (bon)",
+    rse_pct < 50   ~ "20-50% (acceptable)",
+    TRUE           ~ "> 50% (médiocre)"
   )
 }
 
@@ -457,7 +453,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
 
   obs <- obs |>
     mutate(
-      group = factor(paste0("Groupe ", .data[[group_col]])),
+      group = factor(paste0("Strate ", .data[[group_col]])),
       time  = .data[[time_col]]
     )
 
@@ -588,14 +584,19 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
 
 
 # =============================================================================
-# plot_model_prediction() — Model prediction plot
+# plot_model_prediction() — Courbe(s) PK/PD avec points de sampling
 # =============================================================================
 
-#' Model prediction plot avec temps de sampling
+#' Courbe(s) PK/PD predite(s) avec points de sampling optimaux
+#'
+#' Trace la courbe concentration-temps (ou effet-temps) a partir des predictions
+#' du modele (.tab $DESIGN). Si la colonne CMT est presente avec plusieurs
+#' compartiments, des courbes separees sont tracees (ex: PK + PD).
+#' Les points de sampling sont marques et etiquetes par strate (TSTRAT).
 #'
 #' @param tab_data   Tibble retourne par read_tab()
 #' @param group_col  Colonne de groupement (defaut : "TSTRAT")
-#' @param title      Titre
+#' @param title      Titre (NULL = automatique)
 #' @return Objet ggplot2
 #' @export
 plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) {
@@ -618,15 +619,57 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   if (!group_col %in% names(obs)) obs[[group_col]] <- 1
 
   obs <- obs |>
-    mutate(group = factor(paste0("Groupe ", .data[[group_col]])),
-           y_val = .data[[y_col]])
+    mutate(y_val = .data[[y_col]],
+           strate = paste0("Strate ", .data[[group_col]]))
 
-  ttl <- title %||% paste("Prediction du modele (", y_col, ") vs Temps")
+  # Detect multi-response (PK-PD) via CMT column
+  has_cmt <- "CMT" %in% names(obs) && n_distinct(obs$CMT) > 1
+  if (has_cmt) {
+    obs <- obs |>
+      mutate(response = paste0("Reponse CMT=", CMT)) |>
+      arrange(response, TIME)
+  } else {
+    obs <- obs |>
+      mutate(response = "Prediction") |>
+      arrange(TIME)
+  }
 
-  ggplot(obs, aes(x = TIME, y = y_val, color = group)) +
-    geom_line(linewidth = 0.8, alpha = 0.7) +
-    geom_point(size = 2.5, alpha = 0.85) +
-    scale_color_brewer(palette = "Set2", name = NULL) +
-    labs(title = ttl, x = "Temps", y = y_col) +
-    .theme_design()
+  y_label <- if (has_cmt) "Prediction (IPRED)" else y_col
+  ttl <- title %||% if (has_cmt) "Courbes PK/PD predites et points de sampling" else
+                     paste0("Courbe predite (", y_col, ") et points de sampling")
+
+  p <- ggplot(obs, aes(x = TIME, y = y_val))
+
+  # Draw curve(s) — connect points sorted by TIME within each response
+  if (has_cmt) {
+    p <- p +
+      geom_line(aes(color = response, group = response),
+                size = 0.9, alpha = 0.6) +
+      geom_point(aes(fill = response), shape = 21, size = 3.5,
+                 color = "white", stroke = 0.8) +
+      scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
+                         name = NULL) +
+      scale_fill_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
+                        name = NULL)
+  } else {
+    p <- p +
+      geom_line(color = "#2563eb", size = 0.9, alpha = 0.6) +
+      geom_point(fill = "#2563eb", shape = 21, size = 3.5,
+                 color = "white", stroke = 0.8)
+  }
+
+  # Label sampling points with strate number
+  p <- p +
+    geom_text(aes(label = strate), size = 2.8, color = "#374151",
+              vjust = -1.3, hjust = 0.5) +
+    labs(title = ttl, x = "Temps (h)", y = y_label,
+         caption = "Points = temps de sampling | Strate = TSTRAT") +
+    .theme_design() +
+    theme(plot.caption = element_text(size = 8, color = "#6b7280"))
+
+  if (has_cmt) {
+    p <- p + facet_wrap(~ response, scales = "free_y", ncol = 1)
+  }
+
+  p
 }

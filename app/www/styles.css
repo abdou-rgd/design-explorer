@@ -19,8 +19,8 @@
 }
 
 /* ── Reset / Base ──────────────────────────────────────────────────────── */
-html { font-size: 16px !important; }
-body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); font-size: 14px; }
+html { font-size: 17px !important; }
+body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); font-size: 15px; }
 
 /* ── Hide default bslib navbar (replaced by sidebar layout) ────────────── */
 .navbar { display: none !important; }
@@ -86,7 +86,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 .nav-item {
   display: block;
   padding: 8px 18px;
-  font-size: 14px !important;
+  font-size: 15px !important;
   color: var(--sidebar-text);
   cursor: pointer;
   border-radius: 0;
@@ -115,7 +115,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: 14px;
   min-height: 42px;
   flex-shrink: 0;
 }
@@ -210,7 +210,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 .metric-card.purple { border-top-color: var(--metric-purple); }
 .metric-card.blue   { border-top-color: var(--run-a); }
 .metric-label {
-  font-size: .72rem;
+  font-size: .78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -225,7 +225,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   font-family: 'JetBrains Mono', monospace;
 }
 .metric-sub {
-  font-size: .72rem;
+  font-size: .78rem;
   color: var(--text-muted);
   margin-top: 3px;
 }
@@ -240,7 +240,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   margin-bottom: 14px;
 }
 .section-title {
-  font-size: .88rem;
+  font-size: .95rem;
   font-weight: 700;
   color: var(--text);
   border-bottom: 1px solid var(--border);
@@ -309,13 +309,13 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 }
 
 /* ── DT table tweaks ───────────────────────────────────────────────────── */
-table.dataTable { font-family:'DM Sans',sans-serif; font-size:14px !important; }
+table.dataTable { font-family:'DM Sans',sans-serif; font-size:15px !important; }
 table.dataTable tbody tr:nth-child(odd)  { background:#f8fafc; }
 table.dataTable tbody tr:hover           { background:#eff6ff; }
-table.dataTable thead th { background:#f1f5f9; font-weight:700; color:var(--text-muted); font-size:12px !important; letter-spacing:.04em; text-transform:uppercase; }
+table.dataTable thead th { background:#f1f5f9; font-weight:700; color:var(--text-muted); font-size:13px !important; letter-spacing:.04em; text-transform:uppercase; }
 
 /* ── Alert ─────────────────────────────────────────────────────────────── */
-.alert-info, .alert-warning { border-radius:8px; font-size:.88rem; }
+.alert-info, .alert-warning { border-radius:8px; font-size:.92rem; }
 
 /* ── Run list in drawer ────────────────────────────────────────────────── */
 .run-item {
