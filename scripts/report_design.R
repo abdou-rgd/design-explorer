@@ -635,8 +635,8 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   }
 
   y_label <- if (has_cmt) "Prediction (IPRED)" else y_col
-  ttl <- title %||% if (has_cmt) "Courbes PK/PD predites et points de sampling"
-                     else paste0("Courbe predite (", y_col, ") et points de sampling")
+  ttl <- title %||% if (has_cmt) "Courbes PK/PD predites et points de sampling" else
+                     paste0("Courbe predite (", y_col, ") et points de sampling")
 
   p <- ggplot(obs, aes(x = TIME, y = y_val))
 
@@ -644,7 +644,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   if (has_cmt) {
     p <- p +
       geom_line(aes(color = response, group = response),
-                linewidth = 0.9, alpha = 0.6) +
+                size = 0.9, alpha = 0.6) +
       geom_point(aes(fill = response), shape = 21, size = 3.5,
                  color = "white", stroke = 0.8) +
       scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
@@ -653,7 +653,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
                         name = NULL)
   } else {
     p <- p +
-      geom_line(color = "#2563eb", linewidth = 0.9, alpha = 0.6) +
+      geom_line(color = "#2563eb", size = 0.9, alpha = 0.6) +
       geom_point(fill = "#2563eb", shape = 21, size = 3.5,
                  color = "white", stroke = 0.8)
   }
