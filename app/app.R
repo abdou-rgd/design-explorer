@@ -343,7 +343,7 @@ server <- function(input, output, session) {
     if (raw == "") return(NULL)
     lbl <- tibble::tibble(raw = stringr::str_split_1(raw, "\n")) |>
       dplyr::filter(stringr::str_detect(raw, "=")) |>
-      tidyr::separate_wider_delim(raw, "=", names = c("key", "val"), too_many = "merge") |>
+      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
       dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
       dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
       tibble::deframe()
