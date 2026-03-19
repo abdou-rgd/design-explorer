@@ -383,7 +383,7 @@ server <- function(input, output, session) {
   output$reset_run_btn <- renderUI({
     if (is.null(merged_ext())) return(NULL)
     actionButton("reset_run", "Retirer la run",
-      icon  = icon("xmark"),
+      icon  = icon("times"),
       class = "btn-sm btn-danger w-100",
       style = "margin-bottom: 8px;"
     )

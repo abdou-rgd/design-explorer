@@ -49,7 +49,7 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
           rse <- rse |> mutate(param = ifelse(param %in% names(lbls), lbls[param], param))
         }
         rse |> mutate(run = r$name)
-      }) |> purrr::list_rbind()
+      }) |> dplyr::bind_rows()
 
       if (nrow(combined) == 0) return(NULL)
 
@@ -58,9 +58,9 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
 
       ggplot(combined, aes(x = param, y = .data[[y_var]], fill = run)) +
         geom_col(position = position_dodge(width = 0.75), width = 0.65,
-                 color = "white", linewidth = 0.3) +
+                 color = "white", size = 0.3) +
         {if (!show_se) geom_hline(yintercept = c(20, 50), linetype = "dashed",
-                                   color = "grey40", linewidth = 0.45)} +
+                                   color = "grey40", size = 0.45)} +
         scale_fill_manual(values = .RUN_COLORS, name = NULL) +
         labs(title = paste(y_lab, "-- Comparaison multi-runs"), x = NULL, y = y_lab) +
         .theme_design() +

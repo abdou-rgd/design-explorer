@@ -134,9 +134,9 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
   ttl   <- title %||% "Information relative (%) par ETA"
 
   ggplot(ri, aes(x = reorder(eta, relativeinf_pct), y = relativeinf_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
+    geom_col(width = 0.65, color = "white", size = 0.3) +
     geom_hline(yintercept = c(20, 50), linetype = "dashed",
-               color = "grey40", linewidth = 0.45) +
+               color = "grey40", size = 0.45) +
     geom_text(
       aes(label = sprintf("%.2f%%", relativeinf_pct)),
       hjust = -0.12, size = 3.2, color = "grey25"
@@ -222,9 +222,9 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
   facet_scales <- if (free_y) "free" else "free_x"
 
   p <- ggplot(rse, aes(x = param, y = rse_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
+    geom_col(width = 0.65, color = "white", size = 0.3) +
     geom_hline(yintercept = c(20, 50), linetype = "dashed",
-               color = "grey40", linewidth = 0.45) +
+               color = "grey40", size = 0.45) +
     geom_text(
       aes(label = sprintf("%.2f%%", rse_pct)),
       vjust = -0.35, size = 2.9, color = "grey25"
@@ -306,7 +306,7 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
   ttl <- title %||% "Convergence — critère d'optimalité par itération"
 
   p <- ggplot(dat, aes(x = ITERATION, y = OBJ, color = bloc_label, group = bloc_label)) +
-    geom_line(linewidth = 0.75, alpha = 0.9) +
+    geom_line(size = 0.75, alpha = 0.9) +
     geom_point(size = 0.6, alpha = 0.4) +
     labs(
       title = ttl,
@@ -391,7 +391,7 @@ plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
   ttl <- title %||% "Matrice de corrélation (FIM)"
 
   ggplot(df, aes(x = col, y = row, fill = value)) +
-    geom_tile(color = "white", linewidth = 0.5) +
+    geom_tile(color = "white", size = 0.5) +
     geom_text(aes(label = sprintf("%.2f", value)),
               size = 2.8, color = "grey20") +
     scale_fill_gradient2(
@@ -462,7 +462,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
   ggplot(obs, aes(x = time, y = group, color = group)) +
     geom_segment(
       aes(x = 0, xend = time, y = group, yend = group),
-      linewidth = 0.4, color = "grey70", alpha = 0.6
+      size = 0.4, color = "grey70", alpha = 0.6
     ) +
     geom_point(size = 3, alpha = 0.85) +
     scale_color_brewer(palette = "Set2", name = NULL) +
@@ -520,7 +520,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   ttl <- title %||% "Erreurs standard (SE) prédites par la FIM"
 
   ggplot(rse, aes(x = param, y = se)) +
-    geom_col(width = 0.65, fill = "#1976d2", color = "white", linewidth = 0.3) +
+    geom_col(width = 0.65, fill = "#1976d2", color = "white", size = 0.3) +
     geom_text(
       aes(label = sprintf("%.4f", se)),
       vjust = -0.35, size = 2.9, color = "grey25"
@@ -571,8 +571,8 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
   ttl <- title %||% "RSE predit par la FIM (%) -- Waterfall"
 
   ggplot(rse, aes(x = reorder(param, rse_pct), y = rse_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
-    geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", linewidth = 0.45) +
+    geom_col(width = 0.65, color = "white", size = 0.3) +
+    geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", size = 0.45) +
     geom_text(aes(label = sprintf("%.2f%%", rse_pct)),
               hjust = -0.12, size = 3, color = "grey25") +
     scale_fill_manual(values = .COLORS_RSE, name = NULL, drop = FALSE) +

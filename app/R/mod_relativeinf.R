@@ -54,8 +54,8 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
 
       ggplot(combined, aes(x = eta, y = relativeinf_pct, fill = run)) +
         geom_col(position = position_dodge(width = 0.75), width = 0.65,
-                 color = "white", linewidth = 0.3) +
-        geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", linewidth = 0.45) +
+                 color = "white", size =0.3) +
+        geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", size =0.45) +
         scale_fill_manual(values = .RUN_COLORS, name = NULL) +
         coord_flip() +
         labs(title = "RELATIVEINF (%) -- Comparaison multi-runs", x = NULL, y = "RELATIVEINF (%)") +
