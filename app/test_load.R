@@ -9,12 +9,12 @@ library(stringr)
 library(purrr)
 library(readr)
 
-source("../scripts/parse_design_outputs.R", local = TRUE)
-source("../scripts/report_design.R",        local = TRUE)
+source("../R/parse_design_outputs.R", local = TRUE)
+source("../R/report_design.R",        local = TRUE)
 
 # Test rapide avec les fichiers exemple 2 (optimisation)
-ext_file <- "../docs/bauer2021_examples/example2/warfarin2.ext"
-shk_file <- "../docs/bauer2021_examples/example2/warfarin2.shk"
+ext_file <- "../docs/papers/bauer2021/examples/example2/warfarin2.ext"
+shk_file <- "../docs/papers/bauer2021/examples/example2/warfarin2.shk"
 
 if (file.exists(ext_file)) {
   ext <- read_ext(ext_file)

@@ -40,8 +40,8 @@ log_info("App demarree — R ", R.version.string,
          ", dplyr ", packageVersion("dplyr"),
          ", shiny ", packageVersion("shiny"))
 
-source("../scripts/parse_design_outputs.R", local = TRUE)
-source("../scripts/report_design.R",        local = TRUE)
+source("../R/parse_design_outputs.R", local = TRUE)
+source("../R/report_design.R",        local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)

@@ -16,12 +16,13 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 
 ```
 .
-├── scripts/
+├── R/
 │   ├── parse_design_outputs.R   # Parsers : read_ext(), read_shk(), get_rse(), ...
 │   └── report_design.R          # Visualisations : plot_rse(), plot_relativeinf(), ...
 ├── app/
-│   ├── app.R                    # Application Shiny "$DESIGN Explorer" (v3.0)
+│   ├── app.R                    # Application Shiny "$DESIGN Explorer"
 │   ├── install_deps.R           # Installation des dépendances Shiny
+│   ├── examples/                # Exemples intégrés dans l'app (Bauer 2021)
 │   └── R/                       # Modules Shiny
 │       ├── mod_upload.R         # Import de fichiers NONMEM
 │       ├── mod_params.R         # Paramètres finaux
@@ -33,14 +34,23 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 │       ├── mod_times.R          # Temps/doses optimisés
 │       ├── mod_raw.R            # Fichiers bruts
 │       └── mod_examples.R       # Exemples intégrés
+├── tests/
+│   └── testthat/
+│       └── test-parse_design_outputs.R
+├── dev/                         # Specs & plans d'implémentation
+│   ├── plans/
+│   └── specs/
 └── docs/
-    ├── manuel_nonmem.txt        # Manuel NONMEM 7.5.1 complet (13 057 lignes)
-    ├── bauer2021_text.txt        # Bauer 2021 — référence $DESIGN
     ├── reading_list.md           # Liste de lecture annotée
-    ├── bauer2021_examples/       # 7 exemples complets (Bauer 2021)
-    ├── inspiration/PFIM/         # Code source PFIM 7.0
-    ├── inspiration/PopED-master/ # Code source PopED
-    └── intern_work/              # Mémoire de stage en cours
+    ├── nonmem/
+    │   └── manuel_nonmem.txt     # Manuel NONMEM 7.5.1 complet (13 057 lignes)
+    ├── papers/
+    │   └── bauer2021/
+    │       ├── bauer2021_text.txt # Bauer 2021 — référence $DESIGN (texte extrait)
+    │       └── examples/          # 7 exemples complets (fichiers NONMEM)
+    ├── inspiration/PFIM/          # Code source PFIM 7.0
+    ├── inspiration/PopED-master/  # Code source PopED
+    └── intern_work/               # Mémoire de stage en cours
 ```
 
 ---
@@ -78,12 +88,12 @@ shiny::runApp("app/")
 
 ## Scripts R
 
-### `scripts/parse_design_outputs.R`
+### `R/parse_design_outputs.R`
 
 Parsers pour les fichiers de sortie NONMEM `$DESIGN` :
 
 ```r
-source("scripts/parse_design_outputs.R")
+source("R/parse_design_outputs.R")
 
 # Lire les fichiers
 ext <- read_ext("run001.ext")
@@ -100,13 +110,13 @@ get_relativeinf(shk)    # Information relative (%) par ETA (TYPE 11)
 summary_design(ext, shk)
 ```
 
-### `scripts/report_design.R`
+### `R/report_design.R`
 
 Visualisations ggplot2 :
 
 ```r
-source("scripts/parse_design_outputs.R")
-source("scripts/report_design.R")
+source("R/parse_design_outputs.R")
+source("R/report_design.R")
 
 plot_rse(ext)            # Barplot RSE(%) par paramètre, facetté par type
 plot_relativeinf(shk)    # Barplot RELATIVEINF(%) par ETA avec code couleur
@@ -162,13 +172,13 @@ plot_convergence(ext)    # Courbe OFV vs itération
 | 6 | TMDD | Stratification (`STRAT/STRATF`), ODE |
 | 7 | TMDD | Bayes FIM, optimisation dose + temps |
 
-Fichiers disponibles dans `docs/bauer2021_examples/`.
+Fichiers disponibles dans `docs/papers/bauer2021/examples/`.
 
 ---
 
 ## Ressources
 
-- `docs/manuel_nonmem.txt` — Manuel NONMEM 7.5.1 complet
-- `docs/bauer2021_text.txt` — Bauer 2021 (texte extrait)
+- `docs/nonmem/manuel_nonmem.txt` — Manuel NONMEM 7.5.1 complet
+- `docs/papers/bauer2021/bauer2021_text.txt` — Bauer 2021 (texte extrait)
 - `docs/reading_list.md` — Liste de lecture annotée
 - `docs/intern_work/redaction.docx` — Mémoire de stage en cours

@@ -2,9 +2,9 @@
 
 ## Notes pour Claude
 
-- **Lecture du manuel** : `docs/manuel_nonmem.txt` (13 057 lignes) — utiliser `Read` avec `offset`/`limit`. Table des sections ci-dessous.
+- **Lecture du manuel** : `docs/nonmem/manuel_nonmem.txt` (13 057 lignes) — utiliser `Read` avec `offset`/`limit`. Table des sections ci-dessous.
 
-### Offsets `docs/manuel_nonmem.txt` (numéros de ligne exacts)
+### Offsets `docs/nonmem/manuel_nonmem.txt` (numéros de ligne exacts)
 
 | Section | Contenu | Ligne début | Ligne fin approx. |
 |---------|---------|-------------|-------------------|
@@ -92,8 +92,8 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 
 | Fichier | Description |
 |---------|-------------|
-| `scripts/parse_design_outputs.R` | Parsers R : `read_ext()`, `read_shk()`, `read_coi()`, `read_clt()`, `read_tab()`, `read_prior_nwpri()`, `read_summary_tab()`, `get_rse()`, `get_relativeinf()`, `get_d_criterion()`, `get_cor_matrix()`, `summary_design()` |
-| `scripts/report_design.R` | Visualisations : `plot_relativeinf()`, `plot_rse()`, `plot_se()`, `plot_rse_waterfall()`, `plot_convergence()`, `plot_fim_heatmap()`, `plot_optimal_times()` |
+| `R/parse_design_outputs.R` | Parsers R : `read_ext()`, `read_shk()`, `read_coi()`, `read_clt()`, `read_tab()`, `read_prior_nwpri()`, `read_summary_tab()`, `get_rse()`, `get_relativeinf()`, `get_d_criterion()`, `get_cor_matrix()`, `summary_design()` |
+| `R/report_design.R` | Visualisations : `plot_relativeinf()`, `plot_rse()`, `plot_se()`, `plot_rse_waterfall()`, `plot_convergence()`, `plot_fim_heatmap()`, `plot_optimal_times()` |
 | `app/app.R` | Application Shiny post-processing $DESIGN (V4) — sidebar nav, drawer, KPI bar — `shiny::runApp("app/")` depuis la racine |
 | `app/R/` | 12 modules : upload, compare, examples, params, rse, relativeinf, fim, times, prior, convergence, raw, helpers_ui |
 | `app/examples/` | Exemples Bauer 2021 intégrés (example1–4, fichiers `.ext`/`.shk`/`.coi`/`.clt`/`.tab`) |
@@ -101,14 +101,14 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 | `app/install_deps.R` | Installe les packages Shiny manquants (shiny, bslib, DT) |
 | `docs/inspiration/PFIM/` | Code source PFIM 7.0 — référence pour plots SE/RSE/shrinkage, rapport HTML, structure FIM |
 | `docs/inspiration/PopED-master/` | Code source PopED — référence pour efficiency(), plot_efficiency_of_windows(), plot_model_prediction() |
-| `docs/manuel_nonmem.txt` | Manuel NONMEM 7.5.1 complet (13 057 lignes) — lisible via Read avec offset |
-| `docs/bauer2021_text.txt` | Papier Bauer 2021 extrait en texte — lisible directement |
-| `docs/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
-| `docs/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
-| `docs/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
-| `docs/bauer2021_examples/` | 7 exemples complets avec tous les fichiers NONMEM |
-| `docs/bauer2021_examples/Design_Theory.pdf` | Fondements mathématiques FIM (4p) |
-| `docs/bauer2021_examples/Table_s1.pdf` | Tableau récap OFVTYPE (1p) |
+| `docs/nonmem/manuel_nonmem.txt` | Manuel NONMEM 7.5.1 complet (13 057 lignes) — lisible via Read avec offset |
+| `docs/papers/bauer2021/bauer2021_text.txt` | Papier Bauer 2021 extrait en texte — lisible directement |
+| `docs/papers/bauer2021/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
+| `docs/nonmem/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
+| `docs/nonmem/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
+| `docs/papers/bauer2021/examples/` | 7 exemples complets avec tous les fichiers NONMEM |
+| `docs/papers/bauer2021/examples/Design_Theory.pdf` | Fondements mathématiques FIM (4p) |
+| `docs/papers/bauer2021/examples/Table_s1.pdf` | Tableau récap OFVTYPE (1p) |
 | `docs/reading_list.md` | Liste de lecture annotée (✅/🔄/⬜, par niveau) |
 | `docs/books/PKPD Analysis with NLMEM/` | Owen & Fiedler-Kelly 2014 (Wiley) — livre de référence |
 | `docs/intern_work/redaction.docx` | Mémoire de stage en cours — question de recherche, méthodologie, planning |
@@ -256,13 +256,13 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 
 | Exemple | Dossier | Ce qu'il illustre |
 |---------|---------|-------------------|
-| 1 | `docs/bauer2021_examples/example1/warfarin.*` | Évaluation simple, FIM bloc-diag |
-| 2 | `docs/bauer2021_examples/example2/warfarin2.*` | Optimisation temps, NELDER |
-| 3 | `docs/bauer2021_examples/example3/priortrue.*` | Robust design via $SIM TRUE=PRIOR |
-| 4 | `docs/bauer2021_examples/example4/warfarin_pkpd_*` | PK-PD multi-réponses |
-| 5 | `docs/bauer2021_examples/example5/optdesign2.*` | DS-optimality, UNINT |
-| 6 | `docs/bauer2021_examples/example6/tmdd2.*` | TMDD, STRAT/STRATF, ODE |
-| 7 | `docs/bauer2021_examples/example7/tmdd2b.*` | Bayes FIM, optimisation dose+temps |
+| 1 | `docs/papers/bauer2021/examples/example1/warfarin.*` | Évaluation simple, FIM bloc-diag |
+| 2 | `docs/papers/bauer2021/examples/example2/warfarin2.*` | Optimisation temps, NELDER |
+| 3 | `docs/papers/bauer2021/examples/example3/priortrue.*` | Robust design via $SIM TRUE=PRIOR |
+| 4 | `docs/papers/bauer2021/examples/example4/warfarin_pkpd_*` | PK-PD multi-réponses |
+| 5 | `docs/papers/bauer2021/examples/example5/optdesign2.*` | DS-optimality, UNINT |
+| 6 | `docs/papers/bauer2021/examples/example6/tmdd2.*` | TMDD, STRAT/STRATF, ODE |
+| 7 | `docs/papers/bauer2021/examples/example7/tmdd2b.*` | Bayes FIM, optimisation dose+temps |
 
 ---
 
