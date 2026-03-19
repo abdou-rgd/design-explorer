@@ -19,7 +19,7 @@ mod_upload_ui <- function(id) {
   )
 }
 
-mod_upload_server <- function(id) {
+mod_upload_server <- function(id, reset_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
 
     # Chemins fichiers detectes
@@ -29,6 +29,14 @@ mod_upload_server <- function(id) {
 
     # Lignes brutes .ext (pour detect_criterion)
     ext_lines_raw <- reactiveVal(NULL)
+
+    # Reset universel
+    if (!is.null(reset_trigger)) {
+      observeEvent(reset_trigger(), {
+        file_paths(list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL))
+        ext_lines_raw(NULL)
+      }, ignoreInit = TRUE)
+    }
 
     observe({
       files <- input$upload
