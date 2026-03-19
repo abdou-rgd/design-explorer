@@ -55,6 +55,19 @@ docs/books/
 docs/courses/
 autoresearch/
 
+# Travail interne de stage (non pertinent pour les collègues)
+docs/intern_work/
+docs/superpowers/
+docs/reading_list.md
+
+# Documents non redistribuables
+docs/manuel_nonmem.txt
+docs/bauer2021_text.txt
+
+# Pages web sauvegardées
+docs/*.htm
+docs/*_files/
+
 # OS
 .DS_Store
 Thumbs.db
