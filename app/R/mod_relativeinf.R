@@ -33,7 +33,7 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
       }
 
       # Multi-run
-      combined <- purrr::imap_dfr(runs, function(r, idx) {
+      combined <- purrr::map_dfr(runs, function(r) {
         if (is.null(r$shk_data)) return(NULL)
         ri <- get_relativeinf(r$shk_data, tbl_no())
         if (nrow(ri) == 0) return(NULL)

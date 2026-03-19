@@ -72,7 +72,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       runs <- all_runs()
       if (length(runs) <= 1) return(plot_optimal_times(tab))
 
-      combined <- purrr::imap_dfr(runs, function(r, idx) {
+      combined <- purrr::map_dfr(runs, function(r) {
         if (is.null(r$tab_data)) return(NULL)
         obs <- r$tab_data
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
