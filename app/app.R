@@ -40,8 +40,8 @@ log_info("App demarree — R ", R.version.string,
          ", dplyr ", packageVersion("dplyr"),
          ", shiny ", packageVersion("shiny"))
 
-source("../scripts/parse_design_outputs.R", local = TRUE)
-source("../scripts/report_design.R",        local = TRUE)
+source("../R/parse_design_outputs.R", local = TRUE)
+source("../R/report_design.R",        local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -343,7 +343,7 @@ server <- function(input, output, session) {
     if (raw == "") return(NULL)
     lbl <- tibble::tibble(raw = stringr::str_split_1(raw, "\n")) |>
       dplyr::filter(stringr::str_detect(raw, "=")) |>
-      tidyr::separate_wider_delim(raw, "=", names = c("key", "val"), too_many = "merge") |>
+      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
       dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
       dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
       tibble::deframe()
@@ -383,7 +383,7 @@ server <- function(input, output, session) {
   output$reset_run_btn <- renderUI({
     if (is.null(merged_ext())) return(NULL)
     actionButton("reset_run", "Retirer la run",
-      icon  = icon("xmark"),
+      icon  = icon("times"),
       class = "btn-sm btn-danger w-100",
       style = "margin-bottom: 8px;"
     )

@@ -31,12 +31,12 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
           select(table_no, ITERATION, OBJ) |>
           filter(!is.na(OBJ), !is.na(ITERATION)) |>
           mutate(run = r$name)
-      }) |> purrr::list_rbind()
+      }) |> dplyr::bind_rows()
 
       if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de convergence") + .theme_design())
 
       p <- ggplot(combined, aes(x = ITERATION, y = OBJ, color = run)) +
-        geom_line(linewidth = 0.75, alpha = 0.9) +
+        geom_line(size = 0.75, alpha = 0.9) +
         scale_color_manual(values = .RUN_COLORS, name = NULL) +
         labs(title = "Convergence -- Comparaison multi-runs",
              x = "Iteration ($DESIGN)", y = "OFV (-log det FIM)",

@@ -117,7 +117,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
           `RSE moy. (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
           `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_
         )
-      }) |> purrr::list_rbind()
+      }) |> dplyr::bind_rows()
       datatable(comp_df, rownames = FALSE, class = "stripe hover compact",
                 options = list(pageLength = 5, dom = "t"))
     })
