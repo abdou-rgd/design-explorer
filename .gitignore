@@ -61,8 +61,11 @@ docs/superpowers/
 docs/reading_list.md
 
 # Documents non redistribuables
-docs/manuel_nonmem.txt
-docs/bauer2021_text.txt
+docs/nonmem/manuel_nonmem.txt
+docs/nonmem/manuel_nonmem.pdf
+docs/nonmem/doc_nonmem_design.pdf
+docs/papers/bauer2021/bauer2021_text.txt
+docs/papers/bauer2021/bauer2021.pdf
 
 # Pages web sauvegardées
 docs/*.htm
