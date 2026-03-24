@@ -252,7 +252,7 @@ server <- function(input, output, session) {
   example_ctl      <- reactiveVal(NULL)
   example_comp_run <- reactiveVal(NULL)
 
-  observeEvent(examples$file_paths(), {
+  observeEvent(examples$file_paths(), ignoreNULL = FALSE, {
     paths <- examples$file_paths()
     if (is.null(paths)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
@@ -288,6 +288,16 @@ server <- function(input, output, session) {
       tab_data = .safe_load(read_tab, comp_paths$tab, ".tab (comp)")
     )
     example_comp_run(comp_data)
+  })
+
+  # Quand l'user uploade un fichier → effacer les données exemple (upload a priorité)
+  observeEvent(upload$file_paths(), ignoreNULL = FALSE, {
+    fps <- upload$file_paths()
+    if (!is.null(fps$ext)) {
+      example_ext(NULL); example_shk(NULL); example_coi(NULL)
+      example_clt(NULL); example_tab(NULL); example_ctl(NULL)
+      example_comp_run(NULL)
+    }
   })
 
   # -- Merged reactives -------------------------------------------------------
