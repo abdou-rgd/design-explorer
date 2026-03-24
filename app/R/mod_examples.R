@@ -36,6 +36,24 @@
       )
     )
   ),
+  example3 = list(
+    title = "Exemple 3 : Robust design ($PRIOR)",
+    desc = "Optimisation robuste via $SIM TRUE=PRIOR SUBPROB=1000. Distribution des temps sur 1000 jeux de parametres.",
+    dir = "examples/example3",
+    prefix = "priortrue",
+    labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
+    has_summary = TRUE,
+    summary_file = "examples/example3/summary.tab",
+    guide = list(
+      context = "Meme modele warfarin, mais l'optimisation tient compte de l'incertitude sur les parametres via $SIM TRUE=PRIOR SUBPROB=1000. Chaque SUBPROB tire un jeu de parametres selon le prior.",
+      points = c(
+        "Le summary.tab agrege les 1000 sous-problemes : distribution des temps optimaux",
+        "La robustesse = le design reste bon meme si les vrais parametres different du nominal",
+        "Comparez les temps optimaux (onglet 'Temps optimaux') avec l'exemple 2 sans prior",
+        "RSE et RELATIVEINF refletent la moyenne sur les 1000 realisations du prior"
+      )
+    )
+  ),
   example4 = list(
     title = "Exemple 4 : PK-PD multi-reponses",
     desc = "Modele warfarin PK-PD (concentration + effet), FIMTYPE=1 + VARCROSS=1.",
