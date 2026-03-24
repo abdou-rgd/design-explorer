@@ -79,16 +79,16 @@ param_type_badge <- function(param) {
   span(param)
 }
 
-# -- Run color palette (max 4 runs) -----------------------------------------
+# -- Run color palette (max 4 runs) — keyed by rid, not by editable name ----
 .RUN_COLORS <- c(
-  "Run A" = "#2563eb",
-  "Run B" = "#dc2626",
-  "Run C" = "#16a34a",
-  "Run D" = "#d97706"
+  "primary" = "#2563eb",
+  "run_1"   = "#dc2626",
+  "run_2"   = "#16a34a",
+  "run_3"   = "#d97706"
 )
 
-run_color <- function(run_name) {
-  .RUN_COLORS[run_name] %||% "#6b7280"
+run_color <- function(rid) {
+  .RUN_COLORS[rid] %||% "#6b7280"
 }
 
 # -- Run pill (header/drawer) -----------------------------------------------

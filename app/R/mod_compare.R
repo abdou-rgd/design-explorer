@@ -25,15 +25,15 @@ mod_compare_server <- function(id) {
     run_counter <- reactiveVal(0L)
 
     observeEvent(input$add_run, {
-      n <- run_counter() + 1L
-      if (n > 3L) {
+      if (length(run_ids()) >= 3L) {
         showNotification("Maximum 3 runs de comparaison (4 total)",
                          type = "warning")
         return()
       }
+      n <- run_counter() + 1L
       run_counter(n)
       rid <- paste0("run_", n)
-      default_name <- c("Run B", "Run C", "Run D")[n]
+      default_name <- c("Run B", "Run C", "Run D")[length(run_ids()) + 1L]
 
       run_names[[rid]] <- default_name
       run_data[[rid]] <- list(
@@ -52,7 +52,7 @@ mod_compare_server <- function(id) {
 
       run_uis <- lapply(ids, function(rid) {
         rname <- isolate(run_names[[rid]])
-        color <- run_color(rname)
+        color <- run_color(rid)
         has_data <- !is.null(isolate(run_data[[rid]]$ext_data))
 
         div(class = "upload-box",
@@ -151,18 +151,20 @@ mod_compare_server <- function(id) {
             )
           }, ignoreInit = TRUE)
 
-          # Name edit observer
-          observeEvent(input[[paste0("name_", local_rid)]], {
-            run_names[[local_rid]] <-
-              input[[paste0("name_", local_rid)]]
-          }, ignoreInit = TRUE)
+          # Name edit observer — debounced to avoid cascade on every keystroke
+          name_input_d <- debounce(
+            reactive(input[[paste0("name_", local_rid)]]), 500
+          )
+          observeEvent(name_input_d(), {
+            run_names[[local_rid]] <- name_input_d()
+          }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
           # Remove observer
           observeEvent(input[[paste0("rm_", local_rid)]], {
             run_ids(setdiff(run_ids(), local_rid))
             run_data[[local_rid]] <- NULL
             run_names[[local_rid]] <- NULL
-            run_counter(max(0L, run_counter() - 1L))
+            # run_counter stays monotone — never decremented
           }, ignoreInit = TRUE)
         })
       }

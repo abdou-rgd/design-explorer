@@ -298,7 +298,7 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 ### Gotchas multi-runs (app V4)
 
 - **vapply + tbl_no cross-run** : `get_ofv(ext, tbl_no)` retourne `numeric(0)` si le run n'a pas la table demandée (ex: run comparaison a 1 table, primary en a 1000) — toujours guard `if (length(val) == 0L) return(NA_real_)` dans tout `vapply` sur `all_runs`
-- **Exemple 3 SUBPROB=1000** : `.ext`/`.shk` ont 1000 TABLE NO., `.tab` a 1000 blocs concaténés sans TSTRAT ; `tbl_no()` passe à max=1000 au chargement
+- **Exemple 3 SUBPROB=1000** : `.ext`/`.shk` ont 1000 TABLE NO., `.tab` a 1000 blocs concaténés sans TSTRAT ; `tbl_no()` passe à max=1000 au chargement. Dans `mod_times.R`, `is_robust = n_distinct(tab$table_no) > 1` → boxplot distribution + `tab_single = filter(tab, table_no == 1)` pour la courbe predite (évite rendu de 10 000 points)
 - **Exemple 2 auto-charge exemple 1** : `compare_with = "example1"` dans `.EXAMPLES` — charger exemple 2 ajoute exemple 1 dans `all_runs` (effet de bord à connaître pour debug)
 - **Labels params multi-run** : en multi-run, utiliser noms bruts THETA1/OMEGA(1,1) et non les labels utilisateur pour éviter l'ambiguité inter-modèles
 

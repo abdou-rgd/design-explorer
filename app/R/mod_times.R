@@ -137,15 +137,15 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
 
       # Cas multi-run : comparaison des temps par run (comportement existant)
       if (length(runs) > 1L) {
-        combined <- purrr::map_dfr(runs, function(r) {
+        combined <- purrr::imap(runs, function(r, rid) {
           if (is.null(r$tab_data)) return(NULL)
           obs <- r$tab_data
           if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
           if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
           if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1
-          obs |> mutate(run = r$name) |>
+          obs |> mutate(run = rid) |>
             select(any_of(c("TSTRAT", "TIME", "run")))
-        })
+        }) |> dplyr::bind_rows()
         if (nrow(combined) == 0) {
           return(plot_optimal_times(tab_single()))
         }
@@ -153,12 +153,15 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         combined <- combined |>
           mutate(group = factor(paste0("Strate ", TSTRAT)))
 
+        run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+                               names(runs))
         return(
           ggplot(combined, aes(x = TIME, y = group,
                                color = run, shape = run)) +
             geom_point(size = 3, alpha = 0.85,
                        position = position_dodge(width = 0.4)) +
-            scale_color_manual(values = .RUN_COLORS, name = NULL) +
+            scale_color_manual(values = .RUN_COLORS, labels = run_labels,
+                               name = NULL) +
             labs(title = "Temps de sampling -- Comparaison multi-runs",
                  x = "Temps (h)", y = NULL,
                  caption = "Un point = temps de prelevement optimal pour ce groupe de patients (TSTRAT)") +

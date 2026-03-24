@@ -48,11 +48,13 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
         if (!is.null(lbls)) {
           rse <- rse |> mutate(param = ifelse(param %in% names(lbls), lbls[param], param))
         }
-        rse |> mutate(run = r$name)
+        rse |> mutate(run = idx)
       }) |> dplyr::bind_rows()
 
       if (nrow(combined) == 0) return(NULL)
 
+      run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+                             names(runs))
       y_var <- if (show_se) "se" else "rse_pct"
       y_lab <- if (show_se) "SE" else "RSE (%)"
 
@@ -61,7 +63,8 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
                  color = "white", size = 0.3) +
         {if (!show_se) geom_hline(yintercept = c(20, 50), linetype = "dashed",
                                    color = "grey40", size = 0.45)} +
-        scale_fill_manual(values = .RUN_COLORS, name = NULL) +
+        scale_fill_manual(values = .RUN_COLORS, labels = run_labels,
+                          name = NULL) +
         labs(title = paste(y_lab, "-- Comparaison multi-runs"), x = NULL, y = y_lab) +
         .theme_design() +
         theme(panel.grid.major.x = element_blank(),
