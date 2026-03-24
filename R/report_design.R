@@ -426,7 +426,7 @@ plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
 #' @return Objet ggplot2
 #' @export
 plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME",
-                               title = NULL) {
+                               cmt_col = NULL, title = NULL) {
 
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
     return(ggplot() + labs(title = "Pas de données .tab disponibles") + .theme_design())
@@ -451,30 +451,41 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
     stop("Colonne '", time_col, "' absente du .tab")
   }
 
+  use_cmt <- !is.null(cmt_col) && cmt_col %in% names(obs) &&
+             n_distinct(obs[[cmt_col]]) > 1L
+
   obs <- obs |>
     mutate(
       group = factor(paste0("Strate ", .data[[group_col]])),
       time  = .data[[time_col]]
     )
 
-  ttl <- title %||% "Temps d'échantillonnage optimaux par groupe"
+  if (use_cmt) {
+    obs <- obs |> mutate(cmt_lbl = paste0("CMT=", .data[[cmt_col]]))
+  }
 
-  ggplot(obs, aes(x = time, y = group, color = group)) +
-    geom_segment(
-      aes(x = 0, xend = time, y = group, yend = group),
-      size = 0.4, color = "grey70", alpha = 0.6
-    ) +
-    geom_point(size = 3, alpha = 0.85) +
-    scale_color_brewer(palette = "Set2", name = NULL) +
-    labs(
-      title = ttl,
-      x     = "Temps",
-      y     = NULL
-    ) +
+  ttl <- title %||% "Temps de prelevement optimaux par groupe (TSTRAT)"
+  cap  <- "Un point = temps de prelevement optimal pour ce groupe de patients (TSTRAT)"
+
+  if (use_cmt) {
+    p <- ggplot(obs, aes(x = time, y = group, color = cmt_lbl, shape = cmt_lbl)) +
+      geom_point(size = 3.5, alpha = 0.85) +
+      scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
+                         name = "Reponse") +
+      scale_shape_manual(values = c(16L, 17L, 15L, 18L), name = "Reponse")
+  } else {
+    p <- ggplot(obs, aes(x = time, y = group, color = group)) +
+      geom_point(size = 3.5, alpha = 0.85) +
+      scale_color_brewer(palette = "Set2", name = NULL)
+  }
+
+  p +
+    labs(title = ttl, x = "Temps (h)", y = NULL, caption = cap) +
     .theme_design() +
     theme(
       panel.grid.major.y = element_blank(),
-      legend.position = if (n_distinct(obs$group) <= 1L) "none" else "bottom"
+      plot.caption = element_text(size = 8, color = "#6b7280"),
+      legend.position = if (!use_cmt && n_distinct(obs$group) <= 1L) "none" else "bottom"
     )
 }
 
@@ -635,8 +646,8 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   }
 
   y_label <- if (has_cmt) "Prediction (IPRED)" else y_col
-  ttl <- title %||% if (has_cmt) "Courbes PK/PD predites et points de sampling" else
-                     paste0("Courbe predite (", y_col, ") et points de sampling")
+  ttl <- title %||% if (has_cmt) "Predictions PK/PD aux temps de sampling optimaux" else
+                     paste0("Predictions (", y_col, ") aux temps de sampling optimaux")
 
   p <- ggplot(obs, aes(x = TIME, y = y_val))
 
@@ -644,7 +655,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   if (has_cmt) {
     p <- p +
       geom_line(aes(color = response, group = response),
-                size = 0.9, alpha = 0.6) +
+                size = 0.7, alpha = 0.35, linetype = "dashed") +
       geom_point(aes(fill = response), shape = 21, size = 3.5,
                  color = "white", stroke = 0.8) +
       scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
@@ -653,7 +664,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
                         name = NULL)
   } else {
     p <- p +
-      geom_line(color = "#2563eb", size = 0.9, alpha = 0.6) +
+      geom_line(color = "#2563eb", size = 0.7, alpha = 0.35, linetype = "dashed") +
       geom_point(fill = "#2563eb", shape = 21, size = 3.5,
                  color = "white", stroke = 0.8)
   }
@@ -663,7 +674,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
     geom_text(aes(label = strate), size = 2.8, color = "#374151",
               vjust = -1.3, hjust = 0.5) +
     labs(title = ttl, x = "Temps (h)", y = y_label,
-         caption = "Points = temps de sampling | Strate = TSTRAT") +
+         caption = "Chaque point = prediction du modele a un temps optimal | Tirets = connexion des points (pas une courbe PK continue)") +
     .theme_design() +
     theme(plot.caption = element_text(size = 8, color = "#6b7280"))
 
