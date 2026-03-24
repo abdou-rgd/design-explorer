@@ -341,7 +341,7 @@ server <- function(input, output, session) {
   param_labels_r <- reactive({
     raw <- trimws(input$param_labels)
     if (raw == "") return(NULL)
-    lbl <- tibble::tibble(raw = stringr::str_split_1(raw, "\n")) |>
+    lbl <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
       dplyr::filter(stringr::str_detect(raw, "=")) |>
       tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
       dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
