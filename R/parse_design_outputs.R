@@ -79,7 +79,19 @@ library(tidyr)
     mutate(distinct(dat), table_no = tbl_no, .before = 1L)
   }
 
-  map(seq_along(table_idx), parse_one) |> compact()
+  blocks <- map(seq_along(table_idx), parse_one) |> compact()
+
+  # Fix NONMEM quirk: .tab files may label all blocks "TABLE NO. 1"
+  # When multiple blocks share the same table_no, assign sequential indices
+  if (length(blocks) > 1L) {
+    tbl_nos <- vapply(blocks, function(b) b$table_no[1L], integer(1L))
+    if (length(unique(tbl_nos)) == 1L) {
+      for (i in seq_along(blocks)) {
+        blocks[[i]]$table_no <- i
+      }
+    }
+  }
+  blocks
 }
 
 #' Prépare les observations d'un fichier .tab pour l'analyse des temps
