@@ -20,6 +20,47 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
       if (length(runs) <= 1) {
         ext <- ext_data()
         if (is.null(ext)) return(NULL)
+
+        # Robust design : beaucoup de sous-problèmes → histogramme OFV finaux
+        n_blocs <- dplyr::n_distinct(ext$table_no)
+        if (n_blocs > 5L) {
+          finals <- ext |>
+            dplyr::filter(type == "final") |>
+            dplyr::select(table_no, OBJ) |>
+            dplyr::filter(!is.na(OBJ))
+
+          if (nrow(finals) == 0L) {
+            return(ggplot() +
+              labs(title = paste0("Design robuste (", n_blocs,
+                                  " sous-problemes) — pas de donnees OFV final")) +
+              .theme_design())
+          }
+
+          med_val <- median(finals$OBJ)
+          return(
+            ggplot(finals, aes(x = OBJ)) +
+              geom_histogram(bins = 40, fill = "#2563eb", alpha = 0.75,
+                             color = "white", size = 0.2) +
+              geom_vline(xintercept = med_val, linetype = "dashed",
+                         color = "#dc2626", size = 0.8) +
+              annotate("text", x = med_val, y = Inf, vjust = 1.5, hjust = -0.1,
+                       label = sprintf("mediane = %.3f", med_val),
+                       color = "#dc2626", size = 3.5) +
+              labs(
+                title = paste0("Distribution du critere D-optimalite",
+                               " (N = ", nrow(finals), " sous-problemes)"),
+                subtitle = "Design robuste : OFV evalue sous chaque realisation du prior",
+                x = "OFV  (-log det FIM)",
+                y = "Nombre de sous-problemes",
+                caption = paste0(
+                  "Ligne tiretee = mediane | ",
+                  "Dispersion = sensibilite du critere a l'incertitude du prior"
+                )
+              ) +
+              .theme_design()
+          )
+        }
+
         return(plot_convergence(ext, log_iter = log_conv()))
       }
 

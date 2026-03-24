@@ -60,38 +60,54 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         NULL
       }
 
-      tagList(
-        robust_banner,
-        fluidRow(
-          column(12,
-            div(class = "plot-card",
-              p(class = "section-title",
-                "Courbe predite et points de sampling"),
-              plotOutput(ns("prediction"), height = "400px")
-            )
-          )
-        ),
-        br(),
-        fluidRow(
-          column(7,
-            div(class = "plot-card",
-              p(class = "section-title",
-                if (is_robust())
-                  "Distribution des temps optimaux par strate (design robuste)"
-                else
-                  "Temps de sampling optimaux par strate (TSTRAT)"
-              ),
-              plotOutput(ns("gantt"), height = "380px")
-            )
-          ),
-          column(5,
-            div(class = "param-table-wrap",
-              p(class = "section-title", "Donnees temps optimaux"),
-              DTOutput(ns("times_table"))
+      if (is_robust()) {
+        # Design robuste : pas de courbe predite, boxplot central + table resume
+        tagList(
+          robust_banner,
+          fluidRow(
+            column(8,
+              div(class = "plot-card",
+                p(class = "section-title",
+                  "Distribution des temps optimaux par strate (design robuste)"),
+                plotOutput(ns("gantt"), height = "420px")
+              )
+            ),
+            column(4,
+              div(class = "param-table-wrap",
+                p(class = "section-title", "Resume statistique (P10 / mediane / P90)"),
+                DTOutput(ns("times_table"))
+              )
             )
           )
         )
-      )
+      } else {
+        tagList(
+          fluidRow(
+            column(12,
+              div(class = "plot-card",
+                p(class = "section-title", "Courbe predite et points de sampling"),
+                plotOutput(ns("prediction"), height = "400px")
+              )
+            )
+          ),
+          br(),
+          fluidRow(
+            column(7,
+              div(class = "plot-card",
+                p(class = "section-title",
+                  "Temps de sampling optimaux par strate (TSTRAT)"),
+                plotOutput(ns("gantt"), height = "380px")
+              )
+            ),
+            column(5,
+              div(class = "param-table-wrap",
+                p(class = "section-title", "Donnees temps optimaux"),
+                DTOutput(ns("times_table"))
+              )
+            )
+          )
+        )
+      }
     })
 
     # -- Courbe predite --------------------------------------------------------
@@ -105,7 +121,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       tab <- tab_data(); req(tab)
       runs <- all_runs()
 
-      # Cas robust design : boxplot de la distribution des temps
+      # Cas robust design : boxplot + annotations medianes
       if (is_robust()) {
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
@@ -113,9 +129,20 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         obs <- obs |> mutate(group = factor(paste0("Strate ", TSTRAT)))
         n_tabs <- n_distinct(tab$table_no)
 
+        med_labels <- obs |>
+          dplyr::group_by(group) |>
+          dplyr::summarise(med = median(TIME), .groups = "drop")
+
         return(
           ggplot(obs, aes(x = TIME, y = group, fill = group)) +
-            geom_boxplot(alpha = 0.7, outlier.size = 0.8, outlier.alpha = 0.4) +
+            geom_boxplot(alpha = 0.7, outlier.size = 0.8,
+                         outlier.alpha = 0.4) +
+            geom_text(data = med_labels,
+                      aes(x = med, y = group,
+                          label = sprintf("%.1fh", med)),
+                      inherit.aes = FALSE,
+                      vjust = -0.6, size = 3.2, fontface = "bold",
+                      color = "#1e3a5f") +
             scale_fill_brewer(palette = "Set2", guide = "none") +
             labs(
               title = "Distribution des temps optimaux par strate",
@@ -124,7 +151,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
               caption = paste0(
                 "N = ", n_tabs,
                 " realisations du prior | Boite = mediane + IQR | ",
-                "Un point hors boite = realisation atypique"
+                "Chiffre = mediane | Point hors boite = realisation atypique"
               )
             ) +
             theme_bw(base_size = 12) +
@@ -182,8 +209,33 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
 
     # -- Table -----------------------------------------------------------------
     output$times_table <- renderDT({
-      tab <- tab_single(); req(tab)
-      obs <- tab
+      tab <- tab_data(); req(tab)
+
+      # Design robuste : table résumé P10 / médiane / P90 par strate
+      if (is_robust()) {
+        obs <- tab
+        if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
+        if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
+
+        summary_tab <- obs |>
+          dplyr::group_by(TSTRAT) |>
+          dplyr::summarise(
+            N       = dplyr::n(),
+            P10     = round(quantile(TIME, 0.10), 2),
+            Mediane = round(median(TIME),          2),
+            P90     = round(quantile(TIME, 0.90),  2),
+            .groups = "drop"
+          ) |>
+          dplyr::arrange(Mediane)
+
+        return(datatable(summary_tab, rownames = FALSE,
+                         class = "stripe hover compact",
+                         options = list(pageLength = 20, dom = "t",
+                                        scrollX = TRUE)))
+      }
+
+      # Cas normal : table des temps individuels
+      obs <- tab_single()
       if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
       if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
 
@@ -191,7 +243,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
         names(obs)
       )
-      if (length(cols_show) == 0) {
+      if (length(cols_show) == 0L) {
         cols_show <- names(obs)[!names(obs) %in% c("table_no")]
       }
 
