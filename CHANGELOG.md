@@ -7,6 +7,17 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ---
 
+## 2026-03-24 (session 2)
+- [maintenance] Correction paths stales dans CLAUDE.md (docs/inspiration/ → docs/other_softwares/, chemins PDF corrigés)
+- [maintenance] Simplification workflow section CLAUDE.md (passage 1 seul laptop perso Sanofi)
+- [maintenance] Ajout 3 gotchas Shiny (observeEvent ignoreNULL, %||% priority, str_split_1)
+- [infra] 2 hooks PostToolUse configurés (lintr auto sur .R, testthat auto sur parse_design_outputs)
+- [infra] Agent r42-compat-checker créé (~/.claude/agents/)
+- [infra] Skill shiny-check créé (~/.claude/skills/shiny-check/)
+- [fix] tests/run_tests.R path detection (normalizePath(".") au lieu de sys.frame(0)$ofile)
+- [fix] test-parse_design_outputs.R source path corrigé (scripts/ → R/)
+- [maintenance] settings.json nettoyé (permissions stales supprimées)
+
 ## 2026-03-24
 - [maintenance] Nettoyage codebase : suppression dossiers vides (`scripts/`, `dev/`), `app/test_load.R` supprimé, CLAUDE.md/README.md désencombrés
 

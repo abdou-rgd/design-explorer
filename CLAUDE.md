@@ -1,22 +1,15 @@
 # CLAUDE.md — Stage Sanofi / Optimal Design NONMEM
 
-## Workflow Browser Claude (journée) ↔ VSCode Claude (soir)
+## Workflow
 
-### Début de session VSCode — rattraper le contexte
+### Début de session — rattraper le contexte
 1. `git fetch --all && git log --oneline origin/main..HEAD` → nouvelles branches/commits
-2. Lire `CHANGELOG.md` section `[En cours]` → PRs mergées dans la journée
+2. Lire `CHANGELOG.md` section `[En cours]` → PRs récentes
 3. Vérifier les PRs ouvertes via MCP GitHub (`mcp__plugin_github_github__list_pull_requests`)
-4. `cd C:/Users/abdou/Desktop/ClaudeProjets-app && git pull` → mettre à jour le miroir livrable
-
-### Conventions pour browser Claude
-- Toujours remplir le PR template complet (`.github/pull_request_template.md`)
-- Toujours ajouter une ligne dans `CHANGELOG.md` section `[En cours]` après chaque merge
-- Nommer les branches : `claude/<action-courte>-<id>` (convention existante)
-- Ne pas modifier `CLAUDE.md` sauf si explicitement demandé par l'utilisateur
 
 ### Dossiers locaux
 - `C:/Users/abdou/Desktop/ClaudeProjets/` — working repo (docs, CLAUDE.md, tout)
-- `C:/Users/abdou/Desktop/ClaudeProjets-app/` — miroir propre (clone git, pour tester la version livrable)
+- `C:/Users/abdou/Desktop/ClaudeProjets-app/` — miroir livrable (GitHub Desktop synchro auto depuis le laptop Sanofi)
 
 ---
 
@@ -61,6 +54,11 @@ shiny::runApp("app/")
 ```bash
 # Installer les dépendances Shiny
 "/c/Program Files/R/R-4.5.2/bin/Rscript" app/install_deps.R
+```
+
+```bash
+# Lancer les tests unitaires (81 tests) — depuis la racine ClaudeProjets/
+"/c/Program Files/R/R-4.5.2/bin/Rscript" tests/run_tests.R
 ```
 
 ---
@@ -116,13 +114,13 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 | `app/examples/` | Exemples Bauer 2021 intégrés (example1–4, fichiers `.ext`/`.shk`/`.coi`/`.clt`/`.tab`) |
 | `app/www/styles.css` | Styles CSS V4 (CSS variables, sidebar layout, KPI bar, drawer, metric cards) |
 | `app/install_deps.R` | Installe les packages Shiny manquants (shiny, bslib, DT) |
-| `docs/inspiration/PFIM/` | Code source PFIM 7.0 — référence pour plots SE/RSE/shrinkage, rapport HTML, structure FIM |
-| `docs/inspiration/PopED-master/` | Code source PopED — référence pour efficiency(), plot_efficiency_of_windows(), plot_model_prediction() |
+| `docs/other_softwares/PFIM/` | Code source PFIM 7.0 — référence SE/RSE/shrinkage (non tracké git) |
+| `docs/other_softwares/PopED-master/` | Code source PopED — référence efficiency(), plot_efficiency_of_windows() (non tracké git) |
 | `docs/nonmem/manuel_nonmem.txt` | Manuel NONMEM 7.5.1 complet (13 057 lignes) — lisible via Read avec offset |
 | `docs/papers/bauer2021/bauer2021_text.txt` | Papier Bauer 2021 extrait en texte — lisible directement |
-| `docs/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
-| `docs/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
-| `docs/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
+| `docs/papers/bauer2021/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
+| `docs/nonmem/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
+| `docs/nonmem/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
 | `docs/bauer2021_examples/` | 7 exemples complets avec tous les fichiers NONMEM |
 | `docs/bauer2021_examples/Design_Theory.pdf` | Fondements mathématiques FIM (4p) |
 | `docs/bauer2021_examples/Table_s1.pdf` | Tableau récap OFVTYPE (1p) |
@@ -293,6 +291,9 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - **`formatStyle` + `colnames=`** : le paramètre `colnames=` de `datatable()` ne mappe pas avec `formatStyle` — toujours renommer les colonnes dans le df avec `rename()` avant `datatable()`
 - **`if_else` vs `ifelse`** : `dplyr::if_else()` exige des conditions vectorisées — pour un check scalaire `!is.null(x)`, utiliser `base::ifelse()` ou un `if/else` ordinaire
 - **Dose row dans `.tab`** : la row 1 est toujours la dose initiale (TIME=0, AMT>0) — l'exclure avec `tab[-1, , drop = FALSE]` avant tout traitement des temps d'échantillonnage
+- **`observeEvent ignoreNULL`** : par défaut `ignoreNULL=TRUE` — si NULL est un état significatif (ex: reset après "Retirer la run"), toujours passer `ignoreNULL = FALSE`, sinon l'observer ne fire pas sur NULL
+- **`%||%` priority + upload** : `merged_ext <- reactive({ example_ext() %||% upload$ext_data() })` donne toujours priorité à `example_ext()` — pattern requis : observer sur `upload$file_paths()` avec `ignoreNULL=FALSE` qui clear tous les `example_*()` reactiveVals quand `!is.null(fps$ext)`
+- **`str_split_1` absent de stringr 1.4.0** : n'existe qu'à partir de stringr 1.5.0 — utiliser `strsplit(x, sep)[[1]]` à la place
 
 ### Gotchas multi-runs (app V4)
 
