@@ -295,12 +295,28 @@ server <- function(input, output, session) {
   })
 
   # Quand l'user uploade un fichier → effacer les données exemple (upload a priorité)
+  # + auto-remplir labels THETA et suggerer nom de run depuis le .ctl
   observeEvent(upload$file_paths(), ignoreNULL = FALSE, {
     fps <- upload$file_paths()
     if (!is.null(fps$ext)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
       example_clt(NULL); example_tab(NULL); example_ctl(NULL)
       example_comp_run(NULL)
+    }
+    # Auto-remplissage depuis le .ctl uploade
+    ctl_lines <- upload$ctl_lines()
+    if (!is.null(ctl_lines)) {
+      # Labels THETA -> textArea param_labels
+      theta_lbl <- tryCatch(parse_theta_labels(ctl_lines), error = function(e) NULL)
+      if (!is.null(theta_lbl)) {
+        lbl_text <- paste(paste0(names(theta_lbl), "=", theta_lbl), collapse = "\n")
+        updateTextAreaInput(session, "param_labels", value = lbl_text)
+      }
+      # Suggestion nom de run -> textInput primary_run_name
+      design_name <- tryCatch(parse_design_summary(ctl_lines), error = function(e) NULL)
+      if (!is.null(design_name)) {
+        updateTextInput(session, "primary_run_name", value = design_name)
+      }
     }
   })
 
@@ -401,6 +417,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_run, {
     reset_trigger(reset_trigger() + 1L)
     updateTextAreaInput(session, "param_labels", value = "")
+    updateTextInput(session, "primary_run_name", value = "Run A")
     showNotification("Run retiree", type = "message")
   })
 

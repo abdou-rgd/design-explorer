@@ -797,3 +797,90 @@ read_summary_tab <- function(file) {
 
   result
 }
+
+# =============================================================================
+# parse_theta_labels — Extrait les noms THETA depuis un control stream NONMEM
+# =============================================================================
+#' Extrait les labels THETA depuis les lignes d'un control stream NONMEM.
+#'
+#' Supporte les formats courants :
+#'   $THETA 0.15 ;[CL]
+#'   $THETA 0.15 ; CL
+#'   $THETA 0.15 ;CL
+#'   THETA multi-lignes (continuation apres $THETA)
+#'
+#' @param lines Character vector de lignes du fichier .ctl/.mod/.con
+#' @return Named character vector c("THETA1"="CL", "THETA2"="V", ...) ou NULL
+#' @export
+parse_theta_labels <- function(lines) {
+  theta_start <- which(str_detect(lines, "^\\$THETA\\b"))
+  if (length(theta_start) == 0L) return(NULL)
+
+  next_block <- which(str_detect(lines, "^\\$") & seq_along(lines) > theta_start[1])
+  theta_end  <- if (length(next_block) > 0L) next_block[1] - 1L else length(lines)
+  theta_lines <- lines[theta_start[1]:theta_end]
+
+  labels <- character(0)
+  for (ln in theta_lines) {
+    comment_match <- regmatches(ln, regexpr(";\\s*\\[?([A-Za-z][A-Za-z0-9_]*)\\]?", ln))
+    if (length(comment_match) == 0L || nchar(comment_match) == 0L) next
+    lbl <- str_trim(sub("^;\\s*\\[?([A-Za-z][A-Za-z0-9_]*)\\]?.*", "\\1", comment_match))
+    if (nchar(lbl) > 0L) labels <- c(labels, lbl)
+  }
+
+  if (length(labels) == 0L) return(NULL)
+  setNames(labels, paste0("THETA", seq_along(labels)))
+}
+
+# =============================================================================
+# parse_design_summary — Extrait un resume des arguments $DESIGN pour nommage
+# =============================================================================
+#' Construit un label court des options $DESIGN cles pour nommer une run.
+#'
+#' Exemple : "$DESIGN FIMTYPE=1 APPROX=FO VARCROSS=1 MAXEVAL=0"
+#'           -> "FT=1/FO/VC=1 (eval)"
+#'
+#' @param lines Character vector de lignes du fichier .ctl/.mod/.con
+#' @return Character scalar, ou NULL si aucun $DESIGN trouve
+#' @export
+parse_design_summary <- function(lines) {
+  design_start <- which(str_detect(lines, "^\\$DESIGN\\b"))
+  if (length(design_start) == 0L) return(NULL)
+
+  design_lines <- character(0)
+  for (i in seq(design_start[1], length(lines))) {
+    ln <- lines[i]
+    if (i > design_start[1] && str_detect(ln, "^\\$")) break
+    design_lines <- c(design_lines, ln)
+  }
+  block <- paste(design_lines, collapse = " ")
+
+  get_arg <- function(key) {
+    m <- regmatches(block, regexpr(paste0("\\b", key, "\\s*=\\s*([A-Za-z0-9]+)"), block, perl = TRUE))
+    if (length(m) == 0L || nchar(m) == 0L) return(NULL)
+    sub(paste0(".*", key, "\\s*=\\s*"), "", m)
+  }
+
+  parts <- character(0)
+
+  fimtype <- get_arg("FIMTYPE") %||% get_arg("FIMDIAG")
+  if (!is.null(fimtype)) parts <- c(parts, paste0("FT=", fimtype))
+
+  ofvtype <- get_arg("OFVTYPE")
+  if (!is.null(ofvtype) && ofvtype != "1") parts <- c(parts, paste0("OFV=", ofvtype))
+
+  approx <- get_arg("APPROX")
+  if (!is.null(approx)) parts <- c(parts, approx) else parts <- c(parts, "FO")
+
+  vc <- get_arg("VARCROSS")
+  if (!is.null(vc) && vc != "0") parts <- c(parts, paste0("VC=", vc))
+
+  desel <- get_arg("DESEL")
+  if (!is.null(desel)) parts <- c(parts, paste0("DESEL=", desel))
+
+  maxeval <- get_arg("MAXEVAL")
+  suffix <- if (!is.null(maxeval) && maxeval == "0") " (eval)" else if (!is.null(maxeval)) " (optim)" else ""
+
+  if (length(parts) == 0L) return(NULL)
+  paste0(paste(parts, collapse = "/"), suffix)
+}

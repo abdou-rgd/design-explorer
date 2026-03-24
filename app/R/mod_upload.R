@@ -27,8 +27,9 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL
     ))
 
-    # Lignes brutes .ext (pour detect_criterion)
+    # Lignes brutes .ext (pour detect_criterion) et .ctl (pour labels/design summary)
     ext_lines_raw <- reactiveVal(NULL)
+    ctl_lines_raw <- reactiveVal(NULL)
 
     # Reset universel
     if (!is.null(reset_trigger)) {
@@ -83,9 +84,14 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
 
       file_paths(paths)
 
-      # Lire les lignes brutes .ext pour detect_criterion
+      # Lire les lignes brutes .ext (detect_criterion) et .ctl (labels/design)
       if (!is.null(paths$ext)) {
         ext_lines_raw(readr::read_lines(paths$ext, progress = FALSE))
+      }
+      if (!is.null(paths$ctl)) {
+        ctl_lines_raw(readr::read_lines(paths$ctl, progress = FALSE))
+      } else {
+        ctl_lines_raw(NULL)
       }
     })
 
@@ -137,6 +143,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       tab_data   = tab_data,
       ctl_data   = ctl_data,
       ext_lines  = ext_lines_raw,
+      ctl_lines  = ctl_lines_raw,
       file_paths = file_paths
     )
   })

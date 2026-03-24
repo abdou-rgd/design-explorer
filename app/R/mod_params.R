@@ -4,11 +4,7 @@
 
 mod_params_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    uiOutput(ns("cards")),
-    br(),
-    uiOutput(ns("table3_ui"))
-  )
+  uiOutput(ns("table3_ui"))
 }
 
 mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
@@ -93,43 +89,13 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
     })
 
     # -------------------------------------------------------------------------
-    # Metric cards (Run A / premier run charge)
-    # -------------------------------------------------------------------------
-    output$cards <- renderUI({
-      ext <- ext_data()
-      if (is.null(ext)) {
-        return(div(class = "alert alert-info", style = "border-radius:10px;",
-                   "Chargez un fichier .ext pour commencer l'analyse."))
-      }
-      ofv   <- get_ofv(ext, tbl_no())
-      rse   <- tryCatch(get_rse(ext, tbl_no()), error = function(e) NULL)
-      lines <- ext_lines() %||% attr(ext, "ext_lines")
-      crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
-      n_blocs <- n_distinct(ext$table_no)
-
-      n_tot  <- if (!is.null(rse)) nrow(rse) else 0L
-      n_good <- if (!is.null(rse)) sum(rse$rse_pct < 20,  na.rm = TRUE) else 0L
-      n_mod  <- if (!is.null(rse)) sum(rse$rse_pct >= 20 & rse$rse_pct < 50, na.rm = TRUE) else 0L
-      n_poor <- if (!is.null(rse)) sum(rse$rse_pct >= 50, na.rm = TRUE) else 0L
-
-      fluidRow(
-        column(3, metric_card("Critere OFV", round(ofv, 4), crit, "blue")),
-        column(3, metric_card("RSE < 20%", n_good,
-                              sprintf("sur %d params", n_tot), "green")),
-        column(3, metric_card("RSE 20-50%", n_mod,
-                              "precision acceptable", "orange")),
-        column(3, metric_card("RSE > 50%", n_poor,
-                              "precision mediocre", "orange"))
-      )
-    })
-
-    # -------------------------------------------------------------------------
     # TABLE 3 — layout UI dynamique
     # -------------------------------------------------------------------------
     output$table3_ui <- renderUI({
       runs <- all_runs()
       if (length(runs) == 0L || all(sapply(runs, function(r) is.null(r$ext_data)))) {
-        return(NULL)
+        return(div(class = "alert alert-info", style = "border-radius:10px;",
+                   "Chargez un fichier .ext pour commencer l'analyse."))
       }
 
       has_shk   <- nrow(shk_long()) > 0L
