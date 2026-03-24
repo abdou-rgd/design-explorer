@@ -267,10 +267,14 @@ server <- function(input, output, session) {
     example_clt(.safe_load(read_clt, paths$clt, ".clt"))
     example_tab(.safe_load(read_tab, paths$tab, ".tab"))
     if (!is.null(paths$ext)) {
-      ctl_path <- file.path(dirname(paths$ext),
-        paste0(tools::file_path_sans_ext(basename(paths$ext)), ".ctl"))
-      if (file.exists(ctl_path))
-        example_ctl(.safe_load(read_prior_nwpri, ctl_path, ".ctl"))
+      base_name <- tools::file_path_sans_ext(basename(paths$ext))
+      for (ext_try in c(".ctl", ".mod", ".con")) {
+        ctl_path <- file.path(dirname(paths$ext), paste0(base_name, ext_try))
+        if (file.exists(ctl_path)) {
+          example_ctl(.safe_load(read_prior_nwpri, ctl_path, ext_try))
+          break
+        }
+      }
     }
     lbl <- examples$labels()
     if (!is.null(lbl)) updateTextAreaInput(session, "param_labels", value = lbl)
@@ -307,12 +311,7 @@ server <- function(input, output, session) {
   merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
   merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
   merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
-  merged_summary <- reactive({
-    upload_summary  <- upload$summary_data()
-    example_summary <- examples$summary_data()
-    if (!is.null(upload_summary) && nrow(upload_summary) > 0) upload_summary
-    else example_summary
-  })
+  merged_summary <- reactive({ examples$summary_data() })
 
   # -- all_runs ---------------------------------------------------------------
   primary_name <- reactive({ input$primary_run_name %||% "Run A" })

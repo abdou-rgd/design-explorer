@@ -11,7 +11,7 @@ mod_upload_ui <- function(id) {
       fileInput(ns("upload"), "Dossier tar.gz ou fichiers",
                 multiple = TRUE,
                 accept   = c(".ext", ".shk", ".coi", ".clt", ".tab",
-                             ".ctl", ".tar.gz", ".tgz", ".gz"),
+                             ".ctl", ".mod", ".con", ".tar.gz", ".tgz", ".gz"),
                 buttonLabel = "Parcourir"),
       helpText("Upload un .tar.gz (workflow nrm) ou plusieurs fichiers individuels."),
       uiOutput(ns("file_status"))
@@ -58,7 +58,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
         coi_i <- which(grepl("\\.coi$", all_names, ignore.case = TRUE))[1]
         clt_i <- which(grepl("\\.clt$", all_names, ignore.case = TRUE))[1]
         tab_i <- which(grepl("\\.tab$", all_names, ignore.case = TRUE))[1]
-        ctl_i <- which(grepl("\\.ctl$", all_names, ignore.case = TRUE))[1]
+        ctl_i <- which(grepl("\\.(ctl|mod|con)$", all_names, ignore.case = TRUE))[1]
 
         if (!is.na(ext_i)) paths$ext <- all_files[ext_i]
         if (!is.na(shk_i)) paths$shk <- all_files[shk_i]
@@ -77,7 +77,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
           if (grepl("\\.coi$", nm, ignore.case = TRUE)) paths$coi <- dp
           if (grepl("\\.clt$", nm, ignore.case = TRUE)) paths$clt <- dp
           if (grepl("\\.tab$", nm, ignore.case = TRUE)) paths$tab <- dp
-          if (grepl("\\.ctl$", nm, ignore.case = TRUE)) paths$ctl <- dp
+          if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE)) paths$ctl <- dp
         }
       }
 

@@ -2,6 +2,10 @@
 # helpers_ui.R — Composants UI réutilisables V4
 # =============================================================================
 
+# -- Seuils qualite RSE / RELATIVEINF (utilises par rse_badge / ri_badge) ---
+RSE_THRESHOLDS    <- c(20, 50)   # <20% bon, 20-50% modere, >50% mauvais
+RELINF_THRESHOLDS <- c(20, 50)   # >=50% bon, 20-50% modere, <20% mauvais
+
 # -- Polices Google Fonts (injectées une fois dans app.R) -------------------
 google_fonts_link <- function() {
   tags$link(
