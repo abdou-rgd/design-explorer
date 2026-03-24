@@ -37,11 +37,7 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 ├── tests/
 │   └── testthat/
 │       └── test-parse_design_outputs.R
-├── dev/                         # Specs & plans d'implémentation
-│   ├── plans/
-│   └── specs/
 └── docs/
-    ├── reading_list.md           # Liste de lecture annotée
     ├── nonmem/
     │   └── manuel_nonmem.txt     # Manuel NONMEM 7.5.1 complet (13 057 lignes)
     ├── papers/
@@ -180,5 +176,4 @@ Fichiers disponibles dans `docs/papers/bauer2021/examples/`.
 
 - `docs/nonmem/manuel_nonmem.txt` — Manuel NONMEM 7.5.1 complet
 - `docs/papers/bauer2021/bauer2021_text.txt` — Bauer 2021 (texte extrait)
-- `docs/reading_list.md` — Liste de lecture annotée
 - `docs/intern_work/redaction.docx` — Mémoire de stage en cours
