@@ -1,5 +1,25 @@
 # CLAUDE.md — Stage Sanofi / Optimal Design NONMEM
 
+## Workflow Browser Claude (journée) ↔ VSCode Claude (soir)
+
+### Début de session VSCode — rattraper le contexte
+1. `git fetch --all && git log --oneline origin/main..HEAD` → nouvelles branches/commits
+2. Lire `CHANGELOG.md` section `[En cours]` → PRs mergées dans la journée
+3. Vérifier les PRs ouvertes via MCP GitHub (`mcp__plugin_github_github__list_pull_requests`)
+4. `cd C:/Users/abdou/Desktop/ClaudeProjets-app && git pull` → mettre à jour le miroir livrable
+
+### Conventions pour browser Claude
+- Toujours remplir le PR template complet (`.github/pull_request_template.md`)
+- Toujours ajouter une ligne dans `CHANGELOG.md` section `[En cours]` après chaque merge
+- Nommer les branches : `claude/<action-courte>-<id>` (convention existante)
+- Ne pas modifier `CLAUDE.md` sauf si explicitement demandé par l'utilisateur
+
+### Dossiers locaux
+- `C:/Users/abdou/Desktop/ClaudeProjets/` — working repo (docs, CLAUDE.md, tout)
+- `C:/Users/abdou/Desktop/ClaudeProjets-app/` — miroir propre (clone git, pour tester la version livrable)
+
+---
+
 ## Notes pour Claude
 
 - **Lecture du manuel** : `docs/nonmem/manuel_nonmem.txt` (13 057 lignes) — utiliser `Read` avec `offset`/`limit`. Table des sections ci-dessous.
@@ -25,8 +45,9 @@
 | I.67 | $RCOV / $RCOVI (design séquentiel) | 7317 | 7428 |
 | I.72 | $DESIGN — évaluation et optimisation | 7521 | 8048 |
 | I.73 | Parallel Computing | 8049 | 9099 |
-- **Task agents background** : pas d'accès Bash dans cet environnement — utiliser les outils `Read`/`Grep`/`Glob` directement à la place.
-- **Rscript** : `"/c/Program Files/R/R-4.5.2/bin/Rscript" script.R` — toujours passer par un fichier `.R` (jamais `-e "..."` : segfault sous bash/WSL Windows)
+- **`gh` CLI absent du PATH** — utiliser les outils MCP GitHub ou `git` local pour les opérations GitHub.
+- **Skills R** : repo `https://github.com/abdou-rgd/r-claude-skills.git` — cloner dans `/tmp/` et copier les dossiers voulus dans `~/.claude/skills/`
+- **Rscript** : `"/c/Program Files/R/R-4.5.2/bin/Rscript" script.R` — toujours passer par un fichier `.R` (jamais `-e "..."` : segfault sous bash/WSL Windows). Rscript local = R 4.5.2 ; **cible serveur Sanofi = R 4.2.0** (voir tableau versions).
 
 ---
 
@@ -40,9 +61,6 @@ shiny::runApp("app/")
 ```bash
 # Installer les dépendances Shiny
 "/c/Program Files/R/R-4.5.2/bin/Rscript" app/install_deps.R
-
-# Vérifier la syntaxe d'un module R
-"/c/Program Files/R/R-4.5.2/bin/Rscript" check.R   # toujours via fichier, jamais -e
 ```
 
 ---
@@ -65,9 +83,6 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 - **Langage** : R
 - **Logiciel source** : NONMEM 7.5+ (sorties texte brut)
 - **Python** : disponible à `C:/Users/abdou/AppData/Local/Python/pythoncore-3.14-64/python.exe` (PyMuPDF installé pour lire les PDFs)
-- **Packages R courants** :
-  - `xpose` / `xpose4` — diagnostics graphiques NONMEM
-  - Voir tableau ci-dessous pour les versions exactes du serveur cible
 
 ### Versions serveur cible (R 4.2.0 — Sanofi RStudio Server)
 
@@ -81,8 +96,8 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 | DT       | 0.23    | OK                                                                                |
 | ggplot2  | 3.3.6   | `linewidth=` (≥ 3.4.0, utiliser `size=`), `geom_sf_label()` coord changes       |
 | dplyr    | 1.0.9   | `.default` dans `case_when()`, `.by=`, `reframe()`, `pick()`, `.env` (≥ 1.1.0)  |
-| tidyr    | 1.2.0   | OK                                                                                |
-| stringr  | 1.4.0   | `str_equal()`, `str_like()`, `str_width()` rewrite (≥ 1.5.0)                    |
+| tidyr    | 1.2.0   | `separate_wider_delim()` (≥ 1.3.0), OK sinon                                    |
+| stringr  | 1.4.0   | `str_equal()`, `str_like()`, `str_width()`, `str_split_1()` rewrite (≥ 1.5.0)   |
 | purrr    | 0.3.4   | `list_c()`, `list_rbind()`, `list_flatten()`, `map_vec()` (≥ 1.0.0)             |
 | readr    | 2.1.2   | OK                                                                                |
 
@@ -95,6 +110,8 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 | `R/parse_design_outputs.R` | Parsers R : `read_ext()`, `read_shk()`, `read_coi()`, `read_clt()`, `read_tab()`, `read_prior_nwpri()`, `read_summary_tab()`, `get_rse()`, `get_relativeinf()`, `get_d_criterion()`, `get_cor_matrix()`, `summary_design()` |
 | `R/report_design.R` | Visualisations : `plot_relativeinf()`, `plot_rse()`, `plot_se()`, `plot_rse_waterfall()`, `plot_convergence()`, `plot_fim_heatmap()`, `plot_optimal_times()` |
 | `app/app.R` | Application Shiny post-processing $DESIGN (V4) — sidebar nav, drawer, KPI bar — `shiny::runApp("app/")` depuis la racine |
+
+> **Vision V5 :** l'app évolue vers un outil bout-en-bout : **générateur de control stream $DESIGN** (inputs : modèle, paramètres, design candidat → output : `.ctl` prêt à soumettre) + post-processing existant. C'est le cœur de la "méthode rapide et robuste".
 | `app/R/` | 12 modules : upload, compare, examples, params, rse, relativeinf, fim, times, prior, convergence, raw, helpers_ui |
 | `app/examples/` | Exemples Bauer 2021 intégrés (example1–4, fichiers `.ext`/`.shk`/`.coi`/`.clt`/`.tab`) |
 | `app/www/styles.css` | Styles CSS V4 (CSS variables, sidebar layout, KPI bar, drawer, metric cards) |
@@ -103,14 +120,13 @@ Contrainte : aucune donnée réelle Sanofi ne peut être partagée (confidential
 | `docs/inspiration/PopED-master/` | Code source PopED — référence pour efficiency(), plot_efficiency_of_windows(), plot_model_prediction() |
 | `docs/nonmem/manuel_nonmem.txt` | Manuel NONMEM 7.5.1 complet (13 057 lignes) — lisible via Read avec offset |
 | `docs/papers/bauer2021/bauer2021_text.txt` | Papier Bauer 2021 extrait en texte — lisible directement |
-| `docs/papers/bauer2021/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
-| `docs/nonmem/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
-| `docs/nonmem/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
-| `docs/papers/bauer2021/examples/` | 7 exemples complets avec tous les fichiers NONMEM |
-| `docs/papers/bauer2021/examples/Design_Theory.pdf` | Fondements mathématiques FIM (4p) |
-| `docs/papers/bauer2021/examples/Table_s1.pdf` | Tableau récap OFVTYPE (1p) |
-| `docs/reading_list.md` | Liste de lecture annotée (✅/🔄/⬜, par niveau) |
-| `docs/books/PKPD Analysis with NLMEM/` | Owen & Fiedler-Kelly 2014 (Wiley) — livre de référence |
+| `docs/bauer2021.pdf` | Papier Bauer 2021 (PDF original) |
+| `docs/doc_nonmem_design.pdf` | Section I.72 du manuel (18p) — $DESIGN |
+| `docs/manuel_nonmem.pdf` | Manuel NONMEM 7.5.1 complet (PDF) |
+| `docs/bauer2021_examples/` | 7 exemples complets avec tous les fichiers NONMEM |
+| `docs/bauer2021_examples/Design_Theory.pdf` | Fondements mathématiques FIM (4p) |
+| `docs/bauer2021_examples/Table_s1.pdf` | Tableau récap OFVTYPE (1p) |
+| `docs/courses/nlme.pdf` | Cours NLME Leroux (janv. 2026) |
 | `docs/intern_work/redaction.docx` | Mémoire de stage en cours — question de recherche, méthodologie, planning |
 
 ---
@@ -233,13 +249,8 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 
 ## Préférences de code
 
-- Écrire des fonctions R claires et documentées (style roxygen2 si pertinent)
 - Privilégier le style `tidyverse` (pipe `|>` natif R 4.1+)
-- Nommer les variables en `snake_case`
-- Éviter les boucles quand `purrr::map*` ou `lapply` suffisent
 - Gérer les cas limites : fichiers manquants, formats NONMEM variants, multiple `TABLE NO.`
-- Ne pas utiliser `attach()` ni `setwd()`
-- Préférer des chemins relatifs ou paramétrés
 
 ---
 
@@ -256,13 +267,13 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 
 | Exemple | Dossier | Ce qu'il illustre |
 |---------|---------|-------------------|
-| 1 | `docs/papers/bauer2021/examples/example1/warfarin.*` | Évaluation simple, FIM bloc-diag |
-| 2 | `docs/papers/bauer2021/examples/example2/warfarin2.*` | Optimisation temps, NELDER |
-| 3 | `docs/papers/bauer2021/examples/example3/priortrue.*` | Robust design via $SIM TRUE=PRIOR |
-| 4 | `docs/papers/bauer2021/examples/example4/warfarin_pkpd_*` | PK-PD multi-réponses |
-| 5 | `docs/papers/bauer2021/examples/example5/optdesign2.*` | DS-optimality, UNINT |
-| 6 | `docs/papers/bauer2021/examples/example6/tmdd2.*` | TMDD, STRAT/STRATF, ODE |
-| 7 | `docs/papers/bauer2021/examples/example7/tmdd2b.*` | Bayes FIM, optimisation dose+temps |
+| 1 | `docs/bauer2021_examples/example1/warfarin.*` | Évaluation simple, FIM bloc-diag |
+| 2 | `docs/bauer2021_examples/example2/warfarin2.*` | Optimisation temps, NELDER |
+| 3 | `docs/bauer2021_examples/example3/priortrue.*` | Robust design via $SIM TRUE=PRIOR |
+| 4 | `docs/bauer2021_examples/example4/warfarin_pkpd_*` | PK-PD multi-réponses |
+| 5 | `docs/bauer2021_examples/example5/optdesign2.*` | DS-optimality, UNINT |
+| 6 | `docs/bauer2021_examples/example6/tmdd2.*` | TMDD, STRAT/STRATF, ODE |
+| 7 | `docs/bauer2021_examples/example7/tmdd2b.*` | Bayes FIM, optimisation dose+temps |
 
 ---
 
@@ -279,7 +290,6 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 
 - **Navigation V4** : pas de `tabsetPanel` — navigation via `conditionalPanel("input.active_tab == 'id'")` contrôlé par JS `navTo(tab, el)` qui appelle `Shiny.setInputValue('active_tab', tab)`. Débugger navigation = vérifier `input$active_tab` côté serveur.
 - **Drawer open/close** : `session$sendCustomMessage("evalJS", js)` — le handler JS est enregistré dans `output$js_handler` (uiOutput) avec `outputOptions(suspendWhenHidden=FALSE)`.
-- **`fileInput` dans `renderUI`** : ne jamais mettre `fileInput` dans un `renderUI` qui dépend de l'état modifié par son propre handler — réinitialise l'input en boucle
 - **`formatStyle` + `colnames=`** : le paramètre `colnames=` de `datatable()` ne mappe pas avec `formatStyle` — toujours renommer les colonnes dans le df avec `rename()` avant `datatable()`
 - **`if_else` vs `ifelse`** : `dplyr::if_else()` exige des conditions vectorisées — pour un check scalaire `!is.null(x)`, utiliser `base::ifelse()` ou un `if/else` ordinaire
 - **Dose row dans `.tab`** : la row 1 est toujours la dose initiale (TIME=0, AMT>0) — l'exclure avec `tab[-1, , drop = FALSE]` avant tout traitement des temps d'échantillonnage
@@ -290,3 +300,7 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - **Exemple 3 SUBPROB=1000** : `.ext`/`.shk` ont 1000 TABLE NO., `.tab` a 1000 blocs concaténés sans TSTRAT ; `tbl_no()` passe à max=1000 au chargement
 - **Exemple 2 auto-charge exemple 1** : `compare_with = "example1"` dans `.EXAMPLES` — charger exemple 2 ajoute exemple 1 dans `all_runs` (effet de bord à connaître pour debug)
 - **Labels params multi-run** : en multi-run, utiliser noms bruts THETA1/OMEGA(1,1) et non les labels utilisateur pour éviter l'ambiguité inter-modèles
+
+### Deliverables (app Shiny, rapports)
+
+- **Pas d'emojis dans le code livrable** : jamais d'emojis dans les noms d'onglets, metric cards, labels, messages d'alerte, ou titres de plots — utiliser des indicateurs textuels/CSS à la place
