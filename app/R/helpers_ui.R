@@ -29,34 +29,6 @@ kpi_bar_ui <- function(id) {
   div(id = "kpi-bar", uiOutput(id))
 }
 
-render_kpi_bar <- function(run_name, file_name, d_crit, rse_mean,
-                            n_poor, n_total) {
-  alert_txt <- if (n_poor > 0) {
-    sprintf("%d param%s RSE > 20%%", n_poor, if (n_poor > 1) "s" else "")
-  } else NULL
-
-  tagList(
-    div(class = "kpi-run",
-      div(class = "kpi-dot"),
-      run_name,
-      tags$span(style = "font-weight:400; color:#64748b; font-size:.76rem;",
-                file_name)
-    ),
-    span(class = "kpi-sep", "|"),
-    div(class = "kpi-metric", tags$strong("D-crit"), round(d_crit, 3)),
-    span(class = "kpi-sep", "|"),
-    div(class = "kpi-metric",
-        tags$strong("RSE moy"),
-        sprintf("%.1f%%", rse_mean)),
-    span(class = "kpi-sep", "|"),
-    div(class = "kpi-metric",
-        tags$strong(sprintf("%d/%d", n_poor, n_total)),
-        "> 20%"),
-    if (!is.null(alert_txt))
-      div(class = "kpi-alert", alert_txt)
-  )
-}
-
 # -- RSE badge ---------------------------------------------------------------
 rse_badge <- function(x) {
   if (is.na(x)) return(span("\u2014", class = "ri-na"))

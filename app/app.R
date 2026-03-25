@@ -378,30 +378,22 @@ server <- function(input, output, session) {
   se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
   log_conv_r <- reactive({ input$log_conv })
 
-  # -- KPI bar ----------------------------------------------------------------
+  # -- KPI bar — pills runs actifs --------------------------------------------
   output$kpi_bar_content <- renderUI({
-    ext <- merged_ext()
-    if (is.null(ext)) {
-      return(div(class = "kpi-metric", style = "color:#94a3b8;",
+    runs     <- all_runs()
+    has_data <- any(vapply(runs, function(r) !is.null(r$ext_data), logical(1L)))
+
+    if (!has_data) {
+      return(div(style = "color:#94a3b8; font-size:.82rem;",
                  "Aucun run charge — ouvrir le drawer pour charger des fichiers"))
     }
-    tbl      <- tbl_no()
-    ofv      <- tryCatch(get_ofv(ext, tbl),    error = function(e) NA_real_)
-    rse      <- tryCatch(get_rse(ext, tbl),    error = function(e) NULL)
-    n_est    <- if (!is.null(rse)) nrow(rse)   else 0L
-    n_poor   <- if (!is.null(rse)) sum(rse$rse_pct > 20, na.rm = TRUE) else 0L
-    rse_mean <- if (!is.null(rse) && n_est > 0) mean(rse$rse_pct, na.rm = TRUE) else NA_real_
-    n_params <- max(n_est, 1L)
-    d_crit   <- if (!is.na(ofv)) exp(-ofv / n_params) else NA_real_
 
-    render_kpi_bar(
-      run_name  = primary_name(),
-      file_name = "",
-      d_crit    = if (!is.na(d_crit)) d_crit else ifelse(!is.na(ofv), ofv, 0),
-      rse_mean  = if (!is.na(rse_mean)) rse_mean else 0,
-      n_poor    = n_poor,
-      n_total   = n_est
-    )
+    pills <- lapply(names(runs), function(rid) {
+      r <- runs[[rid]]
+      if (is.null(r$ext_data)) return(NULL)
+      run_pill(r$name, run_color(rid))
+    })
+    do.call(tagList, Filter(Negate(is.null), pills))
   })
 
   # -- Universal reset button -------------------------------------------------
