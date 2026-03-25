@@ -36,6 +36,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       observeEvent(reset_trigger(), {
         file_paths(list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL))
         ext_lines_raw(NULL)
+        ctl_lines_raw(NULL)
       }, ignoreInit = TRUE)
     }
 

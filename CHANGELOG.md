@@ -7,6 +7,14 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ---
 
+## 2026-03-25 (session 3) — QC round 2 : DT formatStyle + heatmap fallback
+
+- [fix] **DT `formatStyle` crash "column not found"** (`mod_params.R`) : `dt_rse` et `dt_shk` utilisaient `formatStyle(col_name)` avec des noms sanitisés via `make.names()`. Quand le nom de run contient des espaces ou caractères spéciaux, le mapping nom→colonne DT était instable. Fix : remplacer par `formatStyle(col_idx)` avec `which(names(wide) %in% rnms)` — les indices de colonnes sont stables quelle que soit la casse ou le renommage du run.
+- [fix] **FIM heatmap — fallback `"primary"` hardcodé** (`mod_fim.R`) : `selected = "primary"` dans le `selectInput` et `%||% "primary"` dans `renderPlot` cassaient si la première run avait un `rid` différent (ex: run chargée via `mod_compare`). Fix : utiliser `names(runs)[1]` comme fallback dynamique.
+- [fix] **KPI bar — affichage simplifié** (`app.R`, `helpers_ui.R`) : le KPI bar affichait des métriques calculées uniquement depuis la primary run, donnant une impression d'exactitude trompeuse en multi-run. Remplacé par des pills de run colorés (pattern `run_pill()`) — correct pour 1 à N runs, toujours à jour. Suppression de `render_kpi_bar()`.
+- [fix] **`mod_relativeinf.R` — couleurs statiques** : même fix dynamique `run_colors` que les autres modules (était manqué dans le round 1).
+- [fix] **`ctl_lines_raw` non réinitialisé sur reset** (`mod_upload.R`) : l'observer de reset ne remettait pas `ctl_lines_raw(NULL)` → les labels de la session précédente persistaient après "Retirer la run".
+
 ## 2026-03-25 (session 2) — QC multi-run : 5 bugs corrigés
 
 - [fix] **Couleurs multi-run cassées** (`helpers_ui.R`, `mod_rse.R`, `mod_convergence.R`, `mod_times.R`) : `scale_*_manual(values = .RUN_COLORS)` passait la palette statique — si les `rid` dépassent `"run_3"` (counter non réinitialisé en session), les couleurs tombaient en NA. Fix : construire un vecteur dynamique `run_colors <- setNames(vapply(names(runs), run_color, ...), names(runs))` dans chaque module (pattern identique à `mod_relativeinf.R`). Extension de `.RUN_COLORS` jusqu'à `"run_5"`.

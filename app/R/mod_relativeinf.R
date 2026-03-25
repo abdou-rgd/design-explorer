@@ -45,6 +45,8 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
 
       run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
                              names(runs))
+      run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
+                             names(runs))
       # C9: Deterministic ordering based on the primary run (first run) to avoid
       # non-deterministic sort when multiple runs share the same eta names.
       primary_run_rid <- names(runs)[1]
@@ -58,7 +60,7 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
         geom_col(position = position_dodge(width = 0.75), width = 0.65,
                  color = "white", size =0.3) +
         geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", size =0.45) +
-        scale_fill_manual(values = .RUN_COLORS, labels = run_labels,
+        scale_fill_manual(values = run_colors, labels = run_labels,
                           name = NULL) +
         coord_flip() +
         labs(title = "RELATIVEINF (%) -- Comparaison multi-runs", x = NULL, y = "RELATIVEINF (%)") +

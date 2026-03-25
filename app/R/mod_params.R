@@ -172,24 +172,20 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
         rename(Parametre = metric) |>
         select(Parametre, any_of(rnms))
 
-      # Sanitiser les noms de colonnes runs pour que formatStyle fonctionne
-      # meme quand les noms contiennent des espaces ou caracteres speciaux
-      names(wide)[match(rnms[rnms %in% names(wide)], names(wide))] <-
-        safe_rnms[rnms %in% names(wide)]
-
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
         options = list(pageLength = 30, dom = "tip", ordering = FALSE)
       )
 
-      for (col in safe_rnms) {
-        if (col %in% names(wide)) {
-          dt <- dt |>
-            formatStyle(col,
-              color      = styleInterval(c(20, 50), c("#16a34a", "#d97706", "#dc2626")),
-              fontWeight = "bold"
-            )
-        }
+      # Utiliser les indices de colonnes (pas les noms) pour que formatStyle
+      # reste stable meme si le nom de la run change apres chargement
+      run_col_indices <- which(names(wide) %in% rnms)
+      for (col_idx in run_col_indices) {
+        dt <- dt |>
+          formatStyle(col_idx,
+            color      = styleInterval(c(20, 50), c("#16a34a", "#d97706", "#dc2626")),
+            fontWeight = "bold"
+          )
       }
       dt
     })
@@ -201,32 +197,25 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       long <- shk_long()
       req(nrow(long) > 0L)
 
-      rnms      <- run_names()
-      safe_rnms <- make.names(rnms)
+      rnms <- run_names()
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
         rename(ETA = metric) |>
         select(ETA, any_of(rnms))
 
-      # Sanitiser les noms de colonnes runs pour que formatStyle fonctionne
-      # meme quand les noms contiennent des espaces ou caracteres speciaux
-      names(wide)[match(rnms[rnms %in% names(wide)], names(wide))] <-
-        safe_rnms[rnms %in% names(wide)]
-
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
         options = list(dom = "t", ordering = FALSE)
       )
 
-      for (col in safe_rnms) {
-        if (col %in% names(wide)) {
-          dt <- dt |>
-            formatStyle(col,
-              color      = styleInterval(30, c("#16a34a", "#dc2626")),
-              fontWeight = "bold"
-            )
-        }
+      run_col_indices <- which(names(wide) %in% rnms)
+      for (col_idx in run_col_indices) {
+        dt <- dt |>
+          formatStyle(col_idx,
+            color      = styleInterval(30, c("#16a34a", "#dc2626")),
+            fontWeight = "bold"
+          )
       }
       dt
     })
