@@ -289,6 +289,7 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - **Navigation V4** : pas de `tabsetPanel` — navigation via `conditionalPanel("input.active_tab == 'id'")` contrôlé par JS `navTo(tab, el)` qui appelle `Shiny.setInputValue('active_tab', tab)`. Débugger navigation = vérifier `input$active_tab` côté serveur.
 - **Drawer open/close** : `session$sendCustomMessage("evalJS", js)` — le handler JS est enregistré dans `output$js_handler` (uiOutput) avec `outputOptions(suspendWhenHidden=FALSE)`.
 - **`formatStyle` + `colnames=`** : le paramètre `colnames=` de `datatable()` ne mappe pas avec `formatStyle` — toujours renommer les colonnes dans le df avec `rename()` avant `datatable()`
+- **`formatStyle` + noms de runs** : utiliser `formatStyle(col_idx)` avec `which(names(wide) %in% run_names)` — jamais `formatStyle(run_name)` avec les noms d'affichage ou noms sanitisés `make.names()`. Les noms contenant des espaces ou caractères spéciaux lèvent `"column 'X' not found in data"` en runtime.
 - **`if_else` vs `ifelse`** : `dplyr::if_else()` exige des conditions vectorisées — pour un check scalaire `!is.null(x)`, utiliser `base::ifelse()` ou un `if/else` ordinaire
 - **Dose row dans `.tab`** : la row 1 est toujours la dose initiale (TIME=0, AMT>0) — l'exclure avec `tab[-1, , drop = FALSE]` avant tout traitement des temps d'échantillonnage
 - **`observeEvent ignoreNULL`** : par défaut `ignoreNULL=TRUE` — si NULL est un état significatif (ex: reset après "Retirer la run"), toujours passer `ignoreNULL = FALSE`, sinon l'observer ne fire pas sur NULL
