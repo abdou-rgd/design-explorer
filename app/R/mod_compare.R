@@ -91,7 +91,7 @@ mod_compare_server <- function(id) {
             files <- input[[paste0("upload_", local_rid)]]
             req(files)
             paths <- list(ext = NULL, shk = NULL, coi = NULL,
-                          clt = NULL, tab = NULL)
+                          clt = NULL, tab = NULL, ctl = NULL)
 
             if (nrow(files) == 1L &&
                 grepl("\\.(tar\\.gz|tgz)$", files$name,
@@ -109,6 +109,9 @@ mod_compare_server <- function(id) {
                                    ignore.case = TRUE))[1]
                 if (!is.na(idx)) paths[[et]] <- all_f[idx]
               }
+              ctl_idx <- which(grepl("\\.(ctl|mod|con)$", all_n,
+                                     ignore.case = TRUE))[1]
+              if (!is.na(ctl_idx)) paths$ctl <- all_f[ctl_idx]
             } else {
               for (i in seq_len(nrow(files))) {
                 nm <- files$name[i]
@@ -118,6 +121,8 @@ mod_compare_server <- function(id) {
                             ignore.case = TRUE))
                     paths[[et]] <- dp
                 }
+                if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE))
+                  paths$ctl <- dp
               }
             }
 
@@ -142,6 +147,21 @@ mod_compare_server <- function(id) {
               parsed$tab_data <- tryCatch(read_tab(paths$tab),
                                           error = function(e) NULL)
             run_data[[local_rid]] <- parsed
+
+            # Auto-fill run name from .ctl if available
+            if (!is.null(paths$ctl)) {
+              ctl_lines <- tryCatch(readLines(paths$ctl, warn = FALSE),
+                                   error = function(e) NULL)
+              if (!is.null(ctl_lines)) {
+                design_name <- tryCatch(parse_design_summary(ctl_lines),
+                                        error = function(e) NULL)
+                if (!is.null(design_name)) {
+                  run_names[[local_rid]] <- design_name
+                  updateTextInput(session, paste0("name_", local_rid),
+                                  value = design_name)
+                }
+              }
+            }
 
             n_loaded <- sum(!sapply(parsed, is.null))
             showNotification(

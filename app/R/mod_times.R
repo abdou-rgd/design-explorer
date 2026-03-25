@@ -112,8 +112,51 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
 
     # -- Courbe predite --------------------------------------------------------
     output$prediction <- renderPlot({
-      req(tab_single())
-      plot_model_prediction(tab_single())
+      runs <- all_runs()
+      if (length(runs) <= 1L) {
+        req(tab_single())
+        return(plot_model_prediction(tab_single()))
+      }
+
+      # Multi-run : overlay des courbes predites par run
+      combined <- purrr::imap(runs, function(r, rid) {
+        if (is.null(r$tab_data)) return(NULL)
+        tab <- r$tab_data
+        if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
+        if (nrow(tab) > 1L) tab <- tab[-1L, , drop = FALSE]
+        if (nrow(tab) == 0L) return(NULL)
+        pred_col <- intersect(c("IPRED", "PRED", "DV"), names(tab))[1]
+        if (is.na(pred_col)) return(NULL)
+        tab |>
+          dplyr::mutate(IPRED = .data[[pred_col]], run = rid) |>
+          dplyr::select(any_of(c("TIME", "IPRED", "TSTRAT", "run")))
+      }) |> dplyr::bind_rows()
+
+      if (nrow(combined) == 0L) {
+        req(tab_single())
+        return(plot_model_prediction(tab_single()))
+      }
+
+      run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+                             names(runs))
+      run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
+                             names(runs))
+
+      ggplot(combined, aes(x = TIME, y = IPRED, color = run, group = run)) +
+        geom_line(linetype = "dashed", alpha = 0.6, size = 0.8) +
+        geom_point(size = 2.5, alpha = 0.9) +
+        scale_color_manual(values = run_colors, labels = run_labels,
+                           name = NULL) +
+        .theme_design() +
+        labs(
+          title    = "Predictions (IPRED) aux temps de sampling optimaux",
+          subtitle = "Comparaison multi-runs",
+          x = "Temps (h)", y = "IPRED",
+          caption  = paste0(
+            "Chaque point = prediction du modele a un temps optimal",
+            " | Tirets = connexion des points (pas une courbe PK continue)"
+          )
+        )
     }, res = 110)
 
     # -- Gantt / distribution --------------------------------------------------
@@ -182,12 +225,14 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
 
         run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
                                names(runs))
+        run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
+                               names(runs))
         return(
           ggplot(combined, aes(x = TIME, y = group,
                                color = run, shape = run)) +
             geom_point(size = 3, alpha = 0.85,
                        position = position_dodge(width = 0.4)) +
-            scale_color_manual(values = .RUN_COLORS, labels = run_labels,
+            scale_color_manual(values = run_colors, labels = run_labels,
                                name = NULL) +
             labs(title = "Temps de sampling -- Comparaison multi-runs",
                  x = "Temps (h)", y = NULL,

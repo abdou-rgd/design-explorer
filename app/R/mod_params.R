@@ -29,8 +29,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
         if (is.null(rse) || nrow(rse) == 0L) return(NULL)
         rse |>
           mutate(
-            label  = if (length(runs) > 1) param
-                     else ifelse(!is.null(lbls) & param %in% names(lbls), lbls[param], param),
+            label  = ifelse(!is.null(lbls) & param %in% names(lbls), lbls[param], param),
             metric = paste0("%RSE(", label, ")"),
             value  = round(rse_pct, 2),
             run    = r$name

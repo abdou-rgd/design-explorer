@@ -84,7 +84,9 @@ param_type_badge <- function(param) {
   "primary" = "#2563eb",
   "run_1"   = "#dc2626",
   "run_2"   = "#16a34a",
-  "run_3"   = "#d97706"
+  "run_3"   = "#d97706",
+  "run_4"   = "#7c3aed",
+  "run_5"   = "#db2777"
 )
 
 run_color <- function(rid) {

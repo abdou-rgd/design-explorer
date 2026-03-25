@@ -56,6 +56,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
           column(6,
             div(class = "plot-card",
               p(class = "section-title", "Matrice de correlation (FIM)"),
+              uiOutput(ns("heatmap_run_selector")),
               if (!is.null(fim)) {
                 plotOutput(ns("heatmap"), height = "400px")
               } else {
@@ -138,9 +139,27 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       )
     })
 
-    # FIM heatmap
+    # Heatmap run selector (multi-run only)
+    output$heatmap_run_selector <- renderUI({
+      runs <- all_runs()
+      if (length(runs) <= 1L) return(NULL)
+      run_choices <- setNames(names(runs),
+                              vapply(runs, function(r) r$name, character(1L)))
+      selectInput(ns("heatmap_run"), "Run affichee :",
+                  choices = run_choices, selected = "primary",
+                  width = "100%")
+    })
+
+    # FIM heatmap — adapte a la run selectionnee en multi-run
     output$heatmap <- renderPlot({
-      fim <- fim_matrix()
+      runs <- all_runs()
+      rid  <- if (length(runs) > 1L) input$heatmap_run %||% "primary" else "primary"
+      r    <- runs[[rid]]
+      fim  <- if (!is.null(r)) {
+        r$coi_data %||% r$clt_data
+      } else {
+        fim_matrix()
+      }
       if (is.null(fim)) return(NULL)
       plot_fim_heatmap(fim, labels = param_labels())
     }, res = 110)

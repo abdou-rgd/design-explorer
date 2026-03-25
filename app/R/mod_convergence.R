@@ -78,9 +78,11 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
 
       run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
                              names(runs))
+      run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
+                             names(runs))
       p <- ggplot(combined, aes(x = ITERATION, y = OBJ, color = run)) +
         geom_line(size = 0.75, alpha = 0.9) +
-        scale_color_manual(values = .RUN_COLORS, labels = run_labels,
+        scale_color_manual(values = run_colors, labels = run_labels,
                            name = NULL) +
         labs(title = "Convergence -- Comparaison multi-runs",
              x = "Iteration ($DESIGN)", y = "OFV (-log det FIM)",

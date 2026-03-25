@@ -7,7 +7,19 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ---
 
-## 2026-03-25 — Bugfixes audit multi-run
+## 2026-03-25 (session 2) — QC multi-run : 5 bugs corrigés
+
+- [fix] **Couleurs multi-run cassées** (`helpers_ui.R`, `mod_rse.R`, `mod_convergence.R`, `mod_times.R`) : `scale_*_manual(values = .RUN_COLORS)` passait la palette statique — si les `rid` dépassent `"run_3"` (counter non réinitialisé en session), les couleurs tombaient en NA. Fix : construire un vecteur dynamique `run_colors <- setNames(vapply(names(runs), run_color, ...), names(runs))` dans chaque module (pattern identique à `mod_relativeinf.R`). Extension de `.RUN_COLORS` jusqu'à `"run_5"`.
+- [fix] **Param labels ignorées en multi-run** (`mod_params.R`) : suppression du override `if (length(runs) > 1) param` — les labels sont maintenant appliqués de la même façon qu'en mono-run.
+- [fix] **Auto-fill nom des runs de comparaison** (`mod_compare.R`) : l'observer d'upload détecte maintenant les fichiers `.ctl`/`.mod`/`.con` dans le tar.gz ou les uploads individuels. Appel à `parse_design_summary()` après parsing → `updateTextInput()` sur le nom de la run. Même comportement que la primary run.
+- [fix] **Courbe prédite Temps optimaux — seulement primary** (`mod_times.R`) : en multi-run, `output$prediction` construit un dataset combiné (`imap` sur `all_runs()`) et overlaye les courbes IPRED par run avec couleurs distinctes. Fallback mono-run inchangé.
+- [fix] **FIM heatmap — seulement primary** (`mod_fim.R`) : ajout d'un `selectInput` dynamique (`heatmap_run_selector`) visible uniquement en multi-run. `output$heatmap` utilise le `rid` sélectionné pour accéder à `r$coi_data %||% r$clt_data` du run voulu.
+
+---
+
+## 2026-03-25 — Bugfixes audit multi-run + robust design
+
+- [fix] **`.parse_table_blocks()` table_no séquentiel** (`R/parse_design_outputs.R`) : NONMEM labelle tous les blocs `.tab` comme `TABLE NO. 1` en design robuste ($SIM TRUE=PRIOR). Le parser assigne maintenant des indices séquentiels 1:N quand tous les blocs ont le même numéro → `is_robust()` retourne TRUE → UI bascule sur boxplot + table résumé P10/Mediane/P90.
 
 - [fix] **Bug run_counter non-monotone** (`mod_compare.R`) : suppression du décrement `run_counter(max(0L, run_counter() - 1L))` à la suppression d'un run. La limite est désormais vérifiée via `length(run_ids()) >= 3L`. Sans ce fix, supprimer puis re-ajouter un run générait un `rid` déjà dans `observed_ids` → aucun observer créé pour le nouveau run (upload/rename/remove silencieusement cassés).
 - [fix] **`.RUN_COLORS` keyed par `rid`** (`helpers_ui.R` + `mod_rse`, `mod_convergence`, `mod_relativeinf`, `mod_times`) : les clés passent de `"Run A"/"Run B"/...` à `"primary"/"run_1"/...`. Dans les modules ggplot2, `mutate(run = r$name)` → `mutate(run = idx/rid)` via `imap`, avec `labels = run_labels` dans `scale_*_manual`. Renommer un run ne casse plus les couleurs ni la légende.

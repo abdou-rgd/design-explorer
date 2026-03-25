@@ -55,6 +55,8 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
 
       run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
                              names(runs))
+      run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
+                             names(runs))
       y_var <- if (show_se) "se" else "rse_pct"
       y_lab <- if (show_se) "SE" else "RSE (%)"
 
@@ -63,7 +65,7 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
                  color = "white", size = 0.3) +
         {if (!show_se) geom_hline(yintercept = c(20, 50), linetype = "dashed",
                                    color = "grey40", size = 0.45)} +
-        scale_fill_manual(values = .RUN_COLORS, labels = run_labels,
+        scale_fill_manual(values = run_colors, labels = run_labels,
                           name = NULL) +
         labs(title = paste(y_lab, "-- Comparaison multi-runs"), x = NULL, y = y_lab) +
         .theme_design() +
