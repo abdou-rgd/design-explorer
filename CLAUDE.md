@@ -3,6 +3,7 @@
 ## Workflow
 
 ### Début de session — rattraper le contexte
+0. **EN PRIORITÉ** : lire `~/.claude/projects/c--Users-abdou-Desktop-ClaudeProjets/memory/state.md` → état courant (tâche en cours, prochaine étape, décisions actives)
 1. `git fetch --all && git log --oneline origin/main..HEAD` → nouvelles branches/commits
 2. Lire `CHANGELOG.md` section `[En cours]` → PRs récentes
 3. Vérifier les PRs ouvertes via MCP GitHub (`mcp__plugin_github_github__list_pull_requests`)
@@ -59,6 +60,16 @@ shiny::runApp("app/")
 ```bash
 # Lancer les tests unitaires (81 tests) — depuis la racine ClaudeProjets/
 "/c/Program Files/R/R-4.5.2/bin/Rscript" tests/run_tests.R
+```
+
+```bash
+# Sauvegarder l'état de session avant de fermer
+/save-session
+```
+
+```bash
+# Reprendre où on s'était arrêté au démarrage
+/resume-session
 ```
 
 ---
