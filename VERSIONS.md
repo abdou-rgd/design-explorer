@@ -21,7 +21,11 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 
 ## Version actuelle
 
-**V4** — *La naissance de la rose* 🌹
+**V4.1.0** — *La naissance de la rose* 🌹
+
+## Prochaine version
+
+**V4.2.0** (PRs #14–#19 en attente de merge) — Phase 2 Quick Wins
 
 ---
 
@@ -55,7 +59,7 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 | Le puits | disponible |
 | Les étoiles | réservé (grande MAJ) |
 | La morsure du serpent | disponible |
-| La trace laissée | réservé (version FINALE) ✨ |
+| La trace laissée | reserve (version FINALE) |
 
 ---
 
@@ -65,3 +69,4 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 - Le **numéro technique** (`V4.1.0`) est pour le suivi des releases.
 - Les chapitres **réservés** attendent une MAJ significative qui leur correspond.
 - Le nom est choisi en fonction de ce que la version apporte, pas dans l'ordre du livre.
+- Les **versions mineures** (V4.1.0, V4.2.0...) n'ont pas de nom poetique — seules les versions majeures (V1, V2, V3, V4...) en recoivent un.
