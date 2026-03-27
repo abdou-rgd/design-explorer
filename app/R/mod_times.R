@@ -268,26 +268,34 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
     output$times_table <- renderDT({
       tab <- tab_data(); req(tab)
 
-      # Design robuste : table résumé P10 / médiane / P90 par strate
+      # Design robuste : percentiles par (TSTRAT, point d'observation)
       if (is_robust()) {
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
         if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
 
+        # Indice du point d'observation au sein de chaque (table_no, TSTRAT)
+        # -> permet d'aligner le 1er temps de TSTRAT=1 across les 1000 subprob
+        obs <- obs |>
+          dplyr::group_by(table_no, TSTRAT) |>
+          dplyr::mutate(obs_idx = dplyr::row_number()) |>
+          dplyr::ungroup()
+
         summary_tab <- obs |>
-          dplyr::group_by(TSTRAT) |>
+          dplyr::group_by(TSTRAT, obs_idx) |>
           dplyr::summarise(
-            N       = dplyr::n(),
-            P10     = round(quantile(TIME, 0.10), 2),
-            Mediane = round(median(TIME),          2),
-            P90     = round(quantile(TIME, 0.90),  2),
-            .groups = "drop"
+            N_subprob = dplyr::n_distinct(table_no),
+            P10       = round(quantile(TIME, 0.10), 2),
+            Mediane   = round(median(TIME),          2),
+            P90       = round(quantile(TIME, 0.90),  2),
+            .groups   = "drop"
           ) |>
-          dplyr::arrange(Mediane)
+          dplyr::arrange(TSTRAT, obs_idx) |>
+          dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
 
         return(datatable(summary_tab, rownames = FALSE,
                          class = "stripe hover compact",
-                         options = list(pageLength = 20, dom = "t",
+                         options = list(pageLength = 30, dom = "t",
                                         scrollX = TRUE)))
       }
 
