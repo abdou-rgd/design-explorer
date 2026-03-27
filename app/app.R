@@ -111,7 +111,9 @@ ui <- fluidPage(
       tags$button(class = "nav-item", id = "nav-conv",
         onclick = "navTo('conv', this)", "Convergence"),
       tags$button(class = "nav-item", id = "nav-raw",
-        onclick = "navTo('raw', this)", "Donnees brutes")
+        onclick = "navTo('raw', this)", "Donnees brutes"),
+      tags$button(class = "nav-item", id = "nav-ctl",
+        onclick = "navTo('ctl', this)", "Control Stream")
     ),
 
     # -- Main area -----------------------------------------------------------
@@ -134,7 +136,9 @@ ui <- fluidPage(
         conditionalPanel("input.active_tab == 'conv'",
           mod_convergence_ui("conv")),
         conditionalPanel("input.active_tab == 'raw'",
-          mod_raw_ui("raw"))
+          mod_raw_ui("raw")),
+        conditionalPanel("input.active_tab == 'ctl'",
+          mod_ctl_stream_ui("ctl"))
       )
     )
   ),
@@ -155,7 +159,7 @@ ui <- fluidPage(
     tags$hr(),
     div(class = "upload-box",
       tags$h6("Nom du run principal"),
-      textInput("primary_run_name", NULL, value = "Run A", width = "100%")
+      textInput("primary_run_name", NULL, value = "Primary", width = "100%")
     ),
     div(class = "upload-box",
       tags$h6("Labels parametres (THETA)"),
@@ -260,13 +264,14 @@ server <- function(input, output, session) {
   example_clt      <- reactiveVal(NULL)
   example_tab      <- reactiveVal(NULL)
   example_ctl      <- reactiveVal(NULL)
+  example_ctl_lines <- reactiveVal(NULL)
   example_comp_run <- reactiveVal(NULL)
 
   observeEvent(examples$file_paths(), ignoreNULL = FALSE, {
     paths <- examples$file_paths()
     if (is.null(paths)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL)
+      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
       updateTextAreaInput(session, "param_labels", value = "")
       updateTextAreaInput(session, "cmt_labels",   value = "")
@@ -283,6 +288,7 @@ server <- function(input, output, session) {
         ctl_path <- file.path(dirname(paths$ext), paste0(base_name, ext_try))
         if (file.exists(ctl_path)) {
           example_ctl(.safe_load(read_prior_nwpri, ctl_path, ext_try))
+          example_ctl_lines(tryCatch(readr::read_lines(ctl_path), error = function(e) NULL))
           break
         }
       }
@@ -311,7 +317,7 @@ server <- function(input, output, session) {
     fps <- upload$file_paths()
     if (!is.null(fps$ext)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL)
+      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
     }
     # Auto-remplissage depuis le .ctl uploade
@@ -347,7 +353,7 @@ server <- function(input, output, session) {
   merged_summary <- reactive({ examples$summary_data() })
 
   # -- all_runs ---------------------------------------------------------------
-  primary_name <- reactive({ input$primary_run_name %||% "Run A" })
+  primary_name <- reactive({ input$primary_run_name %||% "Primary" })
 
   all_runs <- reactive({
     primary <- list(
@@ -422,7 +428,7 @@ server <- function(input, output, session) {
     reset_trigger(reset_trigger() + 1L)
     updateTextAreaInput(session, "param_labels", value = "")
     updateTextAreaInput(session, "cmt_labels",   value = "")
-    updateTextInput(session, "primary_run_name", value = "Run A")
+    updateTextInput(session, "primary_run_name", value = "Primary")
     showNotification("Run retiree", type = "message")
   })
 
@@ -488,6 +494,9 @@ server <- function(input, output, session) {
 
   mod_raw_server("raw",
     ext_data = merged_ext, all_runs = all_runs)
+
+  mod_ctl_stream_server("ctl",
+    ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
 }
 
 
