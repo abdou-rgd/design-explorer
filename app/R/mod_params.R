@@ -183,7 +183,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       for (col_idx in run_col_indices) {
         dt <- dt |>
           formatStyle(col_idx,
-            color      = styleInterval(c(20, 50), c("#16a34a", "#d97706", "#dc2626")),
+            color      = styleInterval(c(20, 50, 100), c("#16a34a", "#d97706", "#dc2626", "#7f1d1d")),
             fontWeight = "bold"
           )
       }

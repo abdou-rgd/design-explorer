@@ -157,6 +157,12 @@ ui <- fluidPage(
       helpText("Un label par ligne, format THETA1=CL")
     ),
     div(class = "upload-box",
+      tags$h6("Labels compartiments (CMT)"),
+      textAreaInput("cmt_labels", NULL,
+        placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3),
+      helpText("Un label par ligne, format 1=Nom")
+    ),
+    div(class = "upload-box",
       tags$h6("Bloc $DESIGN (TABLE NO.)"),
       selectInput("table_no", NULL, choices = "1", selected = "1")
     ),
@@ -256,6 +262,7 @@ server <- function(input, output, session) {
       example_clt(NULL); example_tab(NULL); example_ctl(NULL)
       example_comp_run(NULL)
       updateTextAreaInput(session, "param_labels", value = "")
+      updateTextAreaInput(session, "cmt_labels",   value = "")
       return()
     }
     example_ext(.safe_load(read_ext, paths$ext, ".ext"))
@@ -308,6 +315,12 @@ server <- function(input, output, session) {
       if (!is.null(theta_lbl)) {
         lbl_text <- paste(paste0(names(theta_lbl), "=", theta_lbl), collapse = "\n")
         updateTextAreaInput(session, "param_labels", value = lbl_text)
+      }
+      # Labels CMT -> textArea cmt_labels (depuis $MODEL COMP=(NOM))
+      cmt_lbl <- tryCatch(parse_cmt_labels(ctl_lines), error = function(e) NULL)
+      if (!is.null(cmt_lbl)) {
+        cmt_text <- paste(paste0(names(cmt_lbl), "=", cmt_lbl), collapse = "\n")
+        updateTextAreaInput(session, "cmt_labels", value = cmt_text)
       }
       # Suggestion nom de run -> textInput primary_run_name
       design_name <- tryCatch(parse_design_summary(ctl_lines), error = function(e) NULL)
@@ -372,6 +385,18 @@ server <- function(input, output, session) {
     if (length(lbl) == 0L) return(NULL)
     lbl
   })
+  cmt_labels_r <- reactive({
+    raw <- trimws(input$cmt_labels)
+    if (raw == "") return(NULL)
+    lbl <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
+      dplyr::filter(stringr::str_detect(raw, "=")) |>
+      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
+      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
+      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
+      tibble::deframe()
+    if (length(lbl) == 0L) return(NULL)
+    lbl
+  })
   se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
   log_conv_r <- reactive({ input$log_conv })
 
@@ -389,6 +414,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_run, {
     reset_trigger(reset_trigger() + 1L)
     updateTextAreaInput(session, "param_labels", value = "")
+    updateTextAreaInput(session, "cmt_labels",   value = "")
     updateTextInput(session, "primary_run_name", value = "Run A")
     showNotification("Run retiree", type = "message")
   })
@@ -445,7 +471,7 @@ server <- function(input, output, session) {
     tbl_no = tbl_no, param_labels = param_labels_r, all_runs = all_runs)
 
   mod_times_server("times",
-    tab_data = merged_tab, all_runs = all_runs)
+    tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r)
 
   mod_prior_server("prior",
     summary_data = merged_summary, ctl_data = merged_ctl)

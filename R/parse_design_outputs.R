@@ -896,3 +896,36 @@ parse_design_summary <- function(lines) {
   if (length(parts) == 0L) return(NULL)
   paste0(paste(parts, collapse = "/"), suffix)
 }
+
+# =============================================================================
+# parse_cmt_labels — Extrait les noms de compartiments depuis $MODEL
+# =============================================================================
+#' Extrait les labels de compartiments depuis un control stream NONMEM.
+#'
+#' Supporte le format :
+#'   $MODEL COMP=(DEPOT,DEFDOSE) COMP=(CENTRAL,DEFOBS) COMP=(EFFECT)
+#'   $MODEL COMP=DEPOT COMP=CENTRAL
+#'
+#' @param lines Character vector de lignes du fichier .ctl/.mod/.con
+#' @return Named character vector c("1"="DEPOT", "2"="CENTRAL", ...) ou NULL
+#' @export
+parse_cmt_labels <- function(lines) {
+  model_start <- which(str_detect(lines, "^\\$MODEL\\b"))
+  if (length(model_start) == 0L) return(NULL)
+
+  next_block <- which(str_detect(lines, "^\\$") & seq_along(lines) > model_start[1])
+  model_end  <- if (length(next_block) > 0L) next_block[1] - 1L else length(lines)
+  block      <- paste(lines[model_start[1]:model_end], collapse = " ")
+
+  # Extraire tous les COMP=(NOM,...) ou COMP=NOM
+  matches <- gregexpr("COMP\\s*=\\s*\\(?([A-Za-z][A-Za-z0-9_]*)", block, perl = TRUE)
+  m       <- regmatches(block, matches)[[1]]
+  if (length(m) == 0L) return(NULL)
+
+  names_vec <- sub(".*COMP\\s*=\\s*\\(?", "", m)
+  names_vec <- trimws(names_vec)
+  names_vec <- names_vec[nchar(names_vec) > 0L]
+  if (length(names_vec) == 0L) return(NULL)
+
+  setNames(names_vec, as.character(seq_along(names_vec)))
+}

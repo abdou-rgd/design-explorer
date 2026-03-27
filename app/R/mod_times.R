@@ -9,7 +9,7 @@ mod_times_ui <- function(id) {
   )
 }
 
-mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
+mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -248,7 +248,19 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       obs_single <- tab_single()
       cmt_col <- if ("CMT" %in% names(obs_single) &&
                      n_distinct(obs_single$CMT) > 1L) "CMT" else NULL
-      plot_optimal_times(obs_single, cmt_col = cmt_col)
+
+      # Appliquer labels CMT dans le df avant le plot
+      lbls <- cmt_labels()
+      obs_plot <- obs_single
+      if (!is.null(lbls) && !is.null(cmt_col) && "CMT" %in% names(obs_plot)) {
+        obs_plot <- obs_plot |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
+      plot_optimal_times(obs_plot, cmt_col = cmt_col)
 
     }, res = 110)
 
@@ -295,6 +307,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       obs_display <- obs |>
         select(all_of(cols_show)) |>
         mutate(across(where(is.double), ~ round(.x, 4)))
+
+      # Appliquer les labels CMT si disponibles
+      lbls <- cmt_labels()
+      if (!is.null(lbls) && "CMT" %in% names(obs_display)) {
+        obs_display <- obs_display |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
 
       datatable(obs_display, rownames = FALSE,
                 class = "stripe hover compact",
