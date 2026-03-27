@@ -15,6 +15,7 @@
   --rse-good-color:   #15803d; --rse-good-bg:   #f0fdf4;
   --rse-mod-color:    #92400e; --rse-mod-bg:    #fef3c7;
   --rse-poor-color:   #dc2626; --rse-poor-bg:   #fef2f2;
+  --rse-vpoor-color:  #7f1d1d; --rse-vpoor-bg:  #fde8e8;
   --metric-purple: #7c3aed;
 }
 
@@ -212,6 +213,7 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 .rse-good     { color: var(--rse-good-color); font-weight: 700; }
 .rse-moderate { color: var(--rse-mod-color);  font-weight: 700; }
 .rse-poor     { color: var(--rse-poor-color); font-weight: 700; }
+.rse-very-poor{ color: var(--rse-vpoor-color); font-weight: 700; }
 .ri-good      { color: var(--rse-good-color); font-weight: 700; }
 .ri-moderate  { color: var(--rse-mod-color);  font-weight: 700; }
 .ri-poor      { color: var(--rse-poor-color); font-weight: 700; }
