@@ -147,11 +147,64 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
       crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
 
-      df <- as.data.frame(
-        c(list(Metrique = paste0("\u2212log(det(FIM)) [", crit, "]")),
-          as.list(ofv_vals)),
+      # -- Ligne OFV -----------------------------------------------------------
+      ofv_label <- paste0("\u2212log(det(FIM)) [", crit, "]")
+      rows <- list(as.data.frame(
+        c(list(Metrique = ofv_label), as.list(ofv_vals)),
         check.names = FALSE
-      )
+      ))
+
+      # -- Ligne efficience relative (vs run primaire) -----------------------
+      primary_ofv <- ofv_vals[[1]]
+      has_comparison <- length(ofv_vals) >= 2L &&
+        !is.na(primary_ofv) &&
+        any(!is.na(ofv_vals[-1]))
+
+      if (has_comparison) {
+        if (crit == "D-OPTIMALITY") {
+          # D-efficiency : (exp(ΔOFV / p) - 1) x 100%
+          # p = nombre de params estimables depuis la run primaire
+          n_params <- tryCatch({
+            rse_df <- get_rse(runs[[1]]$ext_data, tbl)
+            nrow(rse_df)
+          }, error = function(e) NA_integer_)
+
+          eff_vals <- vapply(seq_along(ofv_vals), function(i) {
+            if (i == 1L) return(NA_real_)   # reference
+            if (is.na(ofv_vals[i]) || is.na(primary_ofv)) return(NA_real_)
+            if (is.na(n_params) || n_params == 0L) return(NA_real_)
+            delta <- primary_ofv - ofv_vals[i]
+            round((exp(delta / n_params) - 1) * 100, 2)
+          }, numeric(1))
+          names(eff_vals) <- names(ofv_vals)
+
+          eff_display <- vapply(seq_along(eff_vals), function(i) {
+            if (i == 1L) return("ref")
+            if (is.na(eff_vals[i])) return(NA_character_)
+            sprintf("%+.2f%%", eff_vals[i])
+          }, character(1))
+          names(eff_display) <- names(ofv_vals)
+
+          eff_label <- paste0("D-efficiency vs ref (p=", n_params, ")")
+        } else {
+          # Autres criteres : ΔOFV% = (OFV_ref - OFV_run) / |OFV_ref| x 100%
+          eff_display <- vapply(seq_along(ofv_vals), function(i) {
+            if (i == 1L) return("ref")
+            if (is.na(ofv_vals[i]) || is.na(primary_ofv) || primary_ofv == 0) return(NA_character_)
+            delta_pct <- (primary_ofv - ofv_vals[i]) / abs(primary_ofv) * 100
+            sprintf("%+.2f%%", round(delta_pct, 2))
+          }, character(1))
+          names(eff_display) <- names(ofv_vals)
+          eff_label <- paste0("\u0394OFV% vs ref [", crit, "]")
+        }
+
+        rows[[2]] <- as.data.frame(
+          c(list(Metrique = eff_label), as.list(eff_display)),
+          check.names = FALSE
+        )
+      }
+
+      df <- do.call(rbind, rows)
 
       datatable(df, rownames = FALSE, class = "stripe compact",
                 options = list(dom = "t", ordering = FALSE))
