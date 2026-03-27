@@ -10,12 +10,13 @@
     prefix = "warfarin",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
     guide = list(
-      context = "Modele warfarin 1-compartiment (ADVAN2 TRANS2), absorption premier ordre, erreur combinee. 32 sujets, GROUPSIZE=32.",
+      context = "Modele warfarin 1-compartiment (ADVAN2 TRANS2), absorption premier ordre, erreur combinee. 32 sujets (GROUPSIZE=32), 3 temps de prelevement a 0.5, 2 et 8 h. Valeurs de reference Bauer 2021 Table 3 : OFV = -39.518.",
       points = c(
-        "RSE de CL et V sont faibles (< 20%) : le design est informatif pour ces parametres",
-        "RSE de KA est plus eleve : l'absorption est plus difficile a estimer",
-        "RELATIVEINF montre la reduction d'incertitude apportee par le design sur chaque ETA",
-        "MAXEVAL=0 : c'est une evaluation, pas une optimisation"
+        "FIMDIAG=1 (bloc-diagonal) : hypothese d'independance entre sujets et entre parametres de variabilite. Plus rapide mais moins precis que la FIM complete (FIMDIAG=0)",
+        "MAXEVAL=0 : evaluation pure, aucun temps n'est modifie. Sert de baseline pour comparer avec l'optimisation (Ex. 2)",
+        "RSE(CL) = 36.9%, RSE(V) = 5.0% (Bauer Table 3) : V est bien estime avec ce design, CL beaucoup moins. Un seul temps precoce est insuffisant pour CL",
+        "RELATIVEINF (onglet ddie) = contribution de chaque observation a la reduction de la variance de l'ETA. Une RELATIVEINF faible indique un ETA mal supporte par le design",
+        "La FIM (onglet FIM) est une matrice 3x3 (CL, V, KA) : les elements hors-diagonale mesurent la correlation entre les incertitudes des parametres"
       )
     )
   ),
@@ -45,12 +46,13 @@
     has_summary = TRUE,
     summary_file = "examples/example3/summary.tab",
     guide = list(
-      context = "Meme modele warfarin, mais l'optimisation tient compte de l'incertitude sur les parametres via $SIM TRUE=PRIOR SUBPROB=1000. Chaque SUBPROB tire un jeu de parametres selon le prior.",
+      context = "Meme modele warfarin, optimisation robuste : $SIM TRUE=PRIOR SUBPROB=1000 tire 1000 jeux de parametres (THETA) depuis leur distribution a priori, puis optimise le design pour chacun. L'OFV minimise est E[-log(det(FIM))] sur le prior = critere standard du robust design (Nyberg et al., Bauer 2021).",
       points = c(
-        "Le summary.tab agrege les 1000 sous-problemes : distribution des temps optimaux",
-        "La robustesse = le design reste bon meme si les vrais parametres different du nominal",
-        "Comparez les temps optimaux (onglet 'Temps optimaux') avec l'exemple 2 sans prior",
-        "RSE et RELATIVEINF refletent la moyenne sur les 1000 realisations du prior"
+        "Mecanisme : SUBPROB=1000 genere 1000 sous-problemes independants. Pour chaque subprob, les vrais THETAs sont tires du prior ($PRIOR NWPRI ou $OMEGA/$SIGMA) et la FIM est evaluee/optimisee avec ces valeurs",
+        "Onglet 'Temps optimaux' : le tableau P10/mediane/P90 par strate montre la distribution des temps optimaux. Nos donnees : medianes 0.13 h, triplet groupe autour de 6.9 h [P2.5=1.5, P97.5=23], 158.1 h. Bauer rapporte 159.9 h avec un seed different",
+        "Interpretation pratique (Bauer) : choisir les temps comme 0.13, 1.5, 7.0, 23.0, 160.0 h. OFV resultant = -51.374, proche de l'optimal (mean OFV = -51.95 dans nos donnees, -51.598 dans Bauer)",
+        "Onglet 'Parametres' : la ligne 'D-critere robuste' affiche exp(-mean(OFV_i)/p) avec ses bornes P10/P90 — c'est la moyenne geometrique de det(FIM)^(1/p) sur les 1000 realisations du prior",
+        "RSE et RELATIVEINF refletent le sous-probleme 1000 (dernier). Ils ne sont pas une moyenne — la distribution des RSE n'est pas directement accessible ici"
       )
     )
   ),
