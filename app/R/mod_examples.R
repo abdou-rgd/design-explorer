@@ -49,8 +49,8 @@
       context = "Meme modele warfarin, optimisation robuste : $SIM TRUE=PRIOR SUBPROB=1000 tire 1000 jeux de parametres (THETA) depuis leur distribution a priori, puis optimise le design pour chacun. L'OFV minimise est E[-log(det(FIM))] sur le prior = critere standard du robust design (Nyberg et al., Bauer 2021).",
       points = c(
         "Mecanisme : SUBPROB=1000 genere 1000 sous-problemes independants. Pour chaque subprob, les vrais THETAs sont tires du prior ($PRIOR NWPRI ou $OMEGA/$SIGMA) et la FIM est evaluee/optimisee avec ces valeurs",
-        "Onglet 'Temps optimaux' : le tableau P10/mediane/P90 par strate montre la distribution des temps optimaux. Bauer rapporte : 0.13 h, triplet groupe autour de 6.9 h [P2.5=1.5, P97.5=23], 159.9 h",
-        "Interpretation pratique (Bauer) : choisir les temps comme 0.13, 1.5, 7.0, 23.0, 160.0 h. Le design ainsi obtenu a un OFV = -51.374, tres proche de l'optimal -51.598",
+        "Onglet 'Temps optimaux' : le tableau P10/mediane/P90 par strate montre la distribution des temps optimaux. Nos donnees : medianes 0.13 h, triplet groupe autour de 6.9 h [P2.5=1.5, P97.5=23], 158.1 h. Bauer rapporte 159.9 h avec un seed different",
+        "Interpretation pratique (Bauer) : choisir les temps comme 0.13, 1.5, 7.0, 23.0, 160.0 h. OFV resultant = -51.374, proche de l'optimal (mean OFV = -51.95 dans nos donnees, -51.598 dans Bauer)",
         "Onglet 'Parametres' : la ligne 'D-critere robuste' affiche exp(-mean(OFV_i)/p) avec ses bornes P10/P90 — c'est la moyenne geometrique de det(FIM)^(1/p) sur les 1000 realisations du prior",
         "RSE et RELATIVEINF refletent le sous-probleme 1000 (dernier). Ils ne sont pas une moyenne — la distribution des RSE n'est pas directement accessible ici"
       )
