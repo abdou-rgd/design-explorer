@@ -15,6 +15,12 @@ library(purrr)
 library(readr)
 
 # =============================================================================
+# Version info — affichée dans le sidebar
+# =============================================================================
+.APP_VERSION      <- "V4.1.0"
+.APP_VERSION_NAME <- "La naissance de la rose"
+
+# =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
 # Usage : log_info("message"), log_warn("..."), log_error("...")
 # =============================================================================
@@ -77,6 +83,7 @@ ui <- fluidPage(
 
       div(id = "sidebar-logo",
         div(class = "app-title",   "$DESIGN Explorer"),
+        div(class = "app-version",  paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME)),
         div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
       ),
 
