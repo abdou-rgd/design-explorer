@@ -6,17 +6,22 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ---
 
-## 2026-03-27 (session 2) — Phase 2 A5 : percentiles TSTRAT design robuste
+## V4.2.0 — 2026-03-27 (Phase 2 Quick Wins) — PRs #14–#19
 
-- [feat] **Percentiles TSTRAT par point d'observation** (`mod_times.R`) : remplace le tableau résumé P10/médiane/P90 par strate (1 ligne/TSTRAT) par un tableau (Strate, Obs) montrant la distribution de chaque temps optimal individuel across les N subproblèmes. Calcul via `obs_idx = row_number()` par `(table_no, TSTRAT)` pour aligner les points avant agrégation par `(TSTRAT, obs_idx)`.
+- [feat] **RSE 4 niveaux de sévérité** (PR #14 — `helpers_ui.R`, `styles.css`, `mod_params.R`) : ajout d'un 4ème tier RSE > 100% en bordeaux foncé (`#7f1d1d`). `RSE_THRESHOLDS = c(20, 50, 100)`, classe `.rse-very-poor`, `styleInterval(c(20,50,100), 4 couleurs)`.
+- [feat] **Labels CMT explicites** (PR #14 — `parse_design_outputs.R`, `app.R`, `mod_times.R`) : nouvelle fonction `parse_cmt_labels()` qui parse `$MODEL COMP=(NOM)`. Champ `cmt_labels` dans la sidebar avec auto-fill depuis `.ctl` et reset. Colonne CMT affiche "Nom (CMT=N)" dans la table et le plot des temps optimaux.
+- [feat] **Percentiles TSTRAT par point d'observation** (PR #15 — `mod_times.R`) : remplace le tableau résumé 1 ligne/TSTRAT par un tableau (Strate × Obs) montrant la distribution (P10/Médiane/P90) de chaque temps optimal individuel sur les N subproblèmes.
+- [feat] **Efficiency ratio dans la table OFV** (PR #16 — `mod_params.R`) : ligne "D-efficiency vs ref" = `(exp(ΔOFV/p)-1)×100%` pour D-optimality, `ΔOFV%` pour les autres critères. Run primaire = "ref", visible uniquement en multi-run.
+- [feat] **D-critère robuste** (PR #18 — `parse_design_outputs.R`, `mod_params.R`) : nouvelle fonction `get_robust_d_criterion()`. Formule : `exp(-mean(OFV_i)/p)` (moyenne géométrique de det(FIM)^(1/p) — standard Nyberg et al. / Bauer 2021). Bornes P10/P90 avec inversion OFV/D-crit. Ligne affichée dans la table OFV pour les designs robustes (multi-table, D-OPTIMALITY uniquement).
+- [feat] **Guides pédagogiques enrichis ex1 et ex3** (PR #19 — `mod_examples.R`) : ex1 avec valeurs de référence Bauer Table 3 (OFV=-39.518, RSE(CL)=36.9%, RSE(V)=5.0%) et explication FIMDIAG=1 ; ex3 avec mécanisme `$SIM TRUE=PRIOR SUBPROB=1000`, temps médians 0.13/6.9/158.1 h (nos données), lien avec D-critère robuste.
 
-## 2026-03-27 (session 1) — Phase 1 : Ex4/Ex5 + suppression KPI bar + bugfixes
+## V4.1.0 — 2026-03-27 (Phase 1) — commit 00fb84a
 
-- [feat] **Exemple 4 et 5 intégrés** (`app.R`, `.EXAMPLES`) : ajout des entrées `example4_opt` (PK-PD multi-réponses, `compare_with = "example4"`) et `example5` (DS-optimality, `optdesign2.*`, `compare_with = "example1"`). Fichiers copiés depuis `docs/bauer2021_examples/example5/`.
-- [feat] **Suppression complète du KPI bar** (`app.R`, `helpers_ui.R`, `styles.css`) : div UI, `renderUI`, et tous les styles CSS (y compris responsive) supprimés. Remplacé par les pills de run (`run_pill()`) déjà en place.
-- [fix] **`sprintf` + CSS `%`** (`helpers_ui.R`) : `50%` → `50%%` dans `run_pill()` — le `%` non échappé levait une erreur (`%;ba` si `;background` suit).
-- [fix] **Nommage colonnes RSE/Shrinkage** (`mod_params.R`) : `unname(vapply(...))` pour extraire les noms de runs → les colonnes affichent les vrais noms ("Run A") au lieu des clés rid (`PRIMARY`/`RUN_1`).
-- [docs] Ajout gotchas `sprintf`+CSS`%` et `vapply`+`any_of()` dans `CLAUDE.md`.
+- [feat] **Exemples 4 et 5 intégrés** (`app.R`, `.EXAMPLES`) : `example4_opt` (PK-PD, `compare_with = "example4"`) et `example5` (DS-optimality, `optdesign2.*`, `compare_with = "example1"`).
+- [feat] **Suppression KPI bar** (`app.R`, `helpers_ui.R`, `styles.css`) : div UI, `renderUI`, CSS responsive — tous supprimés.
+- [fix] **`sprintf` + CSS `%`** (`helpers_ui.R`) : `50%` → `50%%` dans `run_pill()`.
+- [fix] **Nommage colonnes RSE/Shrinkage** (`mod_params.R`) : `unname(vapply(...))` → affiche les vrais noms de runs.
+- [docs] Gotchas `sprintf+CSS%` et `vapply+any_of()` dans `CLAUDE.md`.
 
 ---
 
@@ -107,7 +112,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 ## Historique — PRs GitHub
 - [#19] feat: guides enrichis ex1/ex3 (valeurs Bauer, mecanisme $SIM TRUE=PRIOR)
 - [#18] feat: D-critere robuste exp(-mean(OFV)/p) pour design Monte Carlo
-- [#17] docs: CHANGELOG audit — comble trou 19-27 mars, PRs #5-#11
+- [#17] docs: CHANGELOG audit — comble trou 19-27 mars, PRs #5-#19
 - [#16] feat: efficiency ratio D-opt + ΔOFV% multi-run
 - [#15] feat: percentiles TSTRAT par point d'observation (design robuste)
 - [#14] feat: RSE 4 niveaux + labels CMT depuis $MODEL
