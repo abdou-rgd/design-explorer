@@ -107,46 +107,6 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   overflow: hidden;
 }
 
-/* ── KPI Bar ───────────────────────────────────────────────────────────── */
-#kpi-bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 14px;
-  min-height: 42px;
-  flex-shrink: 0;
-}
-#kpi-bar .kpi-run {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--text);
-}
-#kpi-bar .kpi-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--run-a);
-  flex-shrink: 0;
-}
-#kpi-bar .kpi-sep {
-  color: var(--border);
-  font-size: 1.1rem;
-}
-#kpi-bar .kpi-metric { color: var(--text-muted); }
-#kpi-bar .kpi-metric strong { color: var(--text); font-weight: 700; margin-right: 2px; }
-#kpi-bar .kpi-alert {
-  margin-left: auto;
-  background: var(--rse-mod-bg);
-  color: var(--rse-mod-color);
-  padding: 2px 8px;
-  border-radius: 5px;
-  font-size: .75rem;
-  font-weight: 600;
-}
 
 /* ── Tab content ───────────────────────────────────────────────────────── */
 #tab-content {
@@ -315,7 +275,6 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   .nav-section-label { padding: 8px 18px 3px; }
   .nav-item { padding: 6px 18px; }
   #btn-runs { margin: 8px 12px; padding: 5px 12px; }
-  #kpi-bar { padding: 5px 16px; min-height: 36px; gap: 12px; }
   #tab-content { padding: 14px 18px; }
   .metric-card { padding: 10px 14px; margin-bottom: 8px; }
   .metric-value { font-size: 1.35rem; }
@@ -329,7 +288,6 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   #sidebar-logo { padding: 8px 18px 6px; }
   .nav-item { padding: 5px 18px; font-size: 14px !important; }
   .nav-section-label { padding: 6px 18px 2px; font-size: 10px !important; }
-  #kpi-bar { min-height: 32px; padding: 4px 14px; gap: 8px; }
   #tab-content { padding: 10px 16px; }
   .metric-card { padding: 7px 12px; }
   .metric-value { font-size: 1.15rem; }

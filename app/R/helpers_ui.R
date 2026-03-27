@@ -74,7 +74,7 @@ run_pill <- function(name, color) {
       color, color, color
     ),
     span(style = sprintf("display:inline-block;width:7px;height:7px;
-                          border-radius:50%;background:%s;margin-right:5px;
+                          border-radius:50%%;background:%s;margin-right:5px;
                           vertical-align:middle;", color)),
     name
   )

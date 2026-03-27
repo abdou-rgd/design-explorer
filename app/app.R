@@ -110,9 +110,6 @@ ui <- fluidPage(
     # -- Main area -----------------------------------------------------------
     div(id = "app-main",
 
-      # KPI bar
-      div(id = "kpi-bar", uiOutput("kpi_bar_content")),
-
       # Tab content
       div(id = "tab-content",
         conditionalPanel("input.active_tab == 'params' || !input.active_tab",
@@ -379,23 +376,6 @@ server <- function(input, output, session) {
   log_conv_r <- reactive({ input$log_conv })
 
   # -- KPI bar — pills runs actifs --------------------------------------------
-  output$kpi_bar_content <- renderUI({
-    runs     <- all_runs()
-    has_data <- any(vapply(runs, function(r) !is.null(r$ext_data), logical(1L)))
-
-    if (!has_data) {
-      return(div(style = "color:#94a3b8; font-size:.82rem;",
-                 "Aucun run charge — ouvrir le drawer pour charger des fichiers"))
-    }
-
-    pills <- lapply(names(runs), function(rid) {
-      r <- runs[[rid]]
-      if (is.null(r$ext_data)) return(NULL)
-      run_pill(r$name, run_color(rid))
-    })
-    do.call(tagList, Filter(Negate(is.null), pills))
-  })
-
   # -- Universal reset button -------------------------------------------------
   output$reset_run_btn <- renderUI({
     if (is.null(merged_ext())) return(NULL)

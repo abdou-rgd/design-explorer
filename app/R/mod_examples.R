@@ -55,18 +55,52 @@
     )
   ),
   example4 = list(
-    title = "Exemple 4 : PK-PD multi-reponses",
-    desc = "Modele warfarin PK-PD (concentration + effet), FIMTYPE=1 + VARCROSS=1.",
+    title = "Exemple 4 : PK-PD multi-reponses (evaluation)",
+    desc = "Modele warfarin PK-PD (concentration + effet), FIMTYPE=1 + VARCROSS=1. Evaluation du design.",
     dir = "examples/example4",
     prefix = "warfarin_pkpd_eval",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=EMAX\nTHETA5=EC50",
+    compare_with = "example4_opt",
     guide = list(
-      context = "Modele PK-PD multi-compartiment avec effet Emax. CMT==2 pour PK, CMT==3 pour PD. FIMTYPE=1 (bloc-diagonal) + VARCROSS=1.",
+      context = "Modele PK-PD multi-compartiment avec effet Emax. CMT==2 pour PK, CMT==3 pour PD. FIMTYPE=1 (bloc-diagonal) + VARCROSS=1. Evaluation du design initial.",
       points = c(
         "Plus de parametres a estimer (5 THETA + OMEGA + SIGMA PK et PD)",
         "FIMTYPE=1 + VARCROSS=1 equivaut a PFIM style bloc-diagonal",
         "Les RSE des parametres PD (EMAX, EC50) sont generalement plus grands",
-        "Le design doit etre informatif pour les deux reponses simultanement"
+        "Comparez avec l'optimisation (bouton 'Comparer') : les RSE diminuent apres optimisation"
+      )
+    )
+  ),
+  example4_opt = list(
+    title = "Exemple 4 : PK-PD multi-reponses (optimisation)",
+    desc = "Optimisation des temps PK-PD par Nelder-Mead. Comparez les RSE avant/apres.",
+    dir = "examples/example4",
+    prefix = "warfarin_pkpd_opt",
+    labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=EMAX\nTHETA5=EC50",
+    guide = list(
+      context = "Meme modele PK-PD, apres optimisation Nelder-Mead des temps de prelevement. MAXEVAL > 0.",
+      points = c(
+        "Les RSE sont reduits par rapport a l'evaluation initiale",
+        "Les temps optimaux (onglet 'Temps optimaux') montrent les fenetres d'echantillonnage PK et PD",
+        "Le critere D-OFV est minimise : la FIM est plus grande qu'avant optimisation",
+        "Chargez l'Exemple 4 evaluation pour comparer directement"
+      )
+    )
+  ),
+  example5 = list(
+    title = "Exemple 5 : DS-optimality",
+    desc = "Critere DS-optimality (OFVTYPE=6) avec parametres non-interessants (UNINT). Modele warfarin etendu.",
+    dir = "examples/example5",
+    prefix = "optdesign2",
+    labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=F1",
+    compare_with = "example1",
+    guide = list(
+      context = "DS-optimality : maximise la precision sur un sous-ensemble de parametres d'interet, en traitant les autres comme non-interessants (UNINT). Ici F1 (biodisponibilite) est le parametre cible.",
+      points = c(
+        "Le critere DS-OFV = -log(det(FIM_interet)) : seule la FIM des parametres d'interet compte",
+        "UNINT designe les parametres non-interessants (nuisance parameters)",
+        "Comparez avec l'Exemple 1 (D-optimality) : les temps optimaux different selon le critere",
+        "Utile quand certains parametres sont deja bien estimes ou non pertinents pour la decision"
       )
     )
   )

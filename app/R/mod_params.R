@@ -84,7 +84,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
     run_names <- reactive({
       runs <- all_runs()
-      vapply(runs, function(r) r$name, character(1))
+      unname(vapply(runs, function(r) r$name, character(1)))
     })
 
     # -------------------------------------------------------------------------
