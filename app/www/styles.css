@@ -54,6 +54,13 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   letter-spacing: .04em;
   font-family: 'JetBrains Mono', monospace;
 }
+#sidebar-logo .app-version {
+  font-size: .65rem;
+  color: #93c5fd;
+  font-style: italic;
+  margin-top: 2px;
+  opacity: 0.85;
+}
 #sidebar-logo .app-subtitle {
   font-size: .7rem;
   color: var(--sidebar-text);
