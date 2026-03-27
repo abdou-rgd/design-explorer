@@ -16,6 +16,8 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 | V2 | *La rencontre dans le désert* | Premiers vrais utilisateurs, app Shiny V1 |
 | V3 | *Les baobabs* | Refactoring, restructuration codebase (`scripts/` → `R/`) |
 | V4 | *La naissance de la rose* | App Shiny complète : 12 modules, multi-run, navigation sidebar, design robuste |
+| V4.1.0 | — | Ex4/Ex5 intégrés, KPI bar supprimée, fix sprintf CSS%, fix unname(vapply) |
+| V4.2.0 | — | Phase 2 quick wins : RSE 4 niveaux, labels CMT, percentiles TSTRAT, efficiency ratio, D-critère robuste, guides ex1/ex3 |
 
 ---
 
