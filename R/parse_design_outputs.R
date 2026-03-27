@@ -643,6 +643,45 @@ get_d_criterion <- function(ofv, n_params) {
   exp(-ofv / n_params)
 }
 
+# =============================================================================
+# get_robust_d_criterion() — D-critère robuste sur design Monte Carlo
+# =============================================================================
+
+#' Résumer le D-critère sur un design robuste (SUBPROB > 1)
+#'
+#' Approche standard (Nyberg et al., Bauer 2021) :
+#'   D-critère robuste = exp(-mean(OFV_i) / p)  [= moyenne géométrique de det(FIM)^(1/p)]
+#' Bornes : exp(-P90(OFV_i)/p) [P10 D-crit] et exp(-P10(OFV_i)/p) [P90 D-crit]
+#' Note : OFV élevé <=> D-critère faible, donc les bornes OFV s'inversent.
+#'
+#' @param ext      Tibble retourné par read_ext() (multi-table)
+#' @param n_params Nombre de paramètres estimables (depuis get_rse())
+#' @return Liste : d_robust, d_p10, d_p90, ofv_mean, ofv_sd, n_subprob
+#'         ou NULL si ext n'est pas multi-table ou n_params invalide
+#' @export
+get_robust_d_criterion <- function(ext, n_params) {
+  if (is.null(ext) || is.na(n_params) || n_params <= 0L) return(NULL)
+
+  tbl_nos <- sort(unique(ext$table_no))
+  if (length(tbl_nos) <= 1L) return(NULL)
+
+  ofv_vec <- vapply(tbl_nos, function(tbl) {
+    val <- tryCatch(get_ofv(ext, tbl), error = function(e) NA_real_)
+    if (length(val) == 0L) NA_real_ else val
+  }, numeric(1))
+
+  ofv_vec <- ofv_vec[!is.na(ofv_vec)]
+  if (length(ofv_vec) < 2L) return(NULL)
+
+  list(
+    d_robust  = exp(-mean(ofv_vec)               / n_params),
+    d_p10     = exp(-quantile(ofv_vec, 0.90)[[1]] / n_params),  # P90 OFV -> P10 D-crit
+    d_p90     = exp(-quantile(ofv_vec, 0.10)[[1]] / n_params),  # P10 OFV -> P90 D-crit
+    ofv_mean  = mean(ofv_vec),
+    ofv_sd    = sd(ofv_vec),
+    n_subprob = length(ofv_vec)
+  )
+}
 
 # =============================================================================
 # read_prior_nwpri() — Parser $PRIOR NWPRI depuis un .ctl

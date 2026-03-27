@@ -147,11 +147,35 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
       crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
 
-      df <- as.data.frame(
+      # -- Ligne OFV -----------------------------------------------------------
+      rows <- list(as.data.frame(
         c(list(Metrique = paste0("\u2212log(det(FIM)) [", crit, "]")),
           as.list(ofv_vals)),
         check.names = FALSE
-      )
+      ))
+
+      # -- Ligne D-critère robuste (design Monte Carlo uniquement) ------------
+      if (crit == "D-OPTIMALITY") {
+        primary_ext <- runs[[1]]$ext_data
+        if (!is.null(primary_ext)) {
+          n_params <- tryCatch(nrow(get_rse(primary_ext, tbl)), error = function(e) NA_integer_)
+          rdc <- tryCatch(get_robust_d_criterion(primary_ext, n_params), error = function(e) NULL)
+          if (!is.null(rdc)) {
+            d_str <- sprintf("%.4f [%.4f \u2013 %.4f]", rdc$d_robust, rdc$d_p10, rdc$d_p90)
+            rdc_row <- as.data.frame(
+              c(list(Metrique = sprintf("D-critere robuste P10-P90 (n=%d)", rdc$n_subprob)),
+                setNames(
+                  lapply(seq_along(runs), function(i) if (i == 1L) d_str else NA_character_),
+                  names(ofv_vals)
+                )),
+              check.names = FALSE
+            )
+            rows[[length(rows) + 1L]] <- rdc_row
+          }
+        }
+      }
+
+      df <- do.call(rbind, rows)
 
       datatable(df, rownames = FALSE, class = "stripe compact",
                 options = list(dom = "t", ordering = FALSE))
