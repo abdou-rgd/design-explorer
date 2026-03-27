@@ -3,7 +3,32 @@
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
 ## [En cours]
-<!-- Ajouter ici les entrées des PRs mergées non encore archivées -->
+<!-- PRs #14, #15, #16, #18, #19 en attente de merge → V4.2.0 -->
+
+---
+
+## V4.2.0 — 2026-03-27 (Phase 2 Quick Wins) — PRs #14–#19
+
+- [feat] **RSE 4 niveaux de sévérité** (PR #14 — `helpers_ui.R`, `styles.css`, `mod_params.R`) : ajout d'un 4ème tier RSE > 100% en bordeaux foncé (`#7f1d1d`). `RSE_THRESHOLDS = c(20, 50, 100)`, classe `.rse-very-poor`, `styleInterval(c(20,50,100), 4 couleurs)`.
+- [feat] **Labels CMT explicites** (PR #14 — `parse_design_outputs.R`, `app.R`, `mod_times.R`) : nouvelle fonction `parse_cmt_labels()` qui parse `$MODEL COMP=(NOM)`. Champ `cmt_labels` dans la sidebar avec auto-fill depuis `.ctl` et reset. Colonne CMT affiche "Nom (CMT=N)" dans la table et le plot des temps optimaux.
+- [feat] **Percentiles TSTRAT par point d'observation** (PR #15 — `mod_times.R`) : remplace le tableau résumé 1 ligne/TSTRAT par un tableau (Strate × Obs) montrant la distribution (P10/Médiane/P90) de chaque temps optimal individuel sur les N subproblèmes.
+- [feat] **Efficiency ratio dans la table OFV** (PR #16 — `mod_params.R`) : ligne "D-efficiency vs ref" = `(exp(ΔOFV/p)-1)×100%` pour D-optimality, `ΔOFV%` pour les autres critères. Run primaire = "ref", visible uniquement en multi-run.
+- [feat] **D-critère robuste** (PR #18 — `parse_design_outputs.R`, `mod_params.R`) : nouvelle fonction `get_robust_d_criterion()`. Formule : `exp(-mean(OFV_i)/p)` (moyenne géométrique de det(FIM)^(1/p) — standard Nyberg et al. / Bauer 2021). Bornes P10/P90 avec inversion OFV/D-crit. Ligne affichée dans la table OFV pour les designs robustes (multi-table, D-OPTIMALITY uniquement).
+- [feat] **Guides pédagogiques enrichis ex1 et ex3** (PR #19 — `mod_examples.R`) : ex1 avec valeurs de référence Bauer Table 3 (OFV=-39.518, RSE(CL)=36.9%, RSE(V)=5.0%) et explication FIMDIAG=1 ; ex3 avec mécanisme `$SIM TRUE=PRIOR SUBPROB=1000`, temps médians Bauer (0.13/6.9/159.9 h), lien avec D-critère robuste.
+
+## V4.1.0 — 2026-03-27 (Phase 1) — commit 00fb84a
+
+- [feat] **Exemples 4 et 5 intégrés** (`app.R`, `.EXAMPLES`) : `example4_opt` (PK-PD, `compare_with = "example4"`) et `example5` (DS-optimality, `optdesign2.*`, `compare_with = "example1"`).
+- [feat] **Suppression KPI bar** (`app.R`, `helpers_ui.R`, `styles.css`) : div UI, `renderUI`, CSS responsive — tous supprimés.
+- [fix] **`sprintf` + CSS `%`** (`helpers_ui.R`) : `50%` → `50%%` dans `run_pill()`.
+- [fix] **Nommage colonnes RSE/Shrinkage** (`mod_params.R`) : `unname(vapply(...))` → affiche les vrais noms de runs.
+- [docs] Gotchas `sprintf+CSS%` et `vapply+any_of()` dans `CLAUDE.md`.
+
+---
+
+## 2026-03-26 — docs : state.md + commandes session
+
+- [docs] Ajout dans `CLAUDE.md` : lecture prioritaire de `state.md` en début de session, commandes `/save-session` et `/resume-session`.
 
 ---
 
@@ -46,8 +71,28 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [fix] test-parse_design_outputs.R source path corrigé (scripts/ → R/)
 - [maintenance] settings.json nettoyé (permissions stales supprimées)
 
+## 2026-03-24 (session 1) — Bugfixes audit V4 + robust design + infra
+
+- [fix] **Example 3 crash** (`app.R`) : `upload$summary_data()` n'existait pas dans le return de `mod_upload` → crash silencieux. Simplifié : `merged_summary` utilise `examples$summary_data()` uniquement.
+- [fix] **`RSE_THRESHOLDS` / `RELINF_THRESHOLDS` non définis** (`helpers_ui.R`) : constantes référencées dans `rse_badge()`/`ri_badge()` mais jamais déclarées → crash silencieux. Ajout des définitions.
+- [fix] **Support `.mod` / `.con`** (`mod_upload.R`, `app.R`) : convention Sanofi — accepte `.mod` et `.con` en plus de `.ctl` dans `fileInput`, détection tar.gz, et routing multi-fichiers.
+- [fix] **str_split_1 incompatible R 4.2.0** : remplacé par `strsplit(x, sep)[[1]]` (stringr 1.4.0).
+- [fix] **Retirer la run + upload après exemple** (`app.R`) : les métriques de la session précédente persistaient après reset — clearing complet des `reactiveVal` exemples.
+- [feat] **Auto-fill param labels depuis `.ctl`** (`R/parse_design_outputs.R`, `app.R`) : `parse_theta_labels()` extrait les noms THETA depuis les commentaires `;[CL]` du bloc `$THETA`. `parse_design_summary()` génère un label court depuis les args `$DESIGN` (ex: `"FT=1/FO/VC=1 (optim)"`). Auto-remplissage du textarea labels + `primary_run_name` à l'upload.
+- [feat] **Temps optimaux — support robust design** (`mod_times.R`, `report_design.R`) : détection `is_robust` via `n_distinct(tab$table_no) > 1` → boxplot distribution par TSTRAT + banner "N subproblèmes" (au lieu de 10 000 points illisibles). PK-PD (CMT > 1) → gantt coloré par CMT. `plot_optimal_times()` : suppression `geom_segment` depuis time=0, param `cmt_col`.
+- [feat] **Réactivation exemple 3** (robust design, SUBPROB=1000) : `.EXAMPLES` mis à jour, fichiers présents dans `app/examples/`.
+- [docs] Récupération plan Dataset Builder depuis PR #12 fermée → `docs/plans/dataset-builder-plan.md`.
+- [infra] Setup PR template, conventions CHANGELOG, workflow.
+- [infra] 2 hooks PostToolUse (lintr auto `.R`, testthat auto `parse_design_outputs`), agent `r42-compat-checker`, skill `shiny-check`.
+
 ## 2026-03-24
 - [maintenance] Nettoyage codebase : suppression dossiers vides (`scripts/`, `dev/`), `app/test_load.R` supprimé, CLAUDE.md/README.md désencombrés
+
+## 2026-03-19 — PRs #10, #11 + commits directs
+
+- [fix] **PR #10** : `imap_dfr()` → `map_dfr()` dans `mod_relativeinf.R` et `mod_times.R` (paramètre index inutilisé).
+- [fix] **PR #11** : `.gitignore` étendu — exclusion docs internes (`intern_work/`, `superpowers/`), documents non-redistribuables, pages web sauvegardées.
+- [fix] Correction paths `.gitignore` pour fichiers non-redistribuables (commit direct).
 
 ## 2026-03-19 — PR #9 (af8f935)
 - [refactor] Réorganisation structure : `scripts/` → `R/`, docs réorganisés dans `docs/nonmem/` et `docs/papers/bauer2021/`
@@ -67,7 +112,12 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [feat] Exemple 3 (robust design, SUBPROB=1000) intégré
 
 ## Historique — PRs GitHub
+- [#11] fix: .gitignore — fichiers internes et non-redistribuables
+- [#10] fix: imap_dfr → map_dfr (index inutilisé)
+- [#9] refactor: réorganisation structure scripts→R/, docs, compat R 4.2.0
 - [#8] fix: versions packages R 4.2.0 compat (purrr, dplyr, ggplot2)
 - [#7] fix: reset_trigger param mod_upload_server
+- [#6] fix: refactoring parsing fichiers + logging + compat R 4.2.0 (supersède #4)
+- [#5] feat: terminologie Strate, visualisation PK/PD multi-compartiments (supersède #3)
 - [#2] fix: codebase review — 6 corrections critiques
 - [#1] docs: README.md initial ajouté
