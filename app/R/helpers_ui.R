@@ -3,7 +3,7 @@
 # =============================================================================
 
 # -- Seuils qualite RSE / RELATIVEINF (utilises par rse_badge / ri_badge) ---
-RSE_THRESHOLDS    <- c(20, 50)   # <20% bon, 20-50% modere, >50% mauvais
+RSE_THRESHOLDS    <- c(20, 50, 100) # <20% bon, 20-50% modere, 50-100% mauvais, >100% tres mauvais
 RELINF_THRESHOLDS <- c(20, 50)   # >=50% bon, 20-50% modere, <20% mauvais
 
 # -- Polices Google Fonts (injectées une fois dans app.R) -------------------
@@ -32,7 +32,7 @@ kpi_bar_ui <- function(id) {
 # -- RSE badge ---------------------------------------------------------------
 rse_badge <- function(x) {
   if (is.na(x)) return(span("\u2014", class = "ri-na"))
-  cls <- if (x < RSE_THRESHOLDS[1]) "rse-good" else if (x < RSE_THRESHOLDS[2]) "rse-moderate" else "rse-poor"
+  cls <- if (x < RSE_THRESHOLDS[1]) "rse-good" else if (x < RSE_THRESHOLDS[2]) "rse-moderate" else if (x < RSE_THRESHOLDS[3]) "rse-poor" else "rse-very-poor"
   span(sprintf("%.2f%%", x), class = cls)
 }
 

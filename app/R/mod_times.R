@@ -9,7 +9,7 @@ mod_times_ui <- function(id) {
   )
 }
 
-mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
+mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -248,7 +248,19 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       obs_single <- tab_single()
       cmt_col <- if ("CMT" %in% names(obs_single) &&
                      n_distinct(obs_single$CMT) > 1L) "CMT" else NULL
-      plot_optimal_times(obs_single, cmt_col = cmt_col)
+
+      # Appliquer labels CMT dans le df avant le plot
+      lbls <- cmt_labels()
+      obs_plot <- obs_single
+      if (!is.null(lbls) && !is.null(cmt_col) && "CMT" %in% names(obs_plot)) {
+        obs_plot <- obs_plot |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
+      plot_optimal_times(obs_plot, cmt_col = cmt_col)
 
     }, res = 110)
 
@@ -256,26 +268,34 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
     output$times_table <- renderDT({
       tab <- tab_data(); req(tab)
 
-      # Design robuste : table résumé P10 / médiane / P90 par strate
+      # Design robuste : percentiles par (TSTRAT, point d'observation)
       if (is_robust()) {
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
         if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
 
+        # Indice du point d'observation au sein de chaque (table_no, TSTRAT)
+        # -> permet d'aligner le 1er temps de TSTRAT=1 across les 1000 subprob
+        obs <- obs |>
+          dplyr::group_by(table_no, TSTRAT) |>
+          dplyr::mutate(obs_idx = dplyr::row_number()) |>
+          dplyr::ungroup()
+
         summary_tab <- obs |>
-          dplyr::group_by(TSTRAT) |>
+          dplyr::group_by(TSTRAT, obs_idx) |>
           dplyr::summarise(
-            N       = dplyr::n(),
-            P10     = round(quantile(TIME, 0.10), 2),
-            Mediane = round(median(TIME),          2),
-            P90     = round(quantile(TIME, 0.90),  2),
-            .groups = "drop"
+            N_subprob = dplyr::n_distinct(table_no),
+            P10       = round(quantile(TIME, 0.10), 2),
+            Mediane   = round(median(TIME),          2),
+            P90       = round(quantile(TIME, 0.90),  2),
+            .groups   = "drop"
           ) |>
-          dplyr::arrange(Mediane)
+          dplyr::arrange(TSTRAT, obs_idx) |>
+          dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
 
         return(datatable(summary_tab, rownames = FALSE,
                          class = "stripe hover compact",
-                         options = list(pageLength = 20, dom = "t",
+                         options = list(pageLength = 30, dom = "t",
                                         scrollX = TRUE)))
       }
 
@@ -295,6 +315,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       obs_display <- obs |>
         select(all_of(cols_show)) |>
         mutate(across(where(is.double), ~ round(.x, 4)))
+
+      # Appliquer les labels CMT si disponibles
+      lbls <- cmt_labels()
+      if (!is.null(lbls) && "CMT" %in% names(obs_display)) {
+        obs_display <- obs_display |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
 
       datatable(obs_display, rownames = FALSE,
                 class = "stripe hover compact",
