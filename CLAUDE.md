@@ -306,6 +306,8 @@ $DESIGN GROUPSIZE=50 FIMTYPE=1 MAXEVAL=9999 ...
 - **`observeEvent ignoreNULL`** : par défaut `ignoreNULL=TRUE` — si NULL est un état significatif (ex: reset après "Retirer la run"), toujours passer `ignoreNULL = FALSE`, sinon l'observer ne fire pas sur NULL
 - **`%||%` priority + upload** : `merged_ext <- reactive({ example_ext() %||% upload$ext_data() })` donne toujours priorité à `example_ext()` — pattern requis : observer sur `upload$file_paths()` avec `ignoreNULL=FALSE` qui clear tous les `example_*()` reactiveVals quand `!is.null(fps$ext)`
 - **`str_split_1` absent de stringr 1.4.0** : n'existe qu'à partir de stringr 1.5.0 — utiliser `strsplit(x, sep)[[1]]` à la place
+- **`sprintf` + CSS `%`** : tout format string sprintf contenant des pourcentages CSS (`50%`, `100%`) doit les doubler : `50%%`, `100%%`. Sinon R interprète `50%` comme début de spécificateur de format et lève une erreur (ex: `%;ba` si `;background` suit immédiatement). S'applique à toute chaîne CSS dans `sprintf()` — notamment `run_pill()` et les styles inline.
+- **`vapply` sur liste nommée + `any_of()`** : `vapply()` sur une liste nommée retourne un vecteur nommé (noms = clés de la liste, ex: `"primary"`, `"run_1"`). Passer ce vecteur à `dplyr::any_of()` ou `select()` renomme les colonnes avec les clés au lieu des valeurs → colonnes nommées `PRIMARY`/`RUN_1` au lieu de `"Run A"`. Fix : `unname(vapply(...))` partout où on extrait des noms de runs pour la sélection de colonnes.
 
 ### Gotchas multi-runs (app V4)
 
