@@ -2,8 +2,7 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
-## [En cours]
-<!-- Ajouter ici les entrées des PRs mergées non encore archivées -->
+## [En cours] — V4.2.0 (PRs #14–#19, en attente de merge)
 
 ---
 
@@ -37,7 +36,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ## 2026-03-25 (session 2) — QC multi-run : 5 bugs corrigés
 
-- [fix] **Couleurs multi-run cassées** (`helpers_ui.H`, `mod_rse.R`, `mod_convergence.R`, `mod_times.R`) : `scale_*_manual(values = .RUN_COLORS)` passait la palette statique — si les `rid` dépassent `"run_3"` (counter non réinitialisé en session), les couleurs tombaient en NA. Fix : construire un vecteur dynamique `run_colors <- setNames(vapply(names(runs), run_color, ...), names(runs))` dans chaque module (pattern identique à `mod_relativeinf.R`). Extension de `.RUN_COLORS` jusqu'à `"run_5"`.
+- [fix] **Couleurs multi-run cassées** (`helpers_ui.R`, `mod_rse.R`, `mod_convergence.R`, `mod_times.R`) : `scale_*_manual(values = .RUN_COLORS)` passait la palette statique — si les `rid` dépassent `"run_3"` (counter non réinitialisé en session), les couleurs tombaient en NA. Fix : construire un vecteur dynamique `run_colors <- setNames(vapply(names(runs), run_color, ...), names(runs))` dans chaque module (pattern identique à `mod_relativeinf.R`). Extension de `.RUN_COLORS` jusqu'à `"run_5"`.
 - [fix] **Param labels ignorées en multi-run** (`mod_params.R`) : suppression du override `if (length(runs) > 1) param` — les labels sont maintenant appliqués de la même façon qu'en mono-run.
 - [fix] **Auto-fill nom des runs de comparaison** (`mod_compare.R`) : l'observer d'upload détecte maintenant les fichiers `.ctl`/`.mod`/`.con` dans le tar.gz ou les uploads individuels. Appel à `parse_design_summary()` après parsing → `updateTextInput()` sur le nom de la run. Même comportement que la primary run.
 - [fix] **Courbe prédite Temps optimaux — seulement primary** (`mod_times.R`) : en multi-run, `output$prediction` construit un dataset combiné (`imap` sur `all_runs()`) et overlaye les courbes IPRED par run avec couleurs distinctes. Fallback mono-run inchangé.
@@ -106,6 +105,14 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [feat] Exemple 3 (robust design, SUBPROB=1000) intégré
 
 ## Historique — PRs GitHub
+- [#19] feat: guides enrichis ex1/ex3 (valeurs Bauer, mecanisme $SIM TRUE=PRIOR)
+- [#18] feat: D-critere robuste exp(-mean(OFV)/p) pour design Monte Carlo
+- [#17] docs: CHANGELOG audit — comble trou 19-27 mars, PRs #5-#11
+- [#16] feat: efficiency ratio D-opt + ΔOFV% multi-run
+- [#15] feat: percentiles TSTRAT par point d'observation (design robuste)
+- [#14] feat: RSE 4 niveaux + labels CMT depuis $MODEL
+- [#13] docs: VERSIONS.md — versioning poetique + technique
+- [#12] (ferme) plan Dataset Builder recupere dans docs/plans/
 - [#11] fix: .gitignore — fichiers internes et non-redistribuables
 - [#10] fix: imap_dfr → map_dfr (index inutilisé)
 - [#9] refactor: réorganisation structure scripts→R/, docs, compat R 4.2.0
