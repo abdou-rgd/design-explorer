@@ -213,12 +213,27 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
   rse <- rse |>
     mutate(
       quality = factor(
-        .rse_quality(rse_pct),
-        levels = c("< 20% (bon)", "20-50% (acceptable)", "> 50% (médiocre)", "Inconnu")
+        case_when(
+          is.na(rse_pct)  ~ "Inconnu",
+          rse_pct < 20    ~ "< 20% (bon)",
+          rse_pct < 50    ~ "20-50% (acceptable)",
+          rse_pct < 100   ~ "50-100% (mauvais)",
+          TRUE            ~ "> 100% (tres mauvais)"
+        ),
+        levels = c("< 20% (bon)", "20-50% (acceptable)",
+                   "50-100% (mauvais)", "> 100% (tres mauvais)", "Inconnu")
       )
     )
 
-  ttl        <- title %||% "RSE prédit par la FIM (%)"
+  .colors_rse_4 <- c(
+    "< 20% (bon)"          = "#16a34a",
+    "20-50% (acceptable)"  = "#d97706",
+    "50-100% (mauvais)"    = "#dc2626",
+    "> 100% (tres mauvais)" = "#7f1d1d",
+    "Inconnu"              = "#AAAAAA"
+  )
+
+  ttl        <- title %||% "RSE predit par la FIM (%)"
   facet_scales <- if (free_y) "free" else "free_x"
 
   p <- ggplot(rse, aes(x = param, y = rse_pct, fill = quality)) +
@@ -229,7 +244,7 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
       aes(label = sprintf("%.2f%%", rse_pct)),
       vjust = -0.35, size = 2.9, color = "grey25"
     ) +
-    scale_fill_manual(values = .COLORS_RSE, name = NULL, drop = FALSE) +
+    scale_fill_manual(values = .colors_rse_4, name = NULL, drop = FALSE) +
     facet_wrap(~ param_type, scales = facet_scales) +
     labs(
       title = ttl,
