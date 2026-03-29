@@ -5,6 +5,10 @@
 mod_times_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    div(style = "text-align: right; margin-bottom: 6px;",
+      downloadButton(ns("export_csv"), "Exporter CSV",
+                     class = "btn-sm btn-outline-secondary")
+    ),
     uiOutput(ns("content"))
   )
 }
@@ -332,5 +336,49 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
                 options = list(pageLength = 20, dom = "tip",
                                scrollX = TRUE))
     })
+
+    # -- Export CSV ---------------------------------------------------------------
+    output$export_csv <- downloadHandler(
+      filename = function() {
+        paste0("temps_optimaux_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        tab <- tab_data()
+        req(tab)
+
+        if (is_robust()) {
+          obs <- tab
+          if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+          if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
+          obs <- obs |>
+            dplyr::group_by(table_no, TSTRAT) |>
+            dplyr::mutate(obs_idx = dplyr::row_number()) |>
+            dplyr::ungroup()
+          export_df <- obs |>
+            dplyr::group_by(TSTRAT, obs_idx) |>
+            dplyr::summarise(
+              N_subprob = dplyr::n_distinct(table_no),
+              P10       = round(quantile(TIME, 0.10), 2),
+              Mediane   = round(median(TIME), 2),
+              P90       = round(quantile(TIME, 0.90), 2),
+              .groups   = "drop"
+            )
+        } else {
+          obs <- tab_single()
+          if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+          if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
+          cols_show <- intersect(
+            c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
+            names(obs)
+          )
+          if (length(cols_show) == 0L) {
+            cols_show <- names(obs)[!names(obs) %in% c("table_no")]
+          }
+          export_df <- obs |> dplyr::select(dplyr::all_of(cols_show))
+        }
+
+        readr::write_csv(export_df, file)
+      }
+    )
   })
 }
