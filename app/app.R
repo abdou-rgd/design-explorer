@@ -17,8 +17,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V4.1.0"
-.APP_VERSION_NAME <- "La naissance de la rose"
+.APP_VERSION      <- "V4.3.0"
+.APP_VERSION_NAME <- "Les sept exemples"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log

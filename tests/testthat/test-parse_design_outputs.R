@@ -44,6 +44,8 @@ ex1_coi <- proj("app/examples/example1/warfarin.coi")
 ex2_tab <- proj("app/examples/example2/warfarin2b.tab")
 ex3_ext <- proj("app/examples/example3/priortrue.ext")
 ex3_shk <- proj("app/examples/example3/priortrue.shk")
+ex6_coi <- proj("app/examples/example6/tmdd2.coi")
+ex6_clt <- proj("app/examples/example6/tmdd2.clt")
 
 
 # =============================================================================
@@ -355,6 +357,53 @@ test_that("read_coi() column names include NONMEM THETA names", {
 test_that("read_coi() errors with 'introuvable' on missing file", {
   expect_error(
     read_coi(proj("app/examples/does_not_exist.coi")),
+    "introuvable"
+  )
+})
+
+test_that("read_coi() falls back to last table with warning when table_no=1 absent", {
+  # ex6 .coi has TABLE NO. 4 only (4 chained $DESIGN blocks)
+  expect_warning(
+    fim <- read_coi(ex6_coi, table_no = 1L),
+    "repli sur la derniere table"
+  )
+  expect_true(is.matrix(fim))
+  expect_equal(nrow(fim), ncol(fim))
+  expect_true(any(startsWith(colnames(fim), "THETA")))
+})
+
+
+# =============================================================================
+# G2. read_clt() — FIM triangulaire inférieure
+# =============================================================================
+
+test_that("read_clt() returns a named numeric square matrix", {
+  fim <- read_clt(proj("app/examples/example1/warfarin.clt"))
+  expect_true(is.matrix(fim))
+  expect_type(fim, "double")
+  expect_equal(nrow(fim), ncol(fim))
+  expect_false(is.null(rownames(fim)))
+  expect_false(is.null(colnames(fim)))
+})
+
+test_that("read_clt() matrix is symmetric", {
+  fim <- read_clt(proj("app/examples/example1/warfarin.clt"))
+  expect_equal(fim, t(fim))
+})
+
+test_that("read_clt() falls back to last table with warning when table_no=1 absent", {
+  # ex6 .clt has TABLE NO. 4 only
+  expect_warning(
+    fim <- read_clt(ex6_clt, table_no = 1L),
+    "repli sur la derniere table"
+  )
+  expect_true(is.matrix(fim))
+  expect_equal(nrow(fim), ncol(fim))
+})
+
+test_that("read_clt() errors with 'introuvable' on missing file", {
+  expect_error(
+    read_clt(proj("app/examples/does_not_exist.clt")),
     "introuvable"
   )
 })

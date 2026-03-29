@@ -419,7 +419,8 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
 #' Format : TABLE NO header, puis NAME + param names, puis lignes nom + valeurs.
 #'
 #' @param file     Chemin vers le fichier .coi
-#' @param table_no Numéro de table à lire (défaut : 1)
+#' @param table_no Numéro de table à lire (défaut : 1). Si introuvable,
+#'   la dernière table du fichier est utilisée avec un avertissement.
 #' @return Matrice numérique nommée (symétrique)
 #' @export
 read_coi <- function(file, table_no = 1L) {
@@ -431,9 +432,16 @@ read_coi <- function(file, table_no = 1L) {
   table_idx <- which(str_starts(lines, "TABLE NO\\."))
   if (length(table_idx) == 0L) stop("Aucun bloc TABLE NO. dans : ", file)
 
-  # Sélectionner le bon bloc
-  tbl_i <- which(as.integer(str_extract(lines[table_idx], "\\d+")) == table_no)[1L]
-  if (is.na(tbl_i)) stop("TABLE NO. ", table_no, " introuvable dans : ", file)
+  # Sélectionner le bon bloc (fallback sur la dernière table si introuvable)
+  tbl_nums <- as.integer(str_extract(lines[table_idx], "\\d+"))
+  tbl_i <- which(tbl_nums == table_no)[1L]
+  if (is.na(tbl_i)) {
+    warning(
+      "read_coi(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
+      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+    )
+    tbl_i <- length(table_idx)
+  }
 
   start <- table_idx[tbl_i]
   end   <- if (tbl_i < length(table_idx)) table_idx[tbl_i + 1L] - 1L else length(lines)
@@ -475,7 +483,8 @@ read_coi <- function(file, table_no = 1L) {
 #' Format : TABLE NO header, param names, puis lignes triangulaires (1, 2, 3... vals).
 #'
 #' @param file     Chemin vers le fichier .clt
-#' @param table_no Numéro de table à lire (défaut : 1)
+#' @param table_no Numéro de table à lire (défaut : 1). Si introuvable,
+#'   la dernière table du fichier est utilisée avec un avertissement.
 #' @return Matrice numérique nommée (symétrique)
 #' @export
 read_clt <- function(file, table_no = 1L) {
@@ -486,8 +495,16 @@ read_clt <- function(file, table_no = 1L) {
   table_idx <- which(str_starts(lines, "TABLE NO\\."))
   if (length(table_idx) == 0L) stop("Aucun bloc TABLE NO. dans : ", file)
 
-  tbl_i <- which(as.integer(str_extract(lines[table_idx], "\\d+")) == table_no)[1L]
-  if (is.na(tbl_i)) stop("TABLE NO. ", table_no, " introuvable dans : ", file)
+  # Fallback sur la dernière table si introuvable
+  tbl_nums <- as.integer(str_extract(lines[table_idx], "\\d+"))
+  tbl_i <- which(tbl_nums == table_no)[1L]
+  if (is.na(tbl_i)) {
+    warning(
+      "read_clt(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
+      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+    )
+    tbl_i <- length(table_idx)
+  }
 
   start <- table_idx[tbl_i]
   end   <- if (tbl_i < length(table_idx)) table_idx[tbl_i + 1L] - 1L else length(lines)

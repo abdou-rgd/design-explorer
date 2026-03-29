@@ -1,5 +1,5 @@
 # =============================================================================
-# mod_examples.R -- Built-in warfarin examples (Bauer 2021)
+# mod_examples.R -- Built-in examples (Bauer 2021)
 # =============================================================================
 
 .EXAMPLES <- list(
@@ -105,6 +105,58 @@
         "Utile quand certains parametres sont deja bien estimes ou non pertinents pour la decision"
       )
     )
+  ),
+  example6 = list(
+    title = "Exemple 6 : TMDD, STRAT/STRATF",
+    desc = "Modele TMDD ODE (ADVAN13), optimisation avec stratification dose. 4 blocs $DESIGN chaines.",
+    dir = "examples/example6",
+    prefix = "tmdd2",
+    labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
+    guide = list(
+      context = "Modele TMDD (Target-Mediated Drug Disposition) a 3 compartiments avec ODE (ADVAN13). 8 parametres PK (VC, K10, K12, K21, VM, KMC, K03, K30), 2 niveaux de dose (300 et 10000), 5 temps par strate. GROUPSIZE=50, FIMDIAG=1, VARCROSS=1.",
+      points = c(
+        "4 blocs $DESIGN chaines avec NELDER : strategie de redemarrage pour eviter les minima locaux. Comparer les OFV des 4 tables dans l'onglet convergence",
+        "STRAT/STRATF : stratification par dose. STRATF optimise la proportion de sujets par strate (~59%/41%)",
+        "Multi-CMT : CMT=1 (drug) et CMT=3 (receptor) observes. 2 erreurs residuelles separees (EPS(1-2) PK, EPS(3-4) receptor)",
+        "Modele ODE (ADVAN13) : necessaire pour la cinetique TMDD non-lineaire. TOL=12, ATOL=12 pour precision",
+        "8 OMEGAs diagonaux + 4 SIGMAs (dont 2 FIXED a 0.001) -- matrice FIM 20x20"
+      )
+    )
+  ),
+  example7 = list(
+    title = "Exemple 7 : Bayes FIM (OFVTYPE=8)",
+    desc = "FIM bayesienne individuelle. Workflow D-opt (optimisation) puis Bayes (evaluation).",
+    dir = "examples/example7",
+    prefix = "tmdd2b",
+    labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
+    compare_with = "example7_bayes",
+    guide = list(
+      context = "Meme modele TMDD qu'exemple 6. Workflow en 2 problemes : (1) optimisation D-opt classique (OFVTYPE=1, MAXEVAL=50000), (2) evaluation Bayesian FIM (OFVTYPE=8, MAXEVAL=0) sur le design optimise. Le fichier .bfm contient la matrice de variance conditionnelle individuelle.",
+      points = c(
+        "Workflow 2 etapes (Bauer) : optimiser avec D-opt (rapide, robuste) puis evaluer avec Bayes FIM (plus realiste)",
+        "OFVTYPE=8 = FIM bayesienne : integre l'information a priori ($OMEGA) dans le critere",
+        "Le .bfm contient la matrice ETC (conditional variance-covariance) -- mesure la precision individuelle, pas populationnelle (visualisation prevue en V5)",
+        "Comparez avec l'optimisation Bayes pure (bouton Comparer) : memes parametres mais critere different",
+        "Optimisation TIME+DOSE simultanee (DESEL=TIME et DESEL=AMT dans le meme bloc $DESIGN)"
+      )
+    )
+  ),
+  example7_bayes = list(
+    title = "Exemple 7b : Optimisation Bayes pure",
+    desc = "Optimisation directe OFVTYPE=8 (Bayes FIM). Comparez avec le workflow D-opt puis Bayes.",
+    dir = "examples/example7",
+    prefix = "optex6d17_8",
+    labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
+    guide = list(
+      context = "Meme modele TMDD, mais optimisation directe avec OFVTYPE=8 (Bayes FIM). Contrairement a l'Exemple 7 qui optimise d'abord en D-opt puis evalue en Bayes, ici l'optimisation utilise directement le critere bayesien.",
+      points = c(
+        "OFVTYPE=8 des le depart : le critere d'optimisation est la FIM bayesienne, pas la FIM populationnelle",
+        "Plusieurs blocs $DESIGN chaines (6 tables) : exploration progressive du paysage d'optimisation",
+        "Comparez les temps optimaux avec l'Exemple 7 : le critere bayesien peut favoriser des designs differents",
+        "Les OFV D-opt et Bayes ne sont pas comparables directement (echelles differentes)",
+        "Le fichier .bfm contient la progression de la variance conditionnelle au fil des iterations (visualisation prevue en V5)"
+      )
+    )
   )
 )
 
@@ -142,16 +194,16 @@ mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
 
     observeEvent(input$open_examples, {
       showModal(modalDialog(
-        title = "Exemples Bauer 2021 -- Warfarin",
+        title = "Exemples Bauer 2021",
         size = "l",
         easyClose = TRUE,
         fluidRow(
           lapply(names(.EXAMPLES), function(ex_id) {
             ex <- .EXAMPLES[[ex_id]]
             column(3,
-              div(class = "upload-box", style = "cursor:pointer; min-height:200px;",
-                tags$h6(ex$title),
-                tags$p(style = "font-size:.85rem; color:#4b5563;", ex$desc),
+              div(class = "upload-box", style = "cursor:pointer; min-height:180px;",
+                tags$h6(ex$title, style = "font-size:.9rem;"),
+                tags$p(style = "font-size:.8rem; color:#4b5563;", ex$desc),
                 actionButton(ns(paste0("load_", ex_id)), "Charger",
                              class = "btn-sm btn-primary w-100")
               )
@@ -167,7 +219,7 @@ mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
         ex <- .EXAMPLES[[ex_id]]
         base <- ex$dir
 
-        paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL)
+        paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, bfm = NULL)
         for (ext_type in names(paths)) {
           f <- file.path(base, paste0(ex$prefix, ".", ext_type))
           if (file.exists(f)) paths[[ext_type]] <- f
@@ -180,7 +232,7 @@ mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
         # Handle compare_with
         if (!is.null(ex$compare_with)) {
           comp_ex <- .EXAMPLES[[ex$compare_with]]
-          comp_paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL)
+          comp_paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, bfm = NULL)
           for (ext_type in names(comp_paths)) {
             f <- file.path(comp_ex$dir, paste0(comp_ex$prefix, ".", ext_type))
             if (file.exists(f)) comp_paths[[ext_type]] <- f
