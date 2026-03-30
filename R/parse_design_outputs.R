@@ -892,11 +892,14 @@ parse_theta_labels <- function(lines) {
     later <- dollar_lines[dollar_lines > ts]
     non_theta_later <- later[!later %in% theta_start]
     block_end <- if (length(non_theta_later) > 0L) non_theta_later[1] - 1L else length(lines)
+    # Ranges may overlap when $THETA blocks are adjacent; sort(unique()) deduplicates
     theta_lines_idx <- c(theta_lines_idx, ts:block_end)
   }
   theta_lines_idx <- sort(unique(theta_lines_idx))
 
   # Helper: does this line contain a THETA value (number, bounds, or FIXED)?
+  # Assumption: every THETA value line contains at least one digit.
+  # Multi-value lines ($THETA 0.15 8.0 1.0) are counted as one THETA.
   has_value <- function(ln) {
     stripped <- sub(";.*", "", ln)          # remove comment
     stripped <- sub("^\\$THETA\\s*", "", stripped)  # remove $THETA keyword
@@ -909,7 +912,7 @@ parse_theta_labels <- function(lines) {
     comment <- sub("^[^;]*;\\s*", "", ln)
     if (nchar(comment) == 0L) return(NULL)
     # Strip Sanofi prefix: --thN- or --thN-- or similar
-    comment <- sub("^[-]+\\s*(th\\d+)?[-]*\\s*", "", comment, ignore.case = TRUE)
+    comment <- sub("^[-]+\\s*(th\\d+)?[-]*\\s*", "", comment)
     # Strip brackets: [LABEL] -> LABEL
     comment <- sub("^\\[([^]]+)\\].*", "\\1", comment)
     # Take first word-like token (letters, digits, underscores, starting with letter)
