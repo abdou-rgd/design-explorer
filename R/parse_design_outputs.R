@@ -866,6 +866,78 @@ read_summary_tab <- function(file) {
   result
 }
 
+
+# =============================================================================
+# compute_robust_summary — Reimplementation R de summary.f90 (Bauer 2021)
+# =============================================================================
+
+#' Calcule les statistiques robustes a partir d'un .tab multi-subproblemes
+#'
+#' Reimplemente en R la logique du programme Fortran summary.f90 de Bauer (2021).
+#' Pour chaque variable et chaque position de ligne, calcule Mean, STD, RSTD,
+#' Low, High, et percentiles 2.5%/97.5% a travers N subproblemes.
+#'
+#' @param tab Tibble retourne par read_tab(), avec colonne table_no
+#' @return Liste de tibbles (un par variable), meme format que read_summary_tab(),
+#'         ou NULL si <= 1 subprobleme
+#' @export
+compute_robust_summary <- function(tab) {
+  if (is.null(tab) || nrow(tab) == 0L) return(NULL)
+
+  n_sub <- n_distinct(tab$table_no)
+  if (n_sub <= 1L) return(NULL)
+
+  # Row position within each subproblem
+  tab <- tab |>
+    group_by(table_no) |>
+    mutate(row_pos = row_number()) |>
+    ungroup()
+
+  # Numeric columns to summarize (exclude metadata)
+  skip_cols <- c("table_no", "row_pos", "EVID", "MDV", "ID")
+  var_cols <- setdiff(
+    names(tab)[vapply(tab, is.numeric, logical(1))],
+    skip_cols
+  )
+
+  result <- list()
+  for (vc in var_cols) {
+    # Build matrix: rows = row positions, cols = subproblems
+    vals <- tab[[vc]]
+    row_pos <- tab$row_pos
+    tbl_no <- tab$table_no
+    n_rows <- max(row_pos)
+
+    mat <- matrix(NA_real_, nrow = n_rows, ncol = n_sub)
+    unique_tbl <- sort(unique(tbl_no))
+    for (j in seq_along(unique_tbl)) {
+      idx <- which(tbl_no == unique_tbl[j])
+      rp <- row_pos[idx]
+      mat[rp, j] <- vals[idx]
+    }
+
+    row_mean <- rowMeans(mat, na.rm = TRUE)
+    row_sd   <- apply(mat, 1, sd, na.rm = TRUE)
+    row_rstd <- ifelse(row_mean != 0,
+                       abs(100 * row_sd / row_mean),
+                       row_sd)
+
+    summ_df <- tibble(
+      Row      = seq_len(n_rows),
+      Mean     = row_mean,
+      STD      = row_sd,
+      RSTD     = row_rstd,
+      Low      = apply(mat, 1, min, na.rm = TRUE),
+      High     = apply(mat, 1, max, na.rm = TRUE),
+      `2.50%`  = apply(mat, 1, quantile, probs = 0.025, na.rm = TRUE),
+      `97.50%` = apply(mat, 1, quantile, probs = 0.975, na.rm = TRUE)
+    )
+    result[[vc]] <- summ_df
+  }
+  result
+}
+
+
 # =============================================================================
 # parse_theta_labels — Extrait les noms THETA depuis un control stream NONMEM
 # =============================================================================
