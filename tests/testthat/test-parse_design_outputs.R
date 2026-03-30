@@ -606,6 +606,9 @@ test_that("compute_robust_summary() computes correct stats on synthetic data", {
   # Check all required columns present
   expected_cols <- c("Row", "Mean", "STD", "RSTD", "Low", "High", "2.50%", "97.50%")
   expect_true(all(expected_cols %in% names(time_summ)))
+
+  # n_sub metadata
+  expect_equal(result[["n_sub"]], 3L)
 })
 
 test_that("compute_robust_summary() works on real example3 .tab", {
@@ -621,6 +624,9 @@ test_that("compute_robust_summary() works on real example3 .tab", {
 
   # read_tab() applies distinct() per block: 6 raw rows → 4 unique
   expect_equal(nrow(result[["TIME"]]), 4L)
+
+  # n_sub metadata — example3 has 1000 subproblems
+  expect_true(result[["n_sub"]] > 1L)
 
   # Verify Mean values are reasonable (TIME > 0 for obs rows)
   time_means <- result[["TIME"]]$Mean

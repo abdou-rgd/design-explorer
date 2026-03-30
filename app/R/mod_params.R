@@ -64,7 +64,10 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       purrr::map_dfr(runs, function(r) {
         if (is.null(r$tab_data)) return(NULL)
         tab <- r$tab_data
-        if ("EVID" %in% names(tab)) tab <- filter(tab, EVID == 0)
+        # For robust runs, use only subproblem 1
+        if ("table_no" %in% names(tab) && n_distinct(tab$table_no) > 1L)
+          tab <- dplyr::filter(tab, table_no == 1L)
+        if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
         if (nrow(tab) == 0L) return(NULL)
 
         if ("TSTRAT" %in% names(tab)) {
@@ -75,7 +78,11 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
             run    = r$name
           )
         } else if ("TIME" %in% names(tab)) {
-          tibble(metric = "Time", value = round(tab$TIME[1], 4), run = r$name)
+          tibble(
+            metric = paste0("Time ", seq_len(nrow(tab))),
+            value  = round(tab$TIME, 4),
+            run    = r$name
+          )
         } else {
           NULL
         }

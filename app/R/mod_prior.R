@@ -7,7 +7,8 @@ mod_prior_ui <- function(id) {
   tagList(uiOutput(ns("content")))
 }
 
-mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
+mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL),
+                              all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -32,6 +33,8 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
         ))
       }
 
+      n_sub <- summ[["n_sub"]] %||% 1000L
+
       parts <- list()
 
       # -- Bandeau pedagogique ------------------------------------------------
@@ -40,7 +43,8 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
           tags$strong("Principe du design robuste"),
           tags$p(style = "margin:6px 0 0; font-size:.88rem;",
             "Les temps de prelevement sont optimises independamment pour",
-            tags$strong("1000 jeux de parametres"), "tires du prior ($SIM TRUE=PRIOR SUBPROB=1000).",
+            tags$strong(paste0(n_sub, " jeux de parametres")),
+            paste0("tires du prior ($SIM TRUE=PRIOR SUBPROB=", n_sub, ")."),
             "Les plages [2.5% - 97.5%] ci-dessous indiquent les temps qui restent",
             "informatifs quelle que soit l'incertitude parametrique.",
             "La procedure recommandee : choisir des temps dans ces plages, puis",
@@ -67,7 +71,7 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
         parts <- c(parts, list(
           div(class = "plot-card",
             p(class = "section-title",
-              "Distribution des temps optimaux sur 1000 replications prior"),
+              paste0("Distribution des temps optimaux sur ", n_sub, " replications prior")),
             plotOutput(ns("robust_plot"), height = "380px")
           ),
           br(),
@@ -122,6 +126,7 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
       summ <- summary_data(); req(summ)
       time_df  <- summ[["TIME"]];  req(time_df)
       ipred_df <- summ[["IPRED"]]; req(ipred_df)
+      n_sub <- summ[["n_sub"]] %||% 1000L
 
       # Exclure la ligne dose (row 1, TIME=0)
       time_df  <- time_df[-1, , drop = FALSE]
@@ -142,19 +147,62 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL)) {
         ipred_hi   = ipred_df[[hi_col_i]]
       )
 
-      ggplot(plot_df, aes(x = time_mean, y = ipred_mean, label = tstrat)) +
+      p <- ggplot(plot_df, aes(x = time_mean, y = ipred_mean, label = tstrat)) +
         geom_ribbon(aes(ymin = ipred_lo, ymax = ipred_hi),
                     fill = "#3b82f6", alpha = 0.13) +
         geom_errorbarh(aes(xmin = time_lo, xmax = time_hi),
-                       height = 0, color = "#6b7280", size =0.5) +
+                       height = 0, color = "#6b7280", size = 0.5) +
         geom_point(size = 4, color = "#2563eb") +
-        geom_line(size =0.6, color = "#2563eb", alpha = 0.45) +
-        geom_text(size = 3.2, color = "#374151", vjust = -1) +
+        geom_line(size = 0.6, color = "#2563eb", alpha = 0.45) +
+        geom_text(size = 3.2, color = "#374151", vjust = -1)
+
+      # Multi-run overlay: comparison runs' mean predictions
+      runs <- all_runs()
+      if (length(runs) > 1L) {
+        comp_overlays <- purrr::imap(runs[-1], function(r, rid) {
+          if (is.null(r$tab_data)) return(NULL)
+          comp_tab <- r$tab_data
+          if (!("table_no" %in% names(comp_tab)) ||
+              dplyr::n_distinct(comp_tab$table_no) <= 1L)
+            return(NULL)
+          comp_summ <- tryCatch(compute_robust_summary(comp_tab),
+                                error = function(e) NULL)
+          if (is.null(comp_summ) || is.null(comp_summ[["TIME"]]) ||
+              is.null(comp_summ[["IPRED"]]))
+            return(NULL)
+          ct <- comp_summ[["TIME"]][-1, , drop = FALSE]
+          ci <- comp_summ[["IPRED"]][-1, , drop = FALSE]
+          if (nrow(ct) == 0L) return(NULL)
+          tibble(time_mean = ct$Mean, ipred_mean = ci$Mean, run = rid)
+        }) |> dplyr::bind_rows()
+
+        if (nrow(comp_overlays) > 0L) {
+          run_labels <- setNames(
+            vapply(runs[-1], function(r) r$name, character(1L)),
+            names(runs[-1]))
+          run_colors <- setNames(
+            vapply(names(runs[-1]), run_color, character(1L)),
+            names(runs[-1]))
+          p <- p +
+            geom_line(data = comp_overlays,
+                      aes(x = time_mean, y = ipred_mean, color = run),
+                      inherit.aes = FALSE, size = 0.7, alpha = 0.6,
+                      linetype = "dashed") +
+            geom_point(data = comp_overlays,
+                       aes(x = time_mean, y = ipred_mean, color = run),
+                       inherit.aes = FALSE, size = 3, alpha = 0.8) +
+            scale_color_manual(values = run_colors, labels = run_labels,
+                               name = NULL)
+        }
+      }
+
+      p +
         labs(
-          title    = "Prediction moyenne et IC 95% (1000 replications prior)",
+          title    = paste0("Prediction moyenne et IC 95% (", n_sub,
+                            " replications prior)"),
           subtitle = "Barres horizontales = IC 95% des temps  |  Ruban = IC 95% IPRED",
-          x        = "Temps (h) — Mean +/- IC 95%",
-          y        = "IPRED — Mean +/- IC 95%"
+          x        = "Temps (h) -- Mean +/- IC 95%",
+          y        = "IPRED -- Mean +/- IC 95%"
         ) +
         theme_bw(base_size = 11) +
         theme(panel.grid.minor = element_blank())

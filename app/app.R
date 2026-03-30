@@ -378,6 +378,16 @@ server <- function(input, output, session) {
         coi_data = r$coi_data, clt_data = r$clt_data, tab_data = r$tab_data
       )
     }
+    # Deduplicate run names (e.g. two runs with same $DESIGN args)
+    run_nms <- vapply(runs, function(r) r$name, character(1))
+    counts <- table(run_nms)
+    dupe_names <- names(counts[counts > 1L])
+    for (dn in dupe_names) {
+      idx <- which(run_nms == dn)
+      for (k in seq_along(idx)[-1]) {
+        runs[[idx[k]]]$name <- paste0(dn, " (", k, ")")
+      }
+    }
     runs
   })
 
@@ -493,7 +503,8 @@ server <- function(input, output, session) {
     tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r)
 
   mod_prior_server("prior",
-    summary_data = merged_summary, ctl_data = merged_ctl)
+    summary_data = merged_summary, ctl_data = merged_ctl,
+    all_runs = all_runs)
 
   mod_convergence_server("conv",
     ext_data = merged_ext, log_conv = log_conv_r, all_runs = all_runs)

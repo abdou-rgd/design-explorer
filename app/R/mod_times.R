@@ -32,7 +32,12 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       tab <- tab_data(); req(tab)
       obs <- tab
       if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
-      if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
+      if (!"TSTRAT" %in% names(obs)) {
+        obs <- obs |>
+          dplyr::group_by(table_no) |>
+          dplyr::mutate(TSTRAT = dplyr::row_number()) |>
+          dplyr::ungroup()
+      }
       obs <- obs |>
         dplyr::group_by(table_no, TSTRAT) |>
         dplyr::mutate(obs_idx = dplyr::row_number()) |>
@@ -152,6 +157,9 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       combined <- purrr::imap(runs, function(r, rid) {
         if (is.null(r$tab_data)) return(NULL)
         tab <- r$tab_data
+        # For multi-subproblem runs, use only table_no 1
+        if ("table_no" %in% names(tab) && dplyr::n_distinct(tab$table_no) > 1L)
+          tab <- dplyr::filter(tab, table_no == 1L)
         if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
         if (nrow(tab) > 1L) tab <- tab[-1L, , drop = FALSE]
         if (nrow(tab) == 0L) return(NULL)
@@ -194,11 +202,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       tab <- tab_data(); req(tab)
       runs <- all_runs()
 
-      # Cas robust design : boxplot + annotations medianes
+      # Cas robust design : boxplot + annotations medianes + multi-run overlay
       if (is_robust()) {
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-        if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1
+        # Use obs position within each subproblem as strate when TSTRAT absent
+        if (!"TSTRAT" %in% names(obs)) {
+          obs <- obs |>
+            dplyr::group_by(table_no) |>
+            dplyr::mutate(TSTRAT = dplyr::row_number()) |>
+            dplyr::ungroup()
+        }
         obs <- obs |> mutate(group = factor(paste0("Strate ", TSTRAT)))
         n_tabs <- n_distinct(tab$table_no)
 
@@ -206,26 +220,68 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
           dplyr::group_by(group) |>
           dplyr::summarise(med = median(TIME), .groups = "drop")
 
+        p <- ggplot(obs, aes(x = TIME, y = group, fill = group)) +
+          geom_boxplot(alpha = 0.7, outlier.size = 0.8,
+                       outlier.alpha = 0.4) +
+          geom_text(data = med_labels,
+                    aes(x = med, y = group,
+                        label = sprintf("%.1fh", med)),
+                    inherit.aes = FALSE,
+                    vjust = -0.6, size = 3.2, fontface = "bold",
+                    color = "#1e3a5f") +
+          scale_fill_brewer(palette = "Set2", guide = "none")
+
+        # Multi-run overlay: comparison runs' optimal times as colored points
+        if (length(runs) > 1L) {
+          comp_pts <- purrr::imap(runs[-1], function(r, rid) {
+            if (is.null(r$tab_data)) return(NULL)
+            comp_tab <- r$tab_data
+            if ("table_no" %in% names(comp_tab) &&
+                dplyr::n_distinct(comp_tab$table_no) > 1L)
+              comp_tab <- dplyr::filter(comp_tab, table_no == 1L)
+            if ("EVID" %in% names(comp_tab))
+              comp_tab <- dplyr::filter(comp_tab, EVID == 0)
+            if (nrow(comp_tab) == 0L) return(NULL)
+            if (!"TSTRAT" %in% names(comp_tab))
+              comp_tab$TSTRAT <- seq_len(nrow(comp_tab))
+            comp_tab |>
+              dplyr::mutate(group = factor(paste0("Strate ", TSTRAT)),
+                            run = rid) |>
+              dplyr::select(dplyr::any_of(c("TIME", "group", "run")))
+          }) |> dplyr::bind_rows()
+
+          if (nrow(comp_pts) > 0L) {
+            run_labels <- setNames(
+              vapply(runs[-1], function(r) r$name, character(1L)),
+              names(runs[-1]))
+            run_colors <- setNames(
+              vapply(names(runs[-1]), run_color, character(1L)),
+              names(runs[-1]))
+            p <- p +
+              geom_point(data = comp_pts,
+                         aes(x = TIME, y = group, color = run),
+                         inherit.aes = FALSE, size = 3, alpha = 0.85,
+                         position = position_dodge(width = 0.3)) +
+              scale_color_manual(values = run_colors, labels = run_labels,
+                                 name = NULL)
+          }
+        }
+
+        caption_txt <- paste0(
+          "N = ", n_tabs,
+          " realisations du prior | Boite = mediane + IQR | ",
+          "Chiffre = mediane")
+        if (length(runs) > 1L)
+          caption_txt <- paste0(caption_txt,
+                                " | Points colores = runs de comparaison")
+
         return(
-          ggplot(obs, aes(x = TIME, y = group, fill = group)) +
-            geom_boxplot(alpha = 0.7, outlier.size = 0.8,
-                         outlier.alpha = 0.4) +
-            geom_text(data = med_labels,
-                      aes(x = med, y = group,
-                          label = sprintf("%.1fh", med)),
-                      inherit.aes = FALSE,
-                      vjust = -0.6, size = 3.2, fontface = "bold",
-                      color = "#1e3a5f") +
-            scale_fill_brewer(palette = "Set2", guide = "none") +
+          p +
             labs(
               title = "Distribution des temps optimaux par strate",
               x     = "Temps (h)",
               y     = NULL,
-              caption = paste0(
-                "N = ", n_tabs,
-                " realisations du prior | Boite = mediane + IQR | ",
-                "Chiffre = mediane | Point hors boite = realisation atypique"
-              )
+              caption = caption_txt
             ) +
             theme_bw(base_size = 12) +
             theme(
