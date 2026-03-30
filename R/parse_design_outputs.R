@@ -942,6 +942,7 @@ compute_robust_summary <- function(tab) {
     )
     result[[vc]] <- summ_df
   }
+  result[["n_sub"]] <- as.integer(n_sub)
   result
 }
 
