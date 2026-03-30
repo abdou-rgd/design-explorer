@@ -466,3 +466,94 @@ test_that("summary_design() runs without error on example1", {
   )
   expect_false(inherits(result, "error"))
 })
+
+
+# =============================================================================
+# L. parse_theta_labels()
+# =============================================================================
+
+test_that("parse_theta_labels() handles single block with [LABEL] (Bauer format)", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA",
+    "0.15 ;[CL]",
+    "8.0  ;[V]",
+    "1.0  ;[KA]",
+    "$OMEGA (0.07)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V", THETA3 = "KA"))
+})
+
+test_that("parse_theta_labels() handles multiple $THETA blocks", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA (0, 0.15, 1) ; CL",
+    "$THETA (0, 8.0, 50) ; V",
+    "$THETA (0, 1.0, 10) ; KA",
+    "$OMEGA (0.07)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V", THETA3 = "KA"))
+})
+
+test_that("parse_theta_labels() handles Sanofi format ;--thN- LABEL", {
+  ctl <- c(
+    "$PROBLEM frexalimab",
+    "$THETA (0, 3.9, 100)  ;--th1- CL",
+    "$THETA (0, 0.5, 10)   ;--th2- V1",
+    "$THETA (0, 1.2, 50)   ;--th3- Q",
+    "$THETA (0, 2.0, 100)  ;--th4- V2",
+    "$OMEGA BLOCK(2)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V1", THETA3 = "Q", THETA4 = "V2"))
+})
+
+test_that("parse_theta_labels() skips unlabeled THETAs with correct index", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA",
+    "0.15 ; CL",
+    "8.0",
+    "1.0  ; KA",
+    "$OMEGA (0.07)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL", THETA3 = "KA"))
+})
+
+test_that("parse_theta_labels() returns NULL when no $THETA found", {
+  ctl <- c("$PROBLEM test", "$OMEGA (0.07)", "$SIGMA 0.01")
+  expect_null(parse_theta_labels(ctl))
+})
+
+test_that("parse_theta_labels() returns NULL when no comments on THETAs", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA",
+    "3.90834E+00",
+    "-2.18787E+00",
+    "$OMEGA (0.07)"
+  )
+  expect_null(parse_theta_labels(ctl))
+})
+
+test_that("parse_theta_labels() handles $THETA with value on same line", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA 0.15 ;CL",
+    "$OMEGA (0.07)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL"))
+})
+
+test_that("parse_theta_labels() works on real example1 .ctl", {
+  ex1_ctl <- proj("app/examples/example1/warfarin.ctl")
+  if (file.exists(ex1_ctl)) {
+    ctl_lines <- readLines(ex1_ctl, warn = FALSE)
+    lbl <- parse_theta_labels(ctl_lines)
+    expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V", THETA3 = "KA"))
+  }
+})
