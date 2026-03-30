@@ -18,16 +18,14 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 | V4 | *La naissance de la rose* | App Shiny complète : 12 modules, multi-run, navigation sidebar, design robuste |
 | V4.1.0 | — | Ex4/Ex5 intégrés, KPI bar supprimée, fix sprintf CSS%, fix unname(vapply) |
 | V4.2.0 | — | Phase 2 quick wins : RSE 4 niveaux, labels CMT, percentiles TSTRAT, efficiency ratio, D-critère robuste, guides ex1/ex3 |
+| V4.3.0 | — | Exemples Bauer 6 & 7, RSE colorés 4 tiers, export CSV temps optimaux, version sidebar, fix DT Run A |
+| V4.3.1 | — | Review fixes : ligne 100% multi-run, accents titres, reactive robust_summary, Bootstrap 3, na.rm |
 
 ---
 
 ## Version actuelle
 
-**V4.1.0** — *La naissance de la rose* 🌹
-
-## Prochaine version
-
-**V4.2.0** (PRs #14–#19 en attente de merge) — Phase 2 Quick Wins
+**V4.3.1** — *La naissance de la rose*
 
 ---
 
