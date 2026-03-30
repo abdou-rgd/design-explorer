@@ -2,8 +2,7 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
-## [En cours]
-<!-- PRs #14, #15, #16, #18, #19 en attente de merge → V4.2.0 -->
+## [En cours] — V4.2.0 (PRs #14–#19, en attente de merge)
 
 ---
 
@@ -14,7 +13,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [feat] **Percentiles TSTRAT par point d'observation** (PR #15 — `mod_times.R`) : remplace le tableau résumé 1 ligne/TSTRAT par un tableau (Strate × Obs) montrant la distribution (P10/Médiane/P90) de chaque temps optimal individuel sur les N subproblèmes.
 - [feat] **Efficiency ratio dans la table OFV** (PR #16 — `mod_params.R`) : ligne "D-efficiency vs ref" = `(exp(ΔOFV/p)-1)×100%` pour D-optimality, `ΔOFV%` pour les autres critères. Run primaire = "ref", visible uniquement en multi-run.
 - [feat] **D-critère robuste** (PR #18 — `parse_design_outputs.R`, `mod_params.R`) : nouvelle fonction `get_robust_d_criterion()`. Formule : `exp(-mean(OFV_i)/p)` (moyenne géométrique de det(FIM)^(1/p) — standard Nyberg et al. / Bauer 2021). Bornes P10/P90 avec inversion OFV/D-crit. Ligne affichée dans la table OFV pour les designs robustes (multi-table, D-OPTIMALITY uniquement).
-- [feat] **Guides pédagogiques enrichis ex1 et ex3** (PR #19 — `mod_examples.R`) : ex1 avec valeurs de référence Bauer Table 3 (OFV=-39.518, RSE(CL)=36.9%, RSE(V)=5.0%) et explication FIMDIAG=1 ; ex3 avec mécanisme `$SIM TRUE=PRIOR SUBPROB=1000`, temps médians Bauer (0.13/6.9/159.9 h), lien avec D-critère robuste.
+- [feat] **Guides pédagogiques enrichis ex1 et ex3** (PR #19 — `mod_examples.R`) : ex1 avec valeurs de référence Bauer Table 3 (OFV=-39.518, RSE(CL)=36.9%, RSE(V)=5.0%) et explication FIMDIAG=1 ; ex3 avec mécanisme `$SIM TRUE=PRIOR SUBPROB=1000`, temps médians 0.13/6.9/158.1 h (nos données), lien avec D-critère robuste.
 
 ## V4.1.0 — 2026-03-27 (Phase 1) — commit 00fb84a
 
@@ -53,7 +52,6 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 ## 2026-03-25 — Bugfixes audit multi-run + robust design
 
 - [fix] **`.parse_table_blocks()` table_no séquentiel** (`R/parse_design_outputs.R`) : NONMEM labelle tous les blocs `.tab` comme `TABLE NO. 1` en design robuste ($SIM TRUE=PRIOR). Le parser assigne maintenant des indices séquentiels 1:N quand tous les blocs ont le même numéro → `is_robust()` retourne TRUE → UI bascule sur boxplot + table résumé P10/Mediane/P90.
-
 - [fix] **Bug run_counter non-monotone** (`mod_compare.R`) : suppression du décrement `run_counter(max(0L, run_counter() - 1L))` à la suppression d'un run. La limite est désormais vérifiée via `length(run_ids()) >= 3L`. Sans ce fix, supprimer puis re-ajouter un run générait un `rid` déjà dans `observed_ids` → aucun observer créé pour le nouveau run (upload/rename/remove silencieusement cassés).
 - [fix] **`.RUN_COLORS` keyed par `rid`** (`helpers_ui.R` + `mod_rse`, `mod_convergence`, `mod_relativeinf`, `mod_times`) : les clés passent de `"Run A"/"Run B"/...` à `"primary"/"run_1"/...`. Dans les modules ggplot2, `mutate(run = r$name)` → `mutate(run = idx/rid)` via `imap`, avec `labels = run_labels` dans `scale_*_manual`. Renommer un run ne casse plus les couleurs ni la légende.
 - [fix] **Debounce renommage run** (`mod_compare.R`) : l'observer de renommage est désormais débounce à 500ms (`debounce(reactive(...), 500)`), évitant une cascade de recalculs dans tous les modules à chaque frappe clavier.
@@ -112,6 +110,14 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [feat] Exemple 3 (robust design, SUBPROB=1000) intégré
 
 ## Historique — PRs GitHub
+- [#19] feat: guides enrichis ex1/ex3 (valeurs Bauer, mecanisme $SIM TRUE=PRIOR)
+- [#18] feat: D-critere robuste exp(-mean(OFV)/p) pour design Monte Carlo
+- [#17] docs: CHANGELOG audit — comble trou 19-27 mars, PRs #5-#19
+- [#16] feat: efficiency ratio D-opt + ΔOFV% multi-run
+- [#15] feat: percentiles TSTRAT par point d'observation (design robuste)
+- [#14] feat: RSE 4 niveaux + labels CMT depuis $MODEL
+- [#13] docs: VERSIONS.md — versioning poetique + technique
+- [#12] (ferme) plan Dataset Builder recupere dans docs/plans/
 - [#11] fix: .gitignore — fichiers internes et non-redistribuables
 - [#10] fix: imap_dfr → map_dfr (index inutilisé)
 - [#9] refactor: réorganisation structure scripts→R/, docs, compat R 4.2.0

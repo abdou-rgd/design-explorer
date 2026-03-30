@@ -9,7 +9,7 @@ mod_times_ui <- function(id) {
   )
 }
 
-mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
+mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -25,6 +25,29 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       tab <- tab_data()
       req(tab)
       if (is_robust()) filter(tab, table_no == 1L) else tab
+    })
+
+    # Agregation robuste partagee (renderDT + downloadHandler)
+    robust_summary <- reactive({
+      tab <- tab_data(); req(tab)
+      obs <- tab
+      if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+      if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
+      obs <- obs |>
+        dplyr::group_by(table_no, TSTRAT) |>
+        dplyr::mutate(obs_idx = dplyr::row_number()) |>
+        dplyr::ungroup()
+      obs |>
+        dplyr::group_by(TSTRAT, obs_idx) |>
+        dplyr::summarise(
+          N_subprob = dplyr::n_distinct(table_no),
+          P10       = round(quantile(TIME, 0.10, na.rm = TRUE), 2),
+          Mediane   = round(median(TIME,          na.rm = TRUE), 2),
+          P90       = round(quantile(TIME, 0.90,  na.rm = TRUE), 2),
+          .groups   = "drop"
+        ) |>
+        dplyr::arrange(TSTRAT, obs_idx) |>
+        dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
     })
 
     # -- UI dynamique ----------------------------------------------------------
@@ -60,9 +83,15 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         NULL
       }
 
+      export_btn <- div(style = "text-align: right; margin-bottom: 6px;",
+        downloadButton(ns("export_csv"), "Exporter CSV",
+                       class = "btn-sm btn-default")
+      )
+
       if (is_robust()) {
         # Design robuste : pas de courbe predite, boxplot central + table resume
         tagList(
+          export_btn,
           robust_banner,
           fluidRow(
             column(8,
@@ -82,6 +111,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         )
       } else {
         tagList(
+          export_btn,
           fluidRow(
             column(12,
               div(class = "plot-card",
@@ -248,7 +278,19 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
       obs_single <- tab_single()
       cmt_col <- if ("CMT" %in% names(obs_single) &&
                      n_distinct(obs_single$CMT) > 1L) "CMT" else NULL
-      plot_optimal_times(obs_single, cmt_col = cmt_col)
+
+      # Appliquer labels CMT dans le df avant le plot
+      lbls <- cmt_labels()
+      obs_plot <- obs_single
+      if (!is.null(lbls) && !is.null(cmt_col) && "CMT" %in% names(obs_plot)) {
+        obs_plot <- obs_plot |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
+      plot_optimal_times(obs_plot, cmt_col = cmt_col)
 
     }, res = 110)
 
@@ -256,26 +298,10 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
     output$times_table <- renderDT({
       tab <- tab_data(); req(tab)
 
-      # Design robuste : table résumé P10 / médiane / P90 par strate
       if (is_robust()) {
-        obs <- tab
-        if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-        if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
-
-        summary_tab <- obs |>
-          dplyr::group_by(TSTRAT) |>
-          dplyr::summarise(
-            N       = dplyr::n(),
-            P10     = round(quantile(TIME, 0.10), 2),
-            Mediane = round(median(TIME),          2),
-            P90     = round(quantile(TIME, 0.90),  2),
-            .groups = "drop"
-          ) |>
-          dplyr::arrange(Mediane)
-
-        return(datatable(summary_tab, rownames = FALSE,
+        return(datatable(robust_summary(), rownames = FALSE,
                          class = "stripe hover compact",
-                         options = list(pageLength = 20, dom = "t",
+                         options = list(pageLength = 30, dom = "t",
                                         scrollX = TRUE)))
       }
 
@@ -296,10 +322,64 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list())) {
         select(all_of(cols_show)) |>
         mutate(across(where(is.double), ~ round(.x, 4)))
 
+      # Appliquer les labels CMT si disponibles
+      lbls <- cmt_labels()
+      if (!is.null(lbls) && "CMT" %in% names(obs_display)) {
+        obs_display <- obs_display |>
+          mutate(CMT = ifelse(
+            as.character(CMT) %in% names(lbls),
+            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+            as.character(CMT)
+          ))
+      }
+
       datatable(obs_display, rownames = FALSE,
                 class = "stripe hover compact",
                 options = list(pageLength = 20, dom = "tip",
                                scrollX = TRUE))
     })
+
+    # -- Export CSV ------------------------------------------------------------
+    output$export_csv <- downloadHandler(
+      filename = function() {
+        paste0("temps_optimaux_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        tab <- tab_data()
+        req(tab)
+
+        if (is_robust()) {
+          export_df <- robust_summary()
+        } else {
+          obs <- tab_single()
+          if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+          if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
+          cols_show <- intersect(
+            c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
+            names(obs)
+          )
+          if (length(cols_show) == 0L) {
+            cols_show <- names(obs)[!names(obs) %in% c("table_no")]
+          }
+          lbls <- cmt_labels()
+          export_df <- obs |>
+            dplyr::select(dplyr::all_of(cols_show)) |>
+            dplyr::mutate(dplyr::across(where(is.double), ~ round(.x, 4)))
+          if (!is.null(lbls) && "CMT" %in% names(export_df)) {
+            export_df <- export_df |>
+              dplyr::mutate(CMT = ifelse(
+                as.character(CMT) %in% names(lbls),
+                paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+                as.character(CMT)
+              ))
+          }
+        }
+
+        tryCatch(
+          readr::write_csv(export_df, file),
+          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+        )
+      }
+    )
   })
 }

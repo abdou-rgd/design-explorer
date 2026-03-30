@@ -419,7 +419,8 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
 #' Format : TABLE NO header, puis NAME + param names, puis lignes nom + valeurs.
 #'
 #' @param file     Chemin vers le fichier .coi
-#' @param table_no Numéro de table à lire (défaut : 1)
+#' @param table_no Numéro de table à lire (défaut : 1). Si introuvable,
+#'   la dernière table du fichier est utilisée avec un avertissement.
 #' @return Matrice numérique nommée (symétrique)
 #' @export
 read_coi <- function(file, table_no = 1L) {
@@ -431,9 +432,16 @@ read_coi <- function(file, table_no = 1L) {
   table_idx <- which(str_starts(lines, "TABLE NO\\."))
   if (length(table_idx) == 0L) stop("Aucun bloc TABLE NO. dans : ", file)
 
-  # Sélectionner le bon bloc
-  tbl_i <- which(as.integer(str_extract(lines[table_idx], "\\d+")) == table_no)[1L]
-  if (is.na(tbl_i)) stop("TABLE NO. ", table_no, " introuvable dans : ", file)
+  # Sélectionner le bon bloc (fallback sur la dernière table si introuvable)
+  tbl_nums <- as.integer(str_extract(lines[table_idx], "\\d+"))
+  tbl_i <- which(tbl_nums == table_no)[1L]
+  if (is.na(tbl_i)) {
+    warning(
+      "read_coi(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
+      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+    )
+    tbl_i <- length(table_idx)
+  }
 
   start <- table_idx[tbl_i]
   end   <- if (tbl_i < length(table_idx)) table_idx[tbl_i + 1L] - 1L else length(lines)
@@ -475,7 +483,8 @@ read_coi <- function(file, table_no = 1L) {
 #' Format : TABLE NO header, param names, puis lignes triangulaires (1, 2, 3... vals).
 #'
 #' @param file     Chemin vers le fichier .clt
-#' @param table_no Numéro de table à lire (défaut : 1)
+#' @param table_no Numéro de table à lire (défaut : 1). Si introuvable,
+#'   la dernière table du fichier est utilisée avec un avertissement.
 #' @return Matrice numérique nommée (symétrique)
 #' @export
 read_clt <- function(file, table_no = 1L) {
@@ -486,8 +495,16 @@ read_clt <- function(file, table_no = 1L) {
   table_idx <- which(str_starts(lines, "TABLE NO\\."))
   if (length(table_idx) == 0L) stop("Aucun bloc TABLE NO. dans : ", file)
 
-  tbl_i <- which(as.integer(str_extract(lines[table_idx], "\\d+")) == table_no)[1L]
-  if (is.na(tbl_i)) stop("TABLE NO. ", table_no, " introuvable dans : ", file)
+  # Fallback sur la dernière table si introuvable
+  tbl_nums <- as.integer(str_extract(lines[table_idx], "\\d+"))
+  tbl_i <- which(tbl_nums == table_no)[1L]
+  if (is.na(tbl_i)) {
+    warning(
+      "read_clt(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
+      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+    )
+    tbl_i <- length(table_idx)
+  }
 
   start <- table_idx[tbl_i]
   end   <- if (tbl_i < length(table_idx)) table_idx[tbl_i + 1L] - 1L else length(lines)
@@ -643,6 +660,45 @@ get_d_criterion <- function(ofv, n_params) {
   exp(-ofv / n_params)
 }
 
+# =============================================================================
+# get_robust_d_criterion() — D-critère robuste sur design Monte Carlo
+# =============================================================================
+
+#' Résumer le D-critère sur un design robuste (SUBPROB > 1)
+#'
+#' Approche standard (Nyberg et al., Bauer 2021) :
+#'   D-critère robuste = exp(-mean(OFV_i) / p)  [= moyenne géométrique de det(FIM)^(1/p)]
+#' Bornes : exp(-P90(OFV_i)/p) [P10 D-crit] et exp(-P10(OFV_i)/p) [P90 D-crit]
+#' Note : OFV élevé <=> D-critère faible, donc les bornes OFV s'inversent.
+#'
+#' @param ext      Tibble retourné par read_ext() (multi-table)
+#' @param n_params Nombre de paramètres estimables (depuis get_rse())
+#' @return Liste : d_robust, d_p10, d_p90, ofv_mean, ofv_sd, n_subprob
+#'         ou NULL si ext n'est pas multi-table ou n_params invalide
+#' @export
+get_robust_d_criterion <- function(ext, n_params) {
+  if (is.null(ext) || is.na(n_params) || n_params <= 0L) return(NULL)
+
+  tbl_nos <- sort(unique(ext$table_no))
+  if (length(tbl_nos) <= 1L) return(NULL)
+
+  ofv_vec <- vapply(tbl_nos, function(tbl) {
+    val <- tryCatch(get_ofv(ext, tbl), error = function(e) NA_real_)
+    if (length(val) == 0L) NA_real_ else val
+  }, numeric(1))
+
+  ofv_vec <- ofv_vec[!is.na(ofv_vec)]
+  if (length(ofv_vec) < 2L) return(NULL)
+
+  list(
+    d_robust  = exp(-mean(ofv_vec)               / n_params),
+    d_p10     = exp(-quantile(ofv_vec, 0.90)[[1]] / n_params),  # P90 OFV -> P10 D-crit
+    d_p90     = exp(-quantile(ofv_vec, 0.10)[[1]] / n_params),  # P10 OFV -> P90 D-crit
+    ofv_mean  = mean(ofv_vec),
+    ofv_sd    = sd(ofv_vec),
+    n_subprob = length(ofv_vec)
+  )
+}
 
 # =============================================================================
 # read_prior_nwpri() — Parser $PRIOR NWPRI depuis un .ctl
@@ -895,4 +951,37 @@ parse_design_summary <- function(lines) {
 
   if (length(parts) == 0L) return(NULL)
   paste0(paste(parts, collapse = "/"), suffix)
+}
+
+# =============================================================================
+# parse_cmt_labels — Extrait les noms de compartiments depuis $MODEL
+# =============================================================================
+#' Extrait les labels de compartiments depuis un control stream NONMEM.
+#'
+#' Supporte le format :
+#'   $MODEL COMP=(DEPOT,DEFDOSE) COMP=(CENTRAL,DEFOBS) COMP=(EFFECT)
+#'   $MODEL COMP=DEPOT COMP=CENTRAL
+#'
+#' @param lines Character vector de lignes du fichier .ctl/.mod/.con
+#' @return Named character vector c("1"="DEPOT", "2"="CENTRAL", ...) ou NULL
+#' @export
+parse_cmt_labels <- function(lines) {
+  model_start <- which(str_detect(lines, "^\\$MODEL\\b"))
+  if (length(model_start) == 0L) return(NULL)
+
+  next_block <- which(str_detect(lines, "^\\$") & seq_along(lines) > model_start[1])
+  model_end  <- if (length(next_block) > 0L) next_block[1] - 1L else length(lines)
+  block      <- paste(lines[model_start[1]:model_end], collapse = " ")
+
+  # Extraire tous les COMP=(NOM,...) ou COMP=NOM
+  matches <- gregexpr("COMP\\s*=\\s*\\(?([A-Za-z][A-Za-z0-9_]*)", block, perl = TRUE)
+  m       <- regmatches(block, matches)[[1]]
+  if (length(m) == 0L) return(NULL)
+
+  names_vec <- sub(".*COMP\\s*=\\s*\\(?", "", m)
+  names_vec <- trimws(names_vec)
+  names_vec <- names_vec[nchar(names_vec) > 0L]
+  if (length(names_vec) == 0L) return(NULL)
+
+  setNames(names_vec, as.character(seq_along(names_vec)))
 }
