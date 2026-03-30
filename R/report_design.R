@@ -33,13 +33,14 @@ library(purrr)
   )
 }
 
-# Palette qualité RSE : vert (bon) → orange → rouge (médiocre)
+# Palette qualite RSE 4 tiers : vert -> orange -> rouge -> rouge fonce
 .rse_quality <- function(rse_pct) {
   case_when(
-    is.na(rse_pct) ~ "Inconnu",
-    rse_pct < 20   ~ "< 20% (bon)",
-    rse_pct < 50   ~ "20-50% (acceptable)",
-    TRUE           ~ "> 50% (médiocre)"
+    is.na(rse_pct)  ~ "Inconnu",
+    rse_pct < 20    ~ "< 20% (bon)",
+    rse_pct < 50    ~ "20-50% (acceptable)",
+    rse_pct < 100   ~ "50-100% (mauvais)",
+    TRUE            ~ "> 100% (tres mauvais)"
   )
 }
 
@@ -74,10 +75,11 @@ library(purrr)
   "Inconnu"             = "#AAAAAA"
 )
 .COLORS_RSE <- c(
-  "< 20% (bon)"         = "#4CAF50",
-  "20-50% (acceptable)" = "#FF9800",
-  "> 50% (médiocre)"    = "#F44336",
-  "Inconnu"             = "#AAAAAA"
+  "< 20% (bon)"            = "#16a34a",
+  "20-50% (acceptable)"    = "#d97706",
+  "50-100% (mauvais)"      = "#dc2626",
+  "> 100% (tres mauvais)"  = "#7f1d1d",
+  "Inconnu"                = "#AAAAAA"
 )
 
 
@@ -169,7 +171,7 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
 #'
 #' Affiche le RSE prédit (= |SE_FIM / estimate| × 100) pour tous les
 #' paramètres estimables, facetté par type (THETA / OMEGA / SIGMA).
-#' Lignes de référence à 20% et 50%.
+#' Lignes de référence à 20%, 50% et 100%.
 #'
 #' @param ext          Tibble retourné par read_ext()
 #' @param table_no     Numéro de table (défaut : dernier bloc $DESIGN)
@@ -214,7 +216,7 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
     mutate(
       quality = factor(
         .rse_quality(rse_pct),
-        levels = c("< 20% (bon)", "20-50% (acceptable)", "> 50% (médiocre)", "Inconnu")
+        levels = names(.COLORS_RSE)
       )
     )
 
@@ -223,7 +225,7 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
 
   p <- ggplot(rse, aes(x = param, y = rse_pct, fill = quality)) +
     geom_col(width = 0.65, color = "white", size = 0.3) +
-    geom_hline(yintercept = c(20, 50), linetype = "dashed",
+    geom_hline(yintercept = c(20, 50, 100), linetype = "dashed",
                color = "grey40", size = 0.45) +
     geom_text(
       aes(label = sprintf("%.2f%%", rse_pct)),
@@ -575,15 +577,15 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
   rse <- rse |>
     mutate(quality = factor(
       .rse_quality(rse_pct),
-      levels = c("< 20% (bon)", "20-50% (acceptable)", "> 50% (mediocre)", "Inconnu")
+      levels = names(.COLORS_RSE)
     )) |>
     arrange(desc(rse_pct))
 
-  ttl <- title %||% "RSE predit par la FIM (%) -- Waterfall"
+  ttl <- title %||% "RSE prédit par la FIM (%) -- Waterfall"
 
   ggplot(rse, aes(x = reorder(param, rse_pct), y = rse_pct, fill = quality)) +
     geom_col(width = 0.65, color = "white", size = 0.3) +
-    geom_hline(yintercept = c(20, 50), linetype = "dashed", color = "grey40", size = 0.45) +
+    geom_hline(yintercept = c(20, 50, 100), linetype = "dashed", color = "grey40", size = 0.45) +
     geom_text(aes(label = sprintf("%.2f%%", rse_pct)),
               hjust = -0.12, size = 3, color = "grey25") +
     scale_fill_manual(values = .COLORS_RSE, name = NULL, drop = FALSE) +
