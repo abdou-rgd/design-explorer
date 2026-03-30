@@ -171,7 +171,7 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
 #'
 #' Affiche le RSE prédit (= |SE_FIM / estimate| × 100) pour tous les
 #' paramètres estimables, facetté par type (THETA / OMEGA / SIGMA).
-#' Lignes de référence à 20% et 50%.
+#' Lignes de référence à 20%, 50% et 100%.
 #'
 #' @param ext          Tibble retourné par read_ext()
 #' @param table_no     Numéro de table (défaut : dernier bloc $DESIGN)
@@ -220,7 +220,7 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
       )
     )
 
-  ttl        <- title %||% "RSE predit par la FIM (%)"
+  ttl        <- title %||% "RSE prédit par la FIM (%)"
   facet_scales <- if (free_y) "free" else "free_x"
 
   p <- ggplot(rse, aes(x = param, y = rse_pct, fill = quality)) +
@@ -581,7 +581,7 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
     )) |>
     arrange(desc(rse_pct))
 
-  ttl <- title %||% "RSE predit par la FIM (%) -- Waterfall"
+  ttl <- title %||% "RSE prédit par la FIM (%) -- Waterfall"
 
   ggplot(rse, aes(x = reorder(param, rse_pct), y = rse_pct, fill = quality)) +
     geom_col(width = 0.65, color = "white", size = 0.3) +
