@@ -2,7 +2,20 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
-## [En cours] — V4.2.0 (PRs #14–#19, en attente de merge)
+## V4.3.1 — 2026-03-30 (Review fixes) — PRs #23 #24
+
+- [fix] **RSE color tiers** (PR #23 — `R/report_design.R`, `app/R/mod_rse.R`) : ligne de référence 100% ajoutée en mode multi-run (`yintercept = c(20, 50, 100)`), accents restaurés dans les titres (`"RSE prédit"`), roxygen mis à jour (20%/50%/100%).
+- [fix] **Export CSV temps optimaux** (PR #24 — `app/R/mod_times.R`) : reactive `robust_summary` partagée (fin de la duplication), CSV robuste aligné avec l'affichage (arrange + rename), CSV normal avec labels CMT + arrondi 4 décimales, `btn-default` (Bootstrap 3), `tryCatch` autour de `write_csv`, `na.rm = TRUE` dans `quantile`/`median`.
+
+---
+
+## V4.3.0 — 2026-03-30 (Exemples 6 & 7 + RSE + CSV) — PRs #20 #21 #22 #23 #24
+
+- [feat] **Version affichée dans la sidebar** (PR #20 — `app.R`, `helpers_ui.R`) : numéro de version visible en bas de la sidebar.
+- [fix] **Bug Run A DT + visionneuse Control Stream** (PR #21 — `app/R/mod_upload.R`, `app/R/mod_raw.R`) : crash DT en mode Run A corrigé, ajout d'un viewer `.ctl`/`.mod`/`.con`.
+- [feat] **Exemples Bauer 6 et 7** (PR #22 — `app/R/mod_examples.R`, `app/examples/`) : exemple 6 (TMDD, STRAT/STRATF, ODE), exemple 7 (Bayes FIM, `tmdd2b.*`). 95 tests unitaires.
+- [feat] **RSE colorés par 4 tiers** (PR #23 — `R/report_design.R`, `app/R/mod_rse.R`) : palette `< 20%` vert / `20-50%` orange / `50-100%` rouge / `> 100%` bordeaux. Ligne de référence à 100% ajoutée.
+- [feat] **Export CSV temps optimaux** (PR #24 — `app/R/mod_times.R`) : bouton "Exporter CSV" dans l'onglet Temps, visible uniquement quand des données sont chargées. Cas robuste : résumé P10/Médiane/P90. Cas normal : colonnes affichées avec labels CMT.
 
 ---
 
