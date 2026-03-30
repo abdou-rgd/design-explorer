@@ -884,20 +884,59 @@ parse_theta_labels <- function(lines) {
   theta_start <- which(str_detect(lines, "^\\$THETA\\b"))
   if (length(theta_start) == 0L) return(NULL)
 
-  next_block <- which(str_detect(lines, "^\\$") & seq_along(lines) > theta_start[1])
-  theta_end  <- if (length(next_block) > 0L) next_block[1] - 1L else length(lines)
-  theta_lines <- lines[theta_start[1]:theta_end]
+  # Collect ALL lines belonging to $THETA blocks (handles multiple $THETA blocks)
+  dollar_lines <- which(str_detect(lines, "^\\$"))
+  theta_lines_idx <- integer(0)
+  for (ts in theta_start) {
+    # Block ends at next non-$THETA $ line or end of file
+    later <- dollar_lines[dollar_lines > ts]
+    non_theta_later <- later[!later %in% theta_start]
+    block_end <- if (length(non_theta_later) > 0L) non_theta_later[1] - 1L else length(lines)
+    # Ranges may overlap when $THETA blocks are adjacent; sort(unique()) deduplicates
+    theta_lines_idx <- c(theta_lines_idx, ts:block_end)
+  }
+  theta_lines_idx <- sort(unique(theta_lines_idx))
 
+  # Helper: does this line contain a THETA value (number, bounds, or FIXED)?
+  # Assumption: every THETA value line contains at least one digit.
+  # Multi-value lines ($THETA 0.15 8.0 1.0) are counted as one THETA.
+  has_value <- function(ln) {
+    stripped <- sub(";.*", "", ln)          # remove comment
+    stripped <- sub("^\\$THETA\\s*", "", stripped)  # remove $THETA keyword
+    grepl("[0-9]", stripped)                # contains at least one digit
+  }
+
+  # Helper: extract label from comment after ;
+  extract_label <- function(ln) {
+    if (!grepl(";", ln)) return(NULL)
+    comment <- sub("^[^;]*;\\s*", "", ln)
+    if (nchar(comment) == 0L) return(NULL)
+    # Strip Sanofi prefix: --thN- or --thN-- or similar
+    comment <- sub("^[-]+\\s*(th\\d+)?[-]*\\s*", "", comment)
+    # Strip brackets: [LABEL] -> LABEL
+    comment <- sub("^\\[([^]]+)\\].*", "\\1", comment)
+    # Take first word-like token (letters, digits, underscores, starting with letter)
+    m <- regmatches(comment, regexpr("[A-Za-z][A-Za-z0-9_]*", comment))
+    if (length(m) == 0L || nchar(m) == 0L) return(NULL)
+    m
+  }
+
+  theta_idx <- 0L
   labels <- character(0)
-  for (ln in theta_lines) {
-    comment_match <- regmatches(ln, regexpr(";\\s*\\[?([A-Za-z][A-Za-z0-9_]*)\\]?", ln))
-    if (length(comment_match) == 0L || nchar(comment_match) == 0L) next
-    lbl <- str_trim(sub("^;\\s*\\[?([A-Za-z][A-Za-z0-9_]*)\\]?.*", "\\1", comment_match))
-    if (nchar(lbl) > 0L) labels <- c(labels, lbl)
+  label_names <- character(0)
+  for (i in theta_lines_idx) {
+    ln <- lines[i]
+    if (!has_value(ln)) next   # skip bare "$THETA" line or blank/comment-only lines
+    theta_idx <- theta_idx + 1L
+    lbl <- extract_label(ln)
+    if (!is.null(lbl)) {
+      labels <- c(labels, lbl)
+      label_names <- c(label_names, paste0("THETA", theta_idx))
+    }
   }
 
   if (length(labels) == 0L) return(NULL)
-  setNames(labels, paste0("THETA", seq_along(labels)))
+  setNames(labels, label_names)
 }
 
 # =============================================================================
