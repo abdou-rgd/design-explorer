@@ -5,10 +5,6 @@
 mod_times_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    div(style = "text-align: right; margin-bottom: 6px;",
-      downloadButton(ns("export_csv"), "Exporter CSV",
-                     class = "btn-sm btn-outline-secondary")
-    ),
     uiOutput(ns("content"))
   )
 }
@@ -64,9 +60,15 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         NULL
       }
 
+      export_btn <- div(style = "text-align: right; margin-bottom: 6px;",
+        downloadButton(ns("export_csv"), "Exporter CSV",
+                       class = "btn-sm btn-outline-secondary")
+      )
+
       if (is_robust()) {
         # Design robuste : pas de courbe predite, boxplot central + table resume
         tagList(
+          export_btn,
           robust_banner,
           fluidRow(
             column(8,
@@ -86,6 +88,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         )
       } else {
         tagList(
+          export_btn,
           fluidRow(
             column(12,
               div(class = "plot-card",
