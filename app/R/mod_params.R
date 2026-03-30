@@ -147,11 +147,85 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
       crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
 
-      df <- as.data.frame(
-        c(list(Metrique = paste0("\u2212log(det(FIM)) [", crit, "]")),
-          as.list(ofv_vals)),
+      # -- Ligne OFV -----------------------------------------------------------
+      ofv_label <- paste0("\u2212log(det(FIM)) [", crit, "]")
+      rows <- list(as.data.frame(
+        c(list(Metrique = ofv_label), as.list(ofv_vals)),
         check.names = FALSE
-      )
+      ))
+
+      # -- Ligne efficience relative (vs run primaire) -----------------------
+      primary_ofv <- ofv_vals[[1]]
+      has_comparison <- length(ofv_vals) >= 2L &&
+        !is.na(primary_ofv) &&
+        any(!is.na(ofv_vals[-1]))
+
+      if (has_comparison) {
+        if (crit == "D-OPTIMALITY") {
+          # D-efficiency : (exp(ΔOFV / p) - 1) x 100%
+          # p = nombre de params estimables depuis la run primaire
+          n_params <- tryCatch({
+            rse_df <- get_rse(runs[[1]]$ext_data, tbl)
+            nrow(rse_df)
+          }, error = function(e) NA_integer_)
+
+          eff_vals <- vapply(seq_along(ofv_vals), function(i) {
+            if (i == 1L) return(NA_real_)   # reference
+            if (is.na(ofv_vals[i]) || is.na(primary_ofv)) return(NA_real_)
+            if (is.na(n_params) || n_params == 0L) return(NA_real_)
+            delta <- primary_ofv - ofv_vals[i]
+            round((exp(delta / n_params) - 1) * 100, 2)
+          }, numeric(1))
+          names(eff_vals) <- names(ofv_vals)
+
+          eff_display <- vapply(seq_along(eff_vals), function(i) {
+            if (i == 1L) return("ref")
+            if (is.na(eff_vals[i])) return(NA_character_)
+            sprintf("%+.2f%%", eff_vals[i])
+          }, character(1))
+          names(eff_display) <- names(ofv_vals)
+
+          eff_label <- paste0("D-efficiency vs ref (p=", n_params, ")")
+        } else {
+          # Autres criteres : ΔOFV% = (OFV_ref - OFV_run) / |OFV_ref| x 100%
+          eff_display <- vapply(seq_along(ofv_vals), function(i) {
+            if (i == 1L) return("ref")
+            if (is.na(ofv_vals[i]) || is.na(primary_ofv) || primary_ofv == 0) return(NA_character_)
+            delta_pct <- (primary_ofv - ofv_vals[i]) / abs(primary_ofv) * 100
+            sprintf("%+.2f%%", round(delta_pct, 2))
+          }, character(1))
+          names(eff_display) <- names(ofv_vals)
+          eff_label <- paste0("\u0394OFV% vs ref [", crit, "]")
+        }
+
+        rows[[length(rows) + 1L]] <- as.data.frame(
+          c(list(Metrique = eff_label), as.list(eff_display)),
+          check.names = FALSE
+        )
+      }
+
+      # -- Ligne D-critère robuste (design Monte Carlo uniquement) ------------
+      if (crit == "D-OPTIMALITY") {
+        primary_ext <- runs[[1]]$ext_data
+        if (!is.null(primary_ext)) {
+          n_params_r <- tryCatch(nrow(get_rse(primary_ext, tbl)), error = function(e) NA_integer_)
+          rdc <- tryCatch(get_robust_d_criterion(primary_ext, n_params_r), error = function(e) NULL)
+          if (!is.null(rdc)) {
+            d_str <- sprintf("%.4f [%.4f \u2013 %.4f]", rdc$d_robust, rdc$d_p10, rdc$d_p90)
+            rdc_row <- as.data.frame(
+              c(list(Metrique = sprintf("D-critere robuste P10-P90 (n=%d)", rdc$n_subprob)),
+                setNames(
+                  lapply(seq_along(runs), function(i) if (i == 1L) d_str else NA_character_),
+                  names(ofv_vals)
+                )),
+              check.names = FALSE
+            )
+            rows[[length(rows) + 1L]] <- rdc_row
+          }
+        }
+      }
+
+      df <- do.call(rbind, rows)
 
       datatable(df, rownames = FALSE, class = "stripe compact",
                 options = list(dom = "t", ordering = FALSE))
@@ -183,7 +257,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       for (col_idx in run_col_indices) {
         dt <- dt |>
           formatStyle(col_idx,
-            color      = styleInterval(c(20, 50), c("#16a34a", "#d97706", "#dc2626")),
+            color      = styleInterval(c(20, 50, 100), c("#16a34a", "#d97706", "#dc2626", "#7f1d1d")),
             fontWeight = "bold"
           )
       }

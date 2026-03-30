@@ -15,6 +15,12 @@ library(purrr)
 library(readr)
 
 # =============================================================================
+# Version info — affichée dans le sidebar
+# =============================================================================
+.APP_VERSION      <- "V4.3.0"
+.APP_VERSION_NAME <- "Les sept exemples"
+
+# =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
 # Usage : log_info("message"), log_warn("..."), log_error("...")
 # =============================================================================
@@ -77,6 +83,7 @@ ui <- fluidPage(
 
       div(id = "sidebar-logo",
         div(class = "app-title",   "$DESIGN Explorer"),
+        div(class = "app-version",  paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME)),
         div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
       ),
 
@@ -104,7 +111,9 @@ ui <- fluidPage(
       tags$button(class = "nav-item", id = "nav-conv",
         onclick = "navTo('conv', this)", "Convergence"),
       tags$button(class = "nav-item", id = "nav-raw",
-        onclick = "navTo('raw', this)", "Donnees brutes")
+        onclick = "navTo('raw', this)", "Donnees brutes"),
+      tags$button(class = "nav-item", id = "nav-ctl",
+        onclick = "navTo('ctl', this)", "Control Stream")
     ),
 
     # -- Main area -----------------------------------------------------------
@@ -127,7 +136,9 @@ ui <- fluidPage(
         conditionalPanel("input.active_tab == 'conv'",
           mod_convergence_ui("conv")),
         conditionalPanel("input.active_tab == 'raw'",
-          mod_raw_ui("raw"))
+          mod_raw_ui("raw")),
+        conditionalPanel("input.active_tab == 'ctl'",
+          mod_ctl_stream_ui("ctl"))
       )
     )
   ),
@@ -148,13 +159,19 @@ ui <- fluidPage(
     tags$hr(),
     div(class = "upload-box",
       tags$h6("Nom du run principal"),
-      textInput("primary_run_name", NULL, value = "Run A", width = "100%")
+      textInput("primary_run_name", NULL, value = "Primary", width = "100%")
     ),
     div(class = "upload-box",
       tags$h6("Labels parametres (THETA)"),
       textAreaInput("param_labels", NULL,
         placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
       helpText("Un label par ligne, format THETA1=CL")
+    ),
+    div(class = "upload-box",
+      tags$h6("Labels compartiments (CMT)"),
+      textAreaInput("cmt_labels", NULL,
+        placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3),
+      helpText("Un label par ligne, format 1=Nom")
     ),
     div(class = "upload-box",
       tags$h6("Bloc $DESIGN (TABLE NO.)"),
@@ -247,15 +264,17 @@ server <- function(input, output, session) {
   example_clt      <- reactiveVal(NULL)
   example_tab      <- reactiveVal(NULL)
   example_ctl      <- reactiveVal(NULL)
+  example_ctl_lines <- reactiveVal(NULL)
   example_comp_run <- reactiveVal(NULL)
 
   observeEvent(examples$file_paths(), ignoreNULL = FALSE, {
     paths <- examples$file_paths()
     if (is.null(paths)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL)
+      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
       updateTextAreaInput(session, "param_labels", value = "")
+      updateTextAreaInput(session, "cmt_labels",   value = "")
       return()
     }
     example_ext(.safe_load(read_ext, paths$ext, ".ext"))
@@ -269,6 +288,7 @@ server <- function(input, output, session) {
         ctl_path <- file.path(dirname(paths$ext), paste0(base_name, ext_try))
         if (file.exists(ctl_path)) {
           example_ctl(.safe_load(read_prior_nwpri, ctl_path, ext_try))
+          example_ctl_lines(tryCatch(readr::read_lines(ctl_path), error = function(e) NULL))
           break
         }
       }
@@ -297,7 +317,7 @@ server <- function(input, output, session) {
     fps <- upload$file_paths()
     if (!is.null(fps$ext)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL)
+      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
     }
     # Auto-remplissage depuis le .ctl uploade
@@ -308,6 +328,12 @@ server <- function(input, output, session) {
       if (!is.null(theta_lbl)) {
         lbl_text <- paste(paste0(names(theta_lbl), "=", theta_lbl), collapse = "\n")
         updateTextAreaInput(session, "param_labels", value = lbl_text)
+      }
+      # Labels CMT -> textArea cmt_labels (depuis $MODEL COMP=(NOM))
+      cmt_lbl <- tryCatch(parse_cmt_labels(ctl_lines), error = function(e) NULL)
+      if (!is.null(cmt_lbl)) {
+        cmt_text <- paste(paste0(names(cmt_lbl), "=", cmt_lbl), collapse = "\n")
+        updateTextAreaInput(session, "cmt_labels", value = cmt_text)
       }
       # Suggestion nom de run -> textInput primary_run_name
       design_name <- tryCatch(parse_design_summary(ctl_lines), error = function(e) NULL)
@@ -327,7 +353,7 @@ server <- function(input, output, session) {
   merged_summary <- reactive({ examples$summary_data() })
 
   # -- all_runs ---------------------------------------------------------------
-  primary_name <- reactive({ input$primary_run_name %||% "Run A" })
+  primary_name <- reactive({ input$primary_run_name %||% "Primary" })
 
   all_runs <- reactive({
     primary <- list(
@@ -372,6 +398,18 @@ server <- function(input, output, session) {
     if (length(lbl) == 0L) return(NULL)
     lbl
   })
+  cmt_labels_r <- reactive({
+    raw <- trimws(input$cmt_labels)
+    if (raw == "") return(NULL)
+    lbl <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
+      dplyr::filter(stringr::str_detect(raw, "=")) |>
+      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
+      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
+      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
+      tibble::deframe()
+    if (length(lbl) == 0L) return(NULL)
+    lbl
+  })
   se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
   log_conv_r <- reactive({ input$log_conv })
 
@@ -389,7 +427,8 @@ server <- function(input, output, session) {
   observeEvent(input$reset_run, {
     reset_trigger(reset_trigger() + 1L)
     updateTextAreaInput(session, "param_labels", value = "")
-    updateTextInput(session, "primary_run_name", value = "Run A")
+    updateTextAreaInput(session, "cmt_labels",   value = "")
+    updateTextInput(session, "primary_run_name", value = "Primary")
     showNotification("Run retiree", type = "message")
   })
 
@@ -445,7 +484,7 @@ server <- function(input, output, session) {
     tbl_no = tbl_no, param_labels = param_labels_r, all_runs = all_runs)
 
   mod_times_server("times",
-    tab_data = merged_tab, all_runs = all_runs)
+    tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r)
 
   mod_prior_server("prior",
     summary_data = merged_summary, ctl_data = merged_ctl)
@@ -455,6 +494,9 @@ server <- function(input, output, session) {
 
   mod_raw_server("raw",
     ext_data = merged_ext, all_runs = all_runs)
+
+  mod_ctl_stream_server("ctl",
+    ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
 }
 
 
