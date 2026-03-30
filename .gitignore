@@ -6,7 +6,8 @@
 
 # Fichiers temporaires Claude/superpowers
 .superpowers/
-.claude/
+.claude/*
+!.claude/rules/
 
 # Données sensibles (jamais committer)
 *.csv
