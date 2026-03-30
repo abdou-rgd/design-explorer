@@ -619,10 +619,8 @@ test_that("compute_robust_summary() works on real example3 .tab", {
   expect_true("TIME" %in% names(result))
   expect_true("IPRED" %in% names(result))
 
-  # read_tab() applies distinct() per block, so duplicate TSTRAT rows are merged
-  # Example 3: 6 raw rows → 4 unique (1 dose + 3 obs with distinct TIME)
-  expect_true(nrow(result[["TIME"]]) >= 3)  # at least dose + 2 obs
-  expect_true(nrow(result[["TIME"]]) <= 6)  # at most 6 raw rows
+  # read_tab() applies distinct() per block: 6 raw rows → 4 unique
+  expect_equal(nrow(result[["TIME"]]), 4L)
 
   # Verify Mean values are reasonable (TIME > 0 for obs rows)
   time_means <- result[["TIME"]]$Mean

@@ -900,6 +900,14 @@ compute_robust_summary <- function(tab) {
     skip_cols
   )
 
+  # Warn if subproblems have unequal row counts (summary.f90 aborts)
+  rows_per_sub <- tapply(tab$row_pos, tab$table_no, max)
+  if (length(unique(rows_per_sub)) > 1L) {
+    warning("compute_robust_summary: subproblems have unequal row counts (",
+            paste(sort(unique(rows_per_sub)), collapse = ", "),
+            "). Statistics for sparse rows are averaged over fewer replications.")
+  }
+
   result <- list()
   for (vc in var_cols) {
     # Build matrix: rows = row positions, cols = subproblems
@@ -920,7 +928,7 @@ compute_robust_summary <- function(tab) {
     row_sd   <- apply(mat, 1, sd, na.rm = TRUE)
     row_rstd <- ifelse(row_mean != 0,
                        abs(100 * row_sd / row_mean),
-                       row_sd)
+                       NA_real_)
 
     summ_df <- tibble(
       Row      = seq_len(n_rows),

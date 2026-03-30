@@ -354,7 +354,6 @@ server <- function(input, output, session) {
   upload_summary <- reactive({
     tab <- upload$tab_data()
     if (is.null(tab)) return(NULL)
-    if (dplyr::n_distinct(tab$table_no) <= 1L) return(NULL)
     compute_robust_summary(tab)
   })
   merged_summary <- reactive({ examples$summary_data() %||% upload_summary() })
