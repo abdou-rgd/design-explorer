@@ -27,6 +27,29 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       if (is_robust()) filter(tab, table_no == 1L) else tab
     })
 
+    # Agregation robuste partagee (renderDT + downloadHandler)
+    robust_summary <- reactive({
+      tab <- tab_data(); req(tab)
+      obs <- tab
+      if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+      if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
+      obs <- obs |>
+        dplyr::group_by(table_no, TSTRAT) |>
+        dplyr::mutate(obs_idx = dplyr::row_number()) |>
+        dplyr::ungroup()
+      obs |>
+        dplyr::group_by(TSTRAT, obs_idx) |>
+        dplyr::summarise(
+          N_subprob = dplyr::n_distinct(table_no),
+          P10       = round(quantile(TIME, 0.10, na.rm = TRUE), 2),
+          Mediane   = round(median(TIME,          na.rm = TRUE), 2),
+          P90       = round(quantile(TIME, 0.90,  na.rm = TRUE), 2),
+          .groups   = "drop"
+        ) |>
+        dplyr::arrange(TSTRAT, obs_idx) |>
+        dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
+    })
+
     # -- UI dynamique ----------------------------------------------------------
     output$content <- renderUI({
       tab <- tab_data()
@@ -62,7 +85,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
       export_btn <- div(style = "text-align: right; margin-bottom: 6px;",
         downloadButton(ns("export_csv"), "Exporter CSV",
-                       class = "btn-sm btn-outline-secondary")
+                       class = "btn-sm btn-default")
       )
 
       if (is_robust()) {
@@ -275,32 +298,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
     output$times_table <- renderDT({
       tab <- tab_data(); req(tab)
 
-      # Design robuste : percentiles par (TSTRAT, point d'observation)
       if (is_robust()) {
-        obs <- tab
-        if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-        if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
-
-        # Indice du point d'observation au sein de chaque (table_no, TSTRAT)
-        # -> permet d'aligner le 1er temps de TSTRAT=1 across les 1000 subprob
-        obs <- obs |>
-          dplyr::group_by(table_no, TSTRAT) |>
-          dplyr::mutate(obs_idx = dplyr::row_number()) |>
-          dplyr::ungroup()
-
-        summary_tab <- obs |>
-          dplyr::group_by(TSTRAT, obs_idx) |>
-          dplyr::summarise(
-            N_subprob = dplyr::n_distinct(table_no),
-            P10       = round(quantile(TIME, 0.10), 2),
-            Mediane   = round(median(TIME),          2),
-            P90       = round(quantile(TIME, 0.90),  2),
-            .groups   = "drop"
-          ) |>
-          dplyr::arrange(TSTRAT, obs_idx) |>
-          dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
-
-        return(datatable(summary_tab, rownames = FALSE,
+        return(datatable(robust_summary(), rownames = FALSE,
                          class = "stripe hover compact",
                          options = list(pageLength = 30, dom = "t",
                                         scrollX = TRUE)))
@@ -340,7 +339,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
                                scrollX = TRUE))
     })
 
-    # -- Export CSV ---------------------------------------------------------------
+    # -- Export CSV ------------------------------------------------------------
     output$export_csv <- downloadHandler(
       filename = function() {
         paste0("temps_optimaux_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
@@ -350,22 +349,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         req(tab)
 
         if (is_robust()) {
-          obs <- tab
-          if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
-          if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1L
-          obs <- obs |>
-            dplyr::group_by(table_no, TSTRAT) |>
-            dplyr::mutate(obs_idx = dplyr::row_number()) |>
-            dplyr::ungroup()
-          export_df <- obs |>
-            dplyr::group_by(TSTRAT, obs_idx) |>
-            dplyr::summarise(
-              N_subprob = dplyr::n_distinct(table_no),
-              P10       = round(quantile(TIME, 0.10), 2),
-              Mediane   = round(median(TIME), 2),
-              P90       = round(quantile(TIME, 0.90), 2),
-              .groups   = "drop"
-            )
+          export_df <- robust_summary()
         } else {
           obs <- tab_single()
           if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
@@ -377,10 +361,24 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
           if (length(cols_show) == 0L) {
             cols_show <- names(obs)[!names(obs) %in% c("table_no")]
           }
-          export_df <- obs |> dplyr::select(dplyr::all_of(cols_show))
+          lbls <- cmt_labels()
+          export_df <- obs |>
+            dplyr::select(dplyr::all_of(cols_show)) |>
+            dplyr::mutate(dplyr::across(where(is.double), ~ round(.x, 4)))
+          if (!is.null(lbls) && "CMT" %in% names(export_df)) {
+            export_df <- export_df |>
+              dplyr::mutate(CMT = ifelse(
+                as.character(CMT) %in% names(lbls),
+                paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
+                as.character(CMT)
+              ))
+          }
         }
 
-        readr::write_csv(export_df, file)
+        tryCatch(
+          readr::write_csv(export_df, file),
+          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+        )
       }
     )
   })
