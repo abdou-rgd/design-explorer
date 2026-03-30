@@ -557,3 +557,73 @@ test_that("parse_theta_labels() works on real example1 .ctl", {
     expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V", THETA3 = "KA"))
   }
 })
+
+
+# =============================================================================
+# M. compute_robust_summary()
+# =============================================================================
+
+test_that("compute_robust_summary() returns NULL for single subproblem", {
+  tab <- tibble::tibble(table_no = 1L, ID = 1, TIME = c(0, 1, 5), IPRED = c(0, 2, 8), EVID = c(1, 0, 0))
+  expect_null(compute_robust_summary(tab))
+})
+
+test_that("compute_robust_summary() returns NULL for NULL input", {
+  expect_null(compute_robust_summary(NULL))
+})
+
+test_that("compute_robust_summary() computes correct stats on synthetic data", {
+  # 3 subproblems, 2 rows each (1 dose + 1 obs)
+  tab <- tibble::tibble(
+    table_no = rep(1:3, each = 2),
+    ID       = 1,
+    TIME     = c(0, 1.0,  0, 2.0,  0, 3.0),
+    IPRED    = c(0, 10,   0, 20,   0, 30),
+    EVID     = rep(c(1, 0), 3),
+    MDV      = rep(c(1, 0), 3)
+  )
+  result <- compute_robust_summary(tab)
+
+  expect_true(is.list(result))
+  expect_true("TIME" %in% names(result))
+  expect_true("IPRED" %in% names(result))
+
+  time_summ <- result[["TIME"]]
+  expect_equal(nrow(time_summ), 2)  # 2 rows per subproblem
+
+  # Row 1 (dose): TIME = 0 for all subproblems → Mean=0, STD=0
+  expect_equal(time_summ$Mean[1], 0)
+  expect_equal(time_summ$STD[1], 0)
+
+  # Row 2 (obs): TIME = 1, 2, 3 → Mean=2, STD=1
+  expect_equal(time_summ$Mean[2], 2)
+  expect_equal(time_summ$STD[2], 1)
+
+  # IPRED row 2: 10, 20, 30 → Mean=20
+  ipred_summ <- result[["IPRED"]]
+  expect_equal(ipred_summ$Mean[2], 20)
+
+  # Check all required columns present
+  expected_cols <- c("Row", "Mean", "STD", "RSTD", "Low", "High", "2.50%", "97.50%")
+  expect_true(all(expected_cols %in% names(time_summ)))
+})
+
+test_that("compute_robust_summary() works on real example3 .tab", {
+  ex3_tab <- proj("app/examples/example3/priortrue.tab")
+  skip_if_not(file.exists(ex3_tab), "example3 .tab not found")
+
+  tab <- read_tab(ex3_tab)
+  result <- compute_robust_summary(tab)
+
+  expect_true(is.list(result))
+  expect_true("TIME" %in% names(result))
+  expect_true("IPRED" %in% names(result))
+
+  # read_tab() applies distinct() per block: 6 raw rows → 4 unique
+  expect_equal(nrow(result[["TIME"]]), 4L)
+
+  # Verify Mean values are reasonable (TIME > 0 for obs rows)
+  time_means <- result[["TIME"]]$Mean
+  expect_true(time_means[1] == 0)  # dose row
+  expect_true(all(time_means[-1] > 0))  # obs rows have positive times
+})

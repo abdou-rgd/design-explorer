@@ -350,7 +350,13 @@ server <- function(input, output, session) {
   merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
   merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
   merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
-  merged_summary <- reactive({ examples$summary_data() })
+  # Robust summary: built-in example (pre-computed) or computed from uploaded .tab
+  upload_summary <- reactive({
+    tab <- upload$tab_data()
+    if (is.null(tab)) return(NULL)
+    compute_robust_summary(tab)
+  })
+  merged_summary <- reactive({ examples$summary_data() %||% upload_summary() })
 
   # -- all_runs ---------------------------------------------------------------
   primary_name <- reactive({ input$primary_run_name %||% "Primary" })
