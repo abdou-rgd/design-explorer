@@ -27,9 +27,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       if (is_robust()) filter(tab, table_no == 1L) else tab
     })
 
-    # Agregation robuste partagee (renderDT + downloadHandler)
-    robust_summary <- reactive({
-      tab <- tab_data(); req(tab)
+    # Helper: agregation robuste pour un seul run (tab = data.frame brut)
+    .robust_summary_one <- function(tab) {
       obs <- tab
       if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
       if (!"TSTRAT" %in% names(obs)) {
@@ -53,6 +52,26 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         ) |>
         dplyr::arrange(TSTRAT, obs_idx) |>
         dplyr::rename(Strate = TSTRAT, Obs = obs_idx, N = N_subprob)
+    }
+
+    # Agregation robuste partagee (renderDT + downloadHandler)
+    # Multi-run : long format avec colonne Run en tete
+    robust_summary <- reactive({
+      runs <- all_runs()
+      if (length(runs) <= 1L) {
+        tab <- tab_data(); req(tab)
+        return(.robust_summary_one(tab))
+      }
+      result <- purrr::imap(runs, function(r, rid) {
+        if (is.null(r$tab_data)) return(NULL)
+        tab <- r$tab_data
+        if (!("table_no" %in% names(tab)) || dplyr::n_distinct(tab$table_no) <= 1L)
+          return(NULL)
+        .robust_summary_one(tab) |>
+          dplyr::mutate(Run = r$name %||% rid, .before = 1)
+      }) |> dplyr::bind_rows()
+      req(nrow(result) > 0L)
+      result
     })
 
     # -- UI dynamique ----------------------------------------------------------
@@ -175,7 +194,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         return(plot_model_prediction(tab_single()))
       }
 
-      run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+      run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                              names(runs))
       run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
                              names(runs))
@@ -252,7 +271,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
           if (nrow(comp_pts) > 0L) {
             run_labels <- setNames(
-              vapply(runs[-1], function(r) r$name, character(1L)),
+              vapply(runs[-1], function(r) r$name %||% "?", character(1L)),
               names(runs[-1]))
             run_colors <- setNames(
               vapply(names(runs[-1]), run_color, character(1L)),
@@ -309,7 +328,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         combined <- combined |>
           mutate(group = factor(paste0("Strate ", TSTRAT)))
 
-        run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+        run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                                names(runs))
         run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
                                names(runs))
