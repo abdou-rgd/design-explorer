@@ -20,20 +20,56 @@
       )
     )
   ),
+  # Convention de nommage :
+  # compare_with      = cle d'une autre entree .EXAMPLES (cross-exemple)
+  # prev_step_prefix  = prefix fichier de l'etape precedente dans le meme dir (intra-exemple)
   example2 = list(
-    title = "Exemple 2 : Optimisation des temps",
-    desc = "Optimisation des temps de prelevement par Nelder-Mead (DESEL=TIME, MAXEVAL=4000).",
+    title = "Exemple 2 : Optimisation des temps (3 etapes)",
+    desc = "Chaine d'optimisations NELDER : 3 passes successives ou chaque etape demarre depuis le design optimal precedent.",
     dir = "examples/example2",
-    prefix = "warfarin2b",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
-    compare_with = "example1",
-    guide = list(
-      context = "Meme modele warfarin, mais avec optimisation des temps via NELDER. Les temps sont libres dans les fenetres definies par TMIN/TMAX.",
-      points = c(
-        "Comparez les RSE avant/apres optimisation (bouton 'Comparer avec l'evaluation')",
-        "L'OFV (= -log(det(FIM))) diminue : le determinant de la FIM augmente",
-        "Les temps optimaux dans l'onglet 'Temps optimaux' montrent ou prelever",
-        "Consultez la convergence : le NELDER converge-t-il bien ?"
+    steps = list(
+      list(
+        label = "Etape 1/3 : Premiere passe NELDER (warfarin2)",
+        prefix = "warfarin2",
+        prev_step_prefix = NULL,
+        guide = list(
+          context = "Premiere optimisation NELDER a partir du design initial (3 temps dans des fenetres TMIN/TMAX). GROUPSIZE=32, FIMDIAG=1, MAXEVAL=9999.",
+          points = c(
+            "Point de depart : memes temps que l'Exemple 1 (evaluation pure)",
+            "NELDER explore les fenetres de temps pour minimiser -log(det(FIM))",
+            "Consultez l'onglet Convergence : le NELDER trouve-t-il un minimum stable ?",
+            "Les temps optimaux dans l'onglet 'Temps optimaux' montrent le premier design optimise"
+          )
+        )
+      ),
+      list(
+        label = "Etape 2/3 : Deuxieme passe NELDER (warfarin2b)",
+        prefix = "warfarin2b",
+        prev_step_prefix = "warfarin2",
+        guide = list(
+          context = "Deuxieme passe NELDER : demarre depuis les temps optimaux de l'etape 1. Le dataset warfarin2b.csv contient le design optimise de l'etape precedente.",
+          points = c(
+            "Comparez les RSE avec l'etape precedente (auto-chargee en comparaison)",
+            "L'OFV devrait etre inferieur ou egal a l'etape 1 (raffinement)",
+            "Si l'OFV est identique, le NELDER a deja converge a l'etape 1",
+            "Consultez la convergence pour verifier la stabilite"
+          )
+        )
+      ),
+      list(
+        label = "Etape 3/3 : Troisieme passe NELDER (warfarin2c)",
+        prefix = "warfarin2c",
+        prev_step_prefix = "warfarin2b",
+        guide = list(
+          context = "Troisieme et derniere passe NELDER. Confirme que l'optimum est stable en redemarrant depuis l'etape 2.",
+          points = c(
+            "Comparez les RSE avec l'etape 2 : les valeurs devraient etre quasi-identiques si l'optimum est atteint",
+            "L'OFV final est le meilleur critere D-optimal obtenu pour ce design",
+            "Strategie anti-minima locaux (Bauer 2021) : enchainer RS -> STGR -> NELDER ou plusieurs passes NELDER",
+            "Les temps optimaux finaux sont ceux a retenir pour le protocole"
+          )
+        )
       )
     )
   ),
@@ -57,35 +93,66 @@
     )
   ),
   example4 = list(
-    title = "Exemple 4 : PK-PD multi-reponses (evaluation)",
-    desc = "Modele warfarin PK-PD (concentration + effet), FIMTYPE=1 + VARCROSS=1. Evaluation du design.",
+    title = "Exemple 4 : PK-PD multi-reponses (4 etapes)",
+    desc = "Modele warfarin PK-PD (concentration + effet). 4 etapes : evaluation FO, evaluation FOCEI, optimisation, raffinement.",
     dir = "examples/example4",
-    prefix = "warfarin_pkpd_eval",
-    labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=EMAX\nTHETA5=EC50",
-    compare_with = "example4_opt",
-    guide = list(
-      context = "Modele PK-PD multi-compartiment avec effet Emax. CMT==2 pour PK, CMT==3 pour PD. FIMTYPE=1 (bloc-diagonal) + VARCROSS=1. Evaluation du design initial.",
-      points = c(
-        "Plus de parametres a estimer (5 THETA + OMEGA + SIGMA PK et PD)",
-        "FIMTYPE=1 + VARCROSS=1 equivaut a PFIM style bloc-diagonal",
-        "Les RSE des parametres PD (EMAX, EC50) sont generalement plus grands",
-        "Comparez avec l'optimisation (bouton 'Comparer') : les RSE diminuent apres optimisation"
-      )
-    )
-  ),
-  example4_opt = list(
-    title = "Exemple 4 : PK-PD multi-reponses (optimisation)",
-    desc = "Optimisation des temps PK-PD par Nelder-Mead. Comparez les RSE avant/apres.",
-    dir = "examples/example4",
-    prefix = "warfarin_pkpd_opt",
-    labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=EMAX\nTHETA5=EC50",
-    guide = list(
-      context = "Meme modele PK-PD, apres optimisation Nelder-Mead des temps de prelevement. MAXEVAL > 0.",
-      points = c(
-        "Les RSE sont reduits par rapport a l'evaluation initiale",
-        "Les temps optimaux (onglet 'Temps optimaux') montrent les fenetres d'echantillonnage PK et PD",
-        "Le critere D-OFV est minimise : la FIM est plus grande qu'avant optimisation",
-        "Chargez l'Exemple 4 evaluation pour comparer directement"
+    labels = "THETA1=KA\nTHETA2=CL\nTHETA3=V\nTHETA4=RIN\nTHETA5=IC50\nTHETA6=KOUT",
+    steps = list(
+      list(
+        label = "Etape 1/4 : Evaluation FO (eval)",
+        prefix = "warfarin_pkpd_eval",
+        prev_step_prefix = NULL,
+        guide = list(
+          context = "Modele PK-PD (ADVAN13 ODE) : CMT=2 PK, CMT=3 PD Emax. GROUPSIZE=52, FIMDIAG=1, VARCROSS=1. Evaluation du design initial (MAXEVAL=0).",
+          points = c(
+            "6 THETAs (KA, CL, V, RIN, IC50, KOUT) + 6 OMEGAs + 2 SIGMAs",
+            "FIMDIAG=1 + VARCROSS=1 : FIM bloc-diagonale style PFIM",
+            "Les RSE des parametres PD (RIN, IC50, KOUT) sont generalement plus grands que les PK",
+            "Ce design initial sert de baseline pour les etapes suivantes"
+          )
+        )
+      ),
+      list(
+        label = "Etape 2/4 : Evaluation FOCEI (eval2)",
+        prefix = "warfarin_pkpd_eval2",
+        prev_step_prefix = "warfarin_pkpd_eval",
+        guide = list(
+          context = "Meme modele, mais FIMTYPE=1 (au lieu de FIMDIAG=1) et GROUPSIZE=26. Evaluation FOCEI du design.",
+          points = c(
+            "FIMTYPE=1 vs FIMDIAG=1 : hypotheses differentes sur la structure de la FIM",
+            "GROUPSIZE=26 (moitie de l'etape 1) : impact direct sur la precision (FIM proportionnelle a N)",
+            "Comparez les RSE avec l'etape 1 : l'effet du GROUPSIZE et du FIMTYPE",
+            "Pas de .tab pour cette etape (pas de $TABLE) — les temps optimaux ne sont pas disponibles"
+          )
+        )
+      ),
+      list(
+        label = "Etape 3/4 : Optimisation (opt)",
+        prefix = "warfarin_pkpd_opt",
+        prev_step_prefix = "warfarin_pkpd_eval2",
+        guide = list(
+          context = "Optimisation des temps PK et PD via NELDER. GROUPSIZE=52, FIMTYPE=1, VARCROSS=1, APPROX=FO, MAXEVAL=9999.",
+          points = c(
+            "DESEL=TIME optimise les temps dans les fenetres TMIN/TMAX pour chaque CMT",
+            "Les RSE devraient diminuer par rapport a l'evaluation (etape 1/2)",
+            "Les temps optimaux PK et PD sont distincts (CMT=2 vs CMT=3)",
+            "APPROX=FO : approximation first-order pour le calcul de la FIM"
+          )
+        )
+      ),
+      list(
+        label = "Etape 4/4 : Optimisation affinee (opt2)",
+        prefix = "warfarin_pkpd_opt2",
+        prev_step_prefix = "warfarin_pkpd_opt",
+        guide = list(
+          context = "Deuxieme passe d'optimisation NELDER avec GROUPSIZE=26. Raffine le design de l'etape 3.",
+          points = c(
+            "GROUPSIZE=26 : moitie des sujets — impact sur les RSE attendus",
+            "Comparez avec l'etape 3 : les temps optimaux changent-ils avec moins de sujets ?",
+            "L'OFV devrait etre different (FIM proportionnelle a N)",
+            "Les temps optimaux finaux sont dans l'onglet 'Temps optimaux'"
+          )
+        )
       )
     )
   ),
@@ -110,6 +177,7 @@
     title = "Exemple 6 : TMDD, STRAT/STRATF",
     desc = "Modele TMDD ODE (ADVAN13), optimisation avec stratification dose. 4 blocs $DESIGN chaines.",
     dir = "examples/example6",
+    table_no_range = c(1L, 4L),
     prefix = "tmdd2",
     labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
     guide = list(
@@ -169,42 +237,128 @@ mod_examples_ui <- function(id) {
   )
 }
 
-mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
+# Pure helper — build file paths for a given dir/prefix
+build_paths <- function(dir, prefix) {
+  exts <- c("ext", "shk", "coi", "clt", "tab", "bfm")
+  paths <- setNames(vector("list", length(exts)), exts)
+  for (et in exts) {
+    f <- file.path(dir, paste0(prefix, ".", et))
+    if (file.exists(f)) paths[[et]] <- f
+  }
+  paths
+}
+
+mod_examples_server <- function(id, session_main = NULL,
+                                reset_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # Selected example data to return
     selected <- reactiveValues(
-      file_paths = NULL, labels = NULL, guide = NULL,
-      compare_paths = NULL, compare_name = NULL,
-      summary_data = NULL
+      file_paths       = NULL,
+      labels           = NULL,
+      guide            = NULL,
+      compare_paths    = NULL,
+      compare_name     = NULL,
+      summary_data     = NULL,
+      ex_id            = NULL,
+      step_idx         = 1L,
+      n_steps          = 0L,
+      banner_dismissed = FALSE
     )
 
-    # Universal reset from app.R
+    # -- load_step: closure over selected -----------------------------------
+    load_step <- function(ex_id, step_idx) {
+      ex <- .EXAMPLES[[ex_id]]
+      has_steps <- !is.null(ex$steps)
+
+      if (has_steps) {
+        step   <- ex$steps[[step_idx]]
+        prefix <- step$prefix
+        guide  <- step$guide
+      } else {
+        prefix <- ex$prefix
+        guide  <- ex$guide
+      }
+
+      selected$file_paths <- build_paths(ex$dir, prefix)
+      selected$labels     <- ex$labels
+      selected$guide      <- guide
+      selected$step_idx   <- step_idx
+      selected$n_steps    <- if (has_steps) length(ex$steps) else 0L
+      selected$banner_dismissed <- FALSE
+
+      # Compare: intra-example (prev_step_prefix) or cross-example
+      if (has_steps && !is.null(step$prev_step_prefix)) {
+        selected$compare_paths <- build_paths(ex$dir,
+                                              step$prev_step_prefix)
+        selected$compare_name  <- step$prev_step_prefix
+      } else if (!has_steps && !is.null(ex$compare_with)) {
+        comp_ex <- .EXAMPLES[[ex$compare_with]]
+        selected$compare_paths <- build_paths(comp_ex$dir,
+                                              comp_ex$prefix)
+        selected$compare_name  <- comp_ex$title
+      } else {
+        selected$compare_paths <- NULL
+        selected$compare_name  <- NULL
+      }
+
+      # Handle summary.tab (robust design — example3 only)
+      if (isTRUE(ex$has_summary) && !is.null(ex$summary_file)) {
+        if (file.exists(ex$summary_file)) {
+          selected$summary_data <- tryCatch(
+            read_summary_tab(ex$summary_file),
+            error = function(e) NULL
+          )
+        }
+      } else {
+        selected$summary_data <- NULL
+      }
+
+      # Track which example is active (set last to avoid
+      # re-triggering observers mid-update)
+      selected$ex_id <- ex_id
+    }
+
+    # -- Universal reset from app.R -----------------------------------------
     if (!is.null(reset_trigger)) {
       observeEvent(reset_trigger(), {
-        selected$file_paths   <- NULL
-        selected$labels       <- NULL
-        selected$guide        <- NULL
-        selected$compare_paths <- NULL
-        selected$compare_name <- NULL
-        selected$summary_data <- NULL
+        selected$file_paths      <- NULL
+        selected$labels          <- NULL
+        selected$guide           <- NULL
+        selected$compare_paths   <- NULL
+        selected$compare_name    <- NULL
+        selected$summary_data    <- NULL
+        selected$ex_id           <- NULL
+        selected$step_idx        <- 1L
+        selected$n_steps         <- 0L
+        selected$banner_dismissed <- FALSE
       })
     }
 
+    # -- Modal: example picker ----------------------------------------------
     observeEvent(input$open_examples, {
       showModal(modalDialog(
         title = "Exemples Bauer 2021",
         size = "l",
         easyClose = TRUE,
         fluidRow(
-          lapply(names(.EXAMPLES), function(ex_id) {
-            ex <- .EXAMPLES[[ex_id]]
+          lapply(names(.EXAMPLES), function(eid) {
+            ex <- .EXAMPLES[[eid]]
+            step_badge <- if (!is.null(ex$steps)) {
+              tags$span(
+                style = "font-size:.72rem; color:#6b7280;",
+                paste0(" (", length(ex$steps), " etapes)")
+              )
+            }
             column(3,
-              div(class = "upload-box", style = "cursor:pointer; min-height:180px;",
-                tags$h6(ex$title, style = "font-size:.9rem;"),
-                tags$p(style = "font-size:.8rem; color:#4b5563;", ex$desc),
-                actionButton(ns(paste0("load_", ex_id)), "Charger",
+              div(
+                class = "upload-box",
+                style = "cursor:pointer; min-height:180px;",
+                tags$h6(ex$title, step_badge,
+                        style = "font-size:.9rem;"),
+                tags$p(style = "font-size:.8rem; color:#4b5563;",
+                       ex$desc),
+                actionButton(ns(paste0("load_", eid)), "Charger",
                              class = "btn-sm btn-primary w-100")
               )
             )
@@ -213,61 +367,57 @@ mod_examples_server <- function(id, session_main = NULL, reset_trigger = NULL) {
       ))
     })
 
-    # Load example handlers
+    # -- Load example handlers (always step 1) ------------------------------
     lapply(names(.EXAMPLES), function(ex_id) {
       observeEvent(input[[paste0("load_", ex_id)]], {
-        ex <- .EXAMPLES[[ex_id]]
-        base <- ex$dir
-
-        paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, bfm = NULL)
-        for (ext_type in names(paths)) {
-          f <- file.path(base, paste0(ex$prefix, ".", ext_type))
-          if (file.exists(f)) paths[[ext_type]] <- f
-        }
-
-        selected$file_paths <- paths
-        selected$labels <- ex$labels
-        selected$guide <- ex$guide
-
-        # Handle compare_with
-        if (!is.null(ex$compare_with)) {
-          comp_ex <- .EXAMPLES[[ex$compare_with]]
-          comp_paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, bfm = NULL)
-          for (ext_type in names(comp_paths)) {
-            f <- file.path(comp_ex$dir, paste0(comp_ex$prefix, ".", ext_type))
-            if (file.exists(f)) comp_paths[[ext_type]] <- f
-          }
-          selected$compare_paths <- comp_paths
-          selected$compare_name <- comp_ex$title
-        } else {
-          selected$compare_paths <- NULL
-          selected$compare_name <- NULL
-        }
-
-        # Handle summary.tab (robust design)
-        if (isTRUE(ex$has_summary) && !is.null(ex$summary_file)) {
-          if (file.exists(ex$summary_file)) {
-            selected$summary_data <- tryCatch(
-              read_summary_tab(ex$summary_file),
-              error = function(e) NULL
-            )
-          }
-        } else {
-          selected$summary_data <- NULL
-        }
-
+        load_step(ex_id, 1L)
         removeModal()
-        showNotification(paste("Exemple charge :", ex$title), type = "message")
+        showNotification(
+          paste("Exemple charge :",
+                .EXAMPLES[[ex_id]]$title),
+          type = "message"
+        )
       })
     })
 
+    # -- Step navigation observers ------------------------------------------
+    observeEvent(input$step_prev, {
+      req(selected$step_idx > 1L)
+      load_step(selected$ex_id, selected$step_idx - 1L)
+    })
+
+    observeEvent(input$step_next, {
+      req(selected$step_idx < selected$n_steps)
+      load_step(selected$ex_id, selected$step_idx + 1L)
+    })
+
+    # -- Dismiss banner observer --------------------------------------------
+    observeEvent(input$dismiss_banner, {
+      selected$banner_dismissed <- TRUE
+    })
+
+    # -- Return reactives ---------------------------------------------------
     list(
-      file_paths    = reactive(selected$file_paths),
-      labels        = reactive(selected$labels),
-      guide         = reactive(selected$guide),
-      compare_paths = reactive(selected$compare_paths),
-      compare_name  = reactive(selected$compare_name),
-      summary_data  = reactive(selected$summary_data)
+      file_paths       = reactive(selected$file_paths),
+      labels           = reactive(selected$labels),
+      guide            = reactive(selected$guide),
+      compare_paths    = reactive(selected$compare_paths),
+      compare_name     = reactive(selected$compare_name),
+      summary_data     = reactive(selected$summary_data),
+      step_idx         = reactive(selected$step_idx),
+      n_steps          = reactive(selected$n_steps),
+      banner_dismissed = reactive(selected$banner_dismissed),
+      step_label       = reactive({
+        ex <- if (!is.null(selected$ex_id)) {
+          .EXAMPLES[[selected$ex_id]]
+        }
+        if (is.null(ex) || is.null(ex$steps)) return(NULL)
+        ex$steps[[selected$step_idx]]$label
+      }),
+      table_no_range   = reactive({
+        if (is.null(selected$ex_id)) return(NULL)
+        .EXAMPLES[[selected$ex_id]]$table_no_range
+      })
     )
   })
 }
