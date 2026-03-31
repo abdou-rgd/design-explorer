@@ -115,31 +115,36 @@ render_guide_banner <- function(ns, guide, paths,
     } else {
       paste("Etape", step_idx, "/", n_steps)
     }
-    prev_disabled <- step_idx <= 1L
-    next_disabled <- step_idx >= n_steps
+    prev_disabled <- isTRUE(step_idx <= 1L)
+    next_disabled <- isTRUE(step_idx >= n_steps)
     tags$div(
       class = "guide-step-nav",
       tags$span(class = "guide-step-label", lbl),
-      actionButton(
-        ns("step_prev"), "Precedent",
-        class = "btn-sm btn-default",
-        disabled = if (prev_disabled) NA else NULL
+      tags$button(
+        id = ns("step_prev"), type = "button",
+        class = "btn btn-sm btn-default action-button",
+        `data-val` = 0,
+        disabled = if (prev_disabled) "disabled" else NULL,
+        "Precedent"
       ),
-      actionButton(
-        ns("step_next"), "Suivant",
-        class = "btn-sm btn-default",
-        disabled = if (next_disabled) NA else NULL
+      tags$button(
+        id = ns("step_next"), type = "button",
+        class = "btn btn-sm btn-default action-button",
+        `data-val` = 0,
+        disabled = if (next_disabled) "disabled" else NULL,
+        "Suivant"
       )
     )
   }
 
   tags$div(
     class = "guide-banner",
-    actionButton(ns("dismiss_banner"), NULL,
-                 class = "dismiss-btn",
-                 style = "background:none; border:none;",
-                 icon = NULL,
-                 tags$span("\u00d7")),
+    tags$button(
+      id = ns("dismiss_banner"), type = "button",
+      class = "dismiss-btn action-button",
+      `data-val` = 0,
+      "\u00d7"
+    ),
     step_nav,
     tags$h6(guide$context),
     if (!is.null(ctl_content)) tags$code(ctl_content),
