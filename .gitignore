@@ -1,3 +1,9 @@
+# Markdown — AI/dev only (CLAUDE.md, GEMINI.md, rules, plans)
+CLAUDE.md
+GEMINI.md
+.claude/rules/*.md
+docs/plans/*.md
+
 # R
 .Rhistory
 .RData
