@@ -13,6 +13,15 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # ext_data du run actuellement selectionne dans le sélecteur heatmap
+    selected_ext <- reactive({
+      runs <- all_runs()
+      if (length(runs) <= 1L) return(ext_data())
+      rid <- input$heatmap_run %||% names(runs)[1]
+      r <- runs[[rid]]
+      if (!is.null(r)) r$ext_data else ext_data()
+    })
+
     # FIM : preferer .coi, sinon .clt
     fim_matrix <- reactive({
       coi <- coi_data()
@@ -69,9 +78,9 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       )
     })
 
-    # Metric cards FIM
+    # Metric cards FIM — synchronisees avec le run selectionne
     output$cards <- renderUI({
-      ext <- ext_data()
+      ext <- selected_ext()
       if (is.null(ext)) return(NULL)
       ofv      <- get_ofv(ext, tbl_no())
       if (length(ofv) != 1L) ofv <- NA_real_
@@ -123,9 +132,9 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
                 options = list(pageLength = 5, dom = "t"))
     })
 
-    # Eigenvalues table
+    # Eigenvalues table — synchronisee avec le run selectionne
     output$eigen_table <- renderDT({
-      ext <- ext_data()
+      ext <- selected_ext()
       if (is.null(ext)) return(NULL)
       eig <- get_eigenvalues(ext, tbl_no())
       if (nrow(eig) == 0L) return(NULL)
@@ -144,7 +153,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       runs <- all_runs()
       if (length(runs) <= 1L) return(NULL)
       run_choices <- setNames(names(runs),
-                              vapply(runs, function(r) r$name, character(1L)))
+                              vapply(runs, function(r) r$name %||% "?", character(1L)))
       selectInput(ns("heatmap_run"), "Run affichee :",
                   choices = run_choices, selected = names(runs)[1],
                   width = "100%")
