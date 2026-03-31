@@ -89,3 +89,60 @@ detect_criterion <- function(lines) {
   if (str_detect(hdr, "R-OPT"))  return("R-OPTIMALITY")
   "D-OPTIMALITY"
 }
+
+# -- Guide banner with optional step navigation ----------------------------
+render_guide_banner <- function(ns, guide, paths,
+                                step_idx = 1L, n_steps = 0L,
+                                step_label = NULL) {
+  if (is.null(guide)) return(NULL)
+
+  # Read .ctl source for display
+  ctl_content <- NULL
+  if (!is.null(paths$ext)) {
+    base <- tools::file_path_sans_ext(basename(paths$ext))
+    ctl_path <- file.path(dirname(paths$ext), paste0(base, ".ctl"))
+    if (file.exists(ctl_path)) {
+      ctl_content <- paste(readLines(ctl_path, warn = FALSE),
+                           collapse = "\n")
+    }
+  }
+
+  # Step navigation bar (only for multi-step examples)
+  has_steps <- isTRUE(n_steps > 1L)
+  step_nav <- if (has_steps) {
+    lbl <- if (!is.null(step_label)) {
+      step_label
+    } else {
+      paste("Etape", step_idx, "/", n_steps)
+    }
+    prev_disabled <- step_idx <= 1L
+    next_disabled <- step_idx >= n_steps
+    tags$div(
+      class = "guide-step-nav",
+      tags$span(class = "guide-step-label", lbl),
+      actionButton(
+        ns("step_prev"), "Precedent",
+        class = "btn-sm btn-default",
+        disabled = if (prev_disabled) NA else NULL
+      ),
+      actionButton(
+        ns("step_next"), "Suivant",
+        class = "btn-sm btn-default",
+        disabled = if (next_disabled) NA else NULL
+      )
+    )
+  }
+
+  tags$div(
+    class = "guide-banner",
+    actionButton(ns("dismiss_banner"), NULL,
+                 class = "dismiss-btn",
+                 style = "background:none; border:none;",
+                 icon = NULL,
+                 tags$span("\u00d7")),
+    step_nav,
+    tags$h6(guide$context),
+    if (!is.null(ctl_content)) tags$code(ctl_content),
+    tags$ul(lapply(guide$points, tags$li))
+  )
+}

@@ -395,6 +395,11 @@ server <- function(input, output, session) {
   observe({
     ext <- merged_ext(); req(ext)
     tabs <- sort(unique(ext$table_no))
+    tnr  <- examples$table_no_range()
+    if (!is.null(tnr) && length(tnr) == 2L) {
+      tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
+      if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
+    }
     updateSelectInput(session, "table_no",
       choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
       selected = as.character(max(tabs)))
@@ -454,22 +459,14 @@ server <- function(input, output, session) {
 
   # -- Guide banner -----------------------------------------------------------
   output$guide_banner <- renderUI({
-    guide <- examples$guide()
-    if (is.null(guide)) return(NULL)
-    paths <- examples$file_paths()
-    ctl_content <- NULL
-    if (!is.null(paths$ext)) {
-      ctl_path <- file.path(dirname(paths$ext),
-        paste0(tools::file_path_sans_ext(basename(paths$ext)), ".ctl"))
-      if (file.exists(ctl_path))
-        ctl_content <- paste(readLines(ctl_path), collapse = "\n")
-    }
-    div(class = "guide-banner",
-      tags$button(class = "dismiss-btn",
-        onclick = "this.parentElement.style.display='none'", "\u00d7"),
-      tags$h6(guide$context),
-      if (!is.null(ctl_content)) tags$code(ctl_content),
-      tags$ul(lapply(guide$points, tags$li))
+    if (isTRUE(examples$banner_dismissed())) return(NULL)
+    render_guide_banner(
+      ns         = NS("examples"),
+      guide      = examples$guide(),
+      paths      = examples$file_paths(),
+      step_idx   = examples$step_idx(),
+      n_steps    = examples$n_steps(),
+      step_label = examples$step_label()
     )
   })
 
