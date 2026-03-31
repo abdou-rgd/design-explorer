@@ -43,7 +43,7 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
 
       if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de RELATIVEINF") + theme_bw())
 
-      run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+      run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                              names(runs))
       run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
                              names(runs))

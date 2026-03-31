@@ -10,7 +10,7 @@ mod_raw_ui <- function(id) {
         column(8, p(class = "section-title", "Contenu complet du fichier .ext")),
         column(2, uiOutput(ns("run_selector"))),
         column(2, downloadButton(ns("export_csv"), "Telecharger CSV",
-                                 class = "btn btn-sm btn-outline-secondary",
+                                 class = "btn btn-sm btn-default",
                                  style = "margin-top:22px; width:100%;"))
       ),
       DTOutput(ns("raw_ext"))
