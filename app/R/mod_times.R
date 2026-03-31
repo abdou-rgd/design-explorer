@@ -13,16 +13,28 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # -- Tab effectif : tab_data() ou premier run secondaire ayant un .tab ------
+    # Permet d'afficher l'onglet Temps optimaux meme si le run principal n'a
+    # pas de fichier .tab (ex : run A = evaluation, run B = optimisation).
+    effective_tab_data <- reactive({
+      tab <- tab_data()
+      if (!is.null(tab)) return(tab)
+      for (r in all_runs()) {
+        if (!is.null(r$tab_data)) return(r$tab_data)
+      }
+      NULL
+    })
+
     # -- Detection robust design (multi-table) ---------------------------------
     is_robust <- reactive({
-      tab <- tab_data()
+      tab <- effective_tab_data()
       if (is.null(tab)) return(FALSE)
       "table_no" %in% names(tab) && n_distinct(tab$table_no) > 1L
     })
 
     # Table 1 uniquement (pour courbe predite + table d'affichage)
     tab_single <- reactive({
-      tab <- tab_data()
+      tab <- effective_tab_data()
       req(tab)
       if (is_robust()) filter(tab, table_no == 1L) else tab
     })
@@ -76,7 +88,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
     # -- UI dynamique ----------------------------------------------------------
     output$content <- renderUI({
-      tab <- tab_data()
+      tab <- effective_tab_data()
 
       if (is.null(tab)) {
         return(div(class = "alert alert-info", style = "border-radius:10px; margin:16px 0;",
@@ -218,11 +230,12 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
     # -- Gantt / distribution --------------------------------------------------
     output$gantt <- renderPlot({
-      tab <- tab_data(); req(tab)
+      tab <- effective_tab_data()
       runs <- all_runs()
 
       # Cas robust design : boxplot + annotations medianes + multi-run overlay
       if (is_robust()) {
+        req(tab)
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
         # Use obs position within each subproblem as strate when TSTRAT absent
@@ -371,7 +384,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
     # -- Table -----------------------------------------------------------------
     output$times_table <- renderDT({
-      tab <- tab_data(); req(tab)
+      tab <- effective_tab_data(); req(tab)
 
       if (is_robust()) {
         return(datatable(robust_summary(), rownames = FALSE,
@@ -420,7 +433,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         paste0("temps_optimaux_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
       },
       content = function(file) {
-        tab <- tab_data()
+        tab <- effective_tab_data()
         req(tab)
 
         if (is_robust()) {
