@@ -164,7 +164,7 @@ mod_examples_ui <- function(id) {
   ns <- NS(id)
   tagList(
     actionButton(ns("open_examples"), "Exemples", icon = icon("book-open"),
-                 class = "btn-sm btn-outline-secondary w-100",
+                 class = "btn-sm btn-default w-100",
                  style = "margin-bottom: 8px;")
   )
 }

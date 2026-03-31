@@ -91,7 +91,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
     run_names <- reactive({
       runs <- all_runs()
-      unname(vapply(runs, function(r) r$name, character(1)))
+      unname(vapply(runs, function(r) r$name %||% "?", character(1)))
     })
 
     # -------------------------------------------------------------------------
@@ -148,7 +148,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
         if (length(val) == 0L) return(NA_real_)
         round(val, 4)
       }, numeric(1))
-      names(ofv_vals) <- vapply(runs, function(r) r$name, character(1))
+      names(ofv_vals) <- vapply(runs, function(r) r$name %||% "?", character(1))
 
       ext_for_crit <- ext_data()
       lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
@@ -246,7 +246,6 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       req(nrow(long) > 0L)
 
       rnms      <- run_names()
-      safe_rnms <- make.names(rnms)
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
