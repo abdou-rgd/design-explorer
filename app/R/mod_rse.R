@@ -8,9 +8,7 @@ mod_rse_ui <- function(id) {
     div(class = "plot-card",
       fluidRow(
         column(9, p(class = "section-title", "RSE / SE predits par la FIM -- par parametre")),
-        column(3, radioButtons(ns("plot_style"), NULL,
-                               choices = c("Barplot" = "bar", "Waterfall" = "waterfall"),
-                               selected = "bar", inline = TRUE))
+        column(3, uiOutput(ns("plot_controls_ui")))
       ),
       plotOutput(ns("plot"), height = "420px")
     )
@@ -19,6 +17,16 @@ mod_rse_ui <- function(id) {
 
 mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    # Toggle visible uniquement en single-run (ignoré en multi-run)
+    output$plot_controls_ui <- renderUI({
+      if (length(all_runs()) > 1L) return(NULL)
+      radioButtons(ns("plot_style"), NULL,
+                   choices = c("Barplot" = "bar", "Waterfall" = "waterfall"),
+                   selected = "bar", inline = TRUE)
+    })
+
     output$plot <- renderPlot({
       ext <- ext_data()
       if (is.null(ext)) return(NULL)
@@ -53,7 +61,7 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, se_mode, all_runs
 
       if (nrow(combined) == 0) return(NULL)
 
-      run_labels <- setNames(vapply(runs, function(r) r$name, character(1L)),
+      run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                              names(runs))
       run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
                              names(runs))
