@@ -110,6 +110,37 @@ prepare_tab_obs <- function(tab) {
 
 
 # =============================================================================
+# read_cpu() — Lecture du fichier .cpu NONMEM (temps de calcul)
+# =============================================================================
+
+#' Lire un fichier .cpu NONMEM
+#'
+#' @param file Chemin vers le fichier .cpu
+#' @return Numeric scalaire : temps de calcul en secondes, ou NA_real_
+#' @export
+read_cpu <- function(file) {
+  if (!file.exists(file)) return(NA_real_)
+  val <- tryCatch(
+    as.numeric(trimws(readLines(file, n = 1L, warn = FALSE))),
+    warning = function(w) NA_real_,
+    error   = function(e) NA_real_
+  )
+  if (length(val) != 1L || is.na(val)) NA_real_ else val
+}
+
+#' Formater un temps CPU en chaine lisible
+#'
+#' @param secs Numeric : temps en secondes
+#' @return Character : "Xs" si <60s, "Xm Ys" sinon
+#' @export
+format_cpu <- function(secs) {
+  if (is.na(secs)) return(NA_character_)
+  if (secs < 60) return(paste0(round(secs, 1), "s"))
+  paste0(floor(secs / 60), "m ", round(secs %% 60), "s")
+}
+
+
+# =============================================================================
 # read_ext() — Lecture du fichier .ext NONMEM $DESIGN
 # =============================================================================
 

@@ -10,7 +10,7 @@ mod_upload_ui <- function(id) {
       tags$h6("Fichiers NONMEM"),
       fileInput(ns("upload"), "Dossier tar.gz ou fichiers",
                 multiple = TRUE,
-                accept   = c(".ext", ".shk", ".coi", ".clt", ".tab", ".bfm",
+                accept   = c(".ext", ".shk", ".coi", ".clt", ".tab", ".bfm", ".cpu",
                              ".ctl", ".mod", ".con", ".tar.gz", ".tgz", ".gz"),
                 buttonLabel = "Parcourir"),
       helpText("Upload un .tar.gz (workflow nrm) ou plusieurs fichiers individuels."),
@@ -24,7 +24,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
 
     # Chemins fichiers detectes
     file_paths <- reactiveVal(list(
-      ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL
+      ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL, cpu = NULL
     ))
 
     # Lignes brutes .ext (pour detect_criterion) et .ctl (pour labels/design summary)
@@ -34,7 +34,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
     # Reset universel
     if (!is.null(reset_trigger)) {
       observeEvent(reset_trigger(), {
-        file_paths(list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL))
+        file_paths(list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL, cpu = NULL))
         ext_lines_raw(NULL)
         ctl_lines_raw(NULL)
       }, ignoreInit = TRUE)
@@ -44,7 +44,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       files <- input$upload
       req(files)
 
-      paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL)
+      paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL, cpu = NULL)
 
       if (nrow(files) == 1L && grepl("\\.(tar\\.gz|tgz)$", files$name, ignore.case = TRUE)) {
         # tar.gz : extraire dans un dossier temporaire
@@ -62,6 +62,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
         tab_i <- which(grepl("\\.tab$", all_names, ignore.case = TRUE))[1]
         ctl_i <- which(grepl("\\.(ctl|mod|con)$", all_names, ignore.case = TRUE))[1]
         bfm_i <- which(grepl("\\.bfm$", all_names, ignore.case = TRUE))[1]
+        cpu_i <- which(grepl("\\.cpu$", all_names, ignore.case = TRUE))[1]
 
         if (!is.na(ext_i)) paths$ext <- all_files[ext_i]
         if (!is.na(shk_i)) paths$shk <- all_files[shk_i]
@@ -70,6 +71,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
         if (!is.na(tab_i)) paths$tab <- all_files[tab_i]
         if (!is.na(ctl_i)) paths$ctl <- all_files[ctl_i]
         if (!is.na(bfm_i)) paths$bfm <- all_files[bfm_i]
+        if (!is.na(cpu_i)) paths$cpu <- all_files[cpu_i]
 
       } else {
         # Fichiers multiples : matcher par nom original
@@ -83,6 +85,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
           if (grepl("\\.tab$", nm, ignore.case = TRUE)) paths$tab <- dp
           if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE)) paths$ctl <- dp
           if (grepl("\\.bfm$", nm, ignore.case = TRUE)) paths$bfm <- dp
+          if (grepl("\\.cpu$", nm, ignore.case = TRUE)) paths$cpu <- dp
         }
       }
 
@@ -117,6 +120,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
     ctl_data <- reactive(.safe_parse(read_prior_nwpri,  file_paths()$ctl, ".ctl"))
     # bfm: pas encore consomme — schema ETC different de .ext, attente read_bfm()
     bfm_data <- reactive(NULL)
+    cpu_data <- reactive(read_cpu(file_paths()$cpu %||% ""))
 
     # Status fichiers
     output$file_status <- renderUI({
@@ -137,7 +141,8 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
         status_line(".clt", p$clt),
         status_line(".tab", p$tab),
         status_line(".ctl/.mod", p$ctl),
-        status_line(".bfm", p$bfm)
+        status_line(".bfm", p$bfm),
+        status_line(".cpu", p$cpu)
       )
     })
 
@@ -150,6 +155,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       tab_data   = tab_data,
       ctl_data   = ctl_data,
       bfm_data   = bfm_data,
+      cpu_data   = cpu_data,
       ext_lines  = ext_lines_raw,
       ctl_lines  = ctl_lines_raw,
       file_paths = file_paths

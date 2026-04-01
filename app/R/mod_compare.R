@@ -38,7 +38,7 @@ mod_compare_server <- function(id) {
       run_names[[rid]] <- default_name
       run_data[[rid]] <- list(
         ext_data = NULL, shk_data = NULL, coi_data = NULL,
-        clt_data = NULL, tab_data = NULL
+        clt_data = NULL, tab_data = NULL, cpu_data = NA_real_
       )
 
       # Append to IDs (this triggers UI render)
@@ -92,7 +92,8 @@ mod_compare_server <- function(id) {
             files <- input[[paste0("upload_", local_rid)]]
             req(files)
             paths <- list(ext = NULL, shk = NULL, coi = NULL,
-                          clt = NULL, tab = NULL, ctl = NULL)
+                          clt = NULL, tab = NULL, ctl = NULL,
+                          cpu = NULL)
 
             if (nrow(files) == 1L &&
                 grepl("\\.(tar\\.gz|tgz)$", files$name,
@@ -105,7 +106,7 @@ mod_compare_server <- function(id) {
               all_f <- list.files(tmp, recursive = TRUE,
                                   full.names = TRUE)
               all_n <- basename(all_f)
-              for (et in c("ext", "shk", "coi", "clt", "tab")) {
+              for (et in c("ext", "shk", "coi", "clt", "tab", "cpu")) {
                 idx <- which(grepl(paste0("\\.", et, "$"), all_n,
                                    ignore.case = TRUE))[1]
                 if (!is.na(idx)) paths[[et]] <- all_f[idx]
@@ -117,7 +118,7 @@ mod_compare_server <- function(id) {
               for (i in seq_len(nrow(files))) {
                 nm <- files$name[i]
                 dp <- files$datapath[i]
-                for (et in c("ext", "shk", "coi", "clt", "tab")) {
+                for (et in c("ext", "shk", "coi", "clt", "tab", "cpu")) {
                   if (grepl(paste0("\\.", et, "$"), nm,
                             ignore.case = TRUE))
                     paths[[et]] <- dp
@@ -130,7 +131,7 @@ mod_compare_server <- function(id) {
             # Parse and store in run_data (does NOT trigger UI re-render)
             parsed <- list(
               ext_data = NULL, shk_data = NULL, coi_data = NULL,
-              clt_data = NULL, tab_data = NULL
+              clt_data = NULL, tab_data = NULL, cpu_data = NA_real_
             )
             if (!is.null(paths$ext))
               parsed$ext_data <- tryCatch(read_ext(paths$ext),
@@ -147,6 +148,8 @@ mod_compare_server <- function(id) {
             if (!is.null(paths$tab))
               parsed$tab_data <- tryCatch(read_tab(paths$tab),
                                           error = function(e) NULL)
+            if (!is.null(paths$cpu))
+              parsed$cpu_data <- read_cpu(paths$cpu)
             run_data[[local_rid]] <- parsed
 
             # Auto-fill run name from .ctl if available
@@ -208,7 +211,8 @@ mod_compare_server <- function(id) {
             shk_data = d$shk_data,
             coi_data = d$coi_data,
             clt_data = d$clt_data,
-            tab_data = d$tab_data
+            tab_data = d$tab_data,
+            cpu_data = d$cpu_data %||% NA_real_
           )
         }
         result
