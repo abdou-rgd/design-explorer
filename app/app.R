@@ -263,6 +263,7 @@ server <- function(input, output, session) {
   example_coi      <- reactiveVal(NULL)
   example_clt      <- reactiveVal(NULL)
   example_tab      <- reactiveVal(NULL)
+  example_cpu      <- reactiveVal(NA_real_)
   example_ctl      <- reactiveVal(NULL)
   example_ctl_lines <- reactiveVal(NULL)
   example_comp_run <- reactiveVal(NULL)
@@ -271,7 +272,8 @@ server <- function(input, output, session) {
     paths <- examples$file_paths()
     if (is.null(paths)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
+      example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
+      example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
       updateTextAreaInput(session, "param_labels", value = "")
       updateTextAreaInput(session, "cmt_labels",   value = "")
@@ -282,6 +284,7 @@ server <- function(input, output, session) {
     example_coi(.safe_load(read_coi, paths$coi, ".coi"))
     example_clt(.safe_load(read_clt, paths$clt, ".clt"))
     example_tab(.safe_load(read_tab, paths$tab, ".tab"))
+    example_cpu(read_cpu(paths$cpu %||% ""))
     if (!is.null(paths$ext)) {
       base_name <- tools::file_path_sans_ext(basename(paths$ext))
       for (ext_try in c(".ctl", ".mod", ".con")) {
@@ -306,7 +309,8 @@ server <- function(input, output, session) {
       shk_data = .safe_load(read_shk, comp_paths$shk, ".shk (comp)"),
       coi_data = .safe_load(read_coi, comp_paths$coi, ".coi (comp)"),
       clt_data = .safe_load(read_clt, comp_paths$clt, ".clt (comp)"),
-      tab_data = .safe_load(read_tab, comp_paths$tab, ".tab (comp)")
+      tab_data = .safe_load(read_tab, comp_paths$tab, ".tab (comp)"),
+      cpu_data = read_cpu(comp_paths$cpu %||% "")
     )
     example_comp_run(comp_data)
   })
@@ -317,7 +321,8 @@ server <- function(input, output, session) {
     fps <- upload$file_paths()
     if (!is.null(fps$ext)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_ctl(NULL); example_ctl_lines(NULL)
+      example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
+      example_ctl(NULL); example_ctl_lines(NULL)
       example_comp_run(NULL)
     }
     # Auto-remplissage depuis le .ctl uploade
@@ -350,6 +355,11 @@ server <- function(input, output, session) {
   merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
   merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
   merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
+  merged_cpu     <- reactive({
+    val <- example_cpu()
+    if (!is.na(val)) return(val)
+    upload$cpu_data()
+  })
   # Robust summary: built-in example (pre-computed) or computed from uploaded .tab
   upload_summary <- reactive({
     tab <- upload$tab_data()
@@ -364,7 +374,8 @@ server <- function(input, output, session) {
   all_runs <- reactive({
     primary <- list(
       name = primary_name(), ext_data = merged_ext(), shk_data = merged_shk(),
-      coi_data = merged_coi(), clt_data = merged_clt(), tab_data = merged_tab()
+      coi_data = merged_coi(), clt_data = merged_clt(), tab_data = merged_tab(),
+      cpu_data = merged_cpu()
     )
     runs <- list(primary = primary)
     ex_comp <- example_comp_run()
@@ -375,7 +386,8 @@ server <- function(input, output, session) {
       r <- comp[[rid]]
       runs[[rid]] <- list(
         name = r$name, ext_data = r$ext_data, shk_data = r$shk_data,
-        coi_data = r$coi_data, clt_data = r$clt_data, tab_data = r$tab_data
+        coi_data = r$coi_data, clt_data = r$clt_data, tab_data = r$tab_data,
+        cpu_data = r$cpu_data %||% NA_real_
       )
     }
     # Deduplicate run names (e.g. two runs with same $DESIGN args)

@@ -254,7 +254,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
-        options = list(pageLength = 30, dom = "tip", ordering = FALSE)
+        options = list(dom = "t", ordering = FALSE, pageLength = -1)
       )
 
       # Utiliser les indices de colonnes (pas les noms) pour que formatStyle

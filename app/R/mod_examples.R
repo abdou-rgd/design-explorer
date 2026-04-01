@@ -239,7 +239,7 @@ mod_examples_ui <- function(id) {
 
 # Pure helper — build file paths for a given dir/prefix
 build_paths <- function(dir, prefix) {
-  exts <- c("ext", "shk", "coi", "clt", "tab", "bfm")
+  exts <- c("ext", "shk", "coi", "clt", "tab", "bfm", "cpu")
   paths <- setNames(vector("list", length(exts)), exts)
   for (et in exts) {
     f <- file.path(dir, paste0(prefix, ".", et))

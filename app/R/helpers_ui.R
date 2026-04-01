@@ -51,14 +51,18 @@ param_type_badge <- function(param) {
   span(param)
 }
 
-# -- Run color palette (max 4 runs) — keyed by rid, not by editable name ----
+# -- Run color palette (max 6 runs actifs, run_counter peut depasser 5) ------
 .RUN_COLORS <- c(
   "primary" = "#2563eb",
   "run_1"   = "#dc2626",
   "run_2"   = "#16a34a",
   "run_3"   = "#d97706",
   "run_4"   = "#7c3aed",
-  "run_5"   = "#db2777"
+  "run_5"   = "#db2777",
+  "run_6"   = "#0891b2",
+  "run_7"   = "#65a30d",
+  "run_8"   = "#c2410c",
+  "run_9"   = "#7c2d12"
 )
 
 run_color <- function(rid) {
