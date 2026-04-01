@@ -125,7 +125,8 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
           `Params` = n_params,
           `Cond. #` = if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else NA,
           `RSE moy. (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
-          `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_
+          `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
+          `RSE med. (%)` = if (n_params > 0L) round(median(rse$rse_pct, na.rm = TRUE), 2) else NA_real_
         )
       }) |> dplyr::bind_rows()
       datatable(comp_df, rownames = FALSE, class = "stripe hover compact",

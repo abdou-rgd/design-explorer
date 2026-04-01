@@ -25,15 +25,15 @@ mod_compare_server <- function(id) {
     run_counter <- reactiveVal(0L)
 
     observeEvent(input$add_run, {
-      if (length(run_ids()) >= 3L) {
-        showNotification("Maximum 3 runs de comparaison (4 total)",
+      if (length(run_ids()) >= 5L) {
+        showNotification("Maximum 5 runs de comparaison (6 total)",
                          type = "warning")
         return()
       }
       n <- run_counter() + 1L
       run_counter(n)
       rid <- paste0("run_", n)
-      default_name <- c("Run B", "Run C", "Run D")[length(run_ids()) + 1L]
+      default_name <- paste0("Run ", LETTERS[n + 1L])
 
       run_names[[rid]] <- default_name
       run_data[[rid]] <- list(
