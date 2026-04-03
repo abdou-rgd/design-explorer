@@ -75,6 +75,13 @@ docs/nonmem/doc_nonmem_design.pdf
 docs/papers/bauer2021/bauer2021_text.txt
 docs/papers/bauer2021/bauer2021.pdf
 
+# Papiers et code tiers (non redistribuables / volumineux)
+docs/papers/*.zip
+docs/papers/FIM_cov_allocation_scripts/
+
+# Fichiers NONMEM XML
+*.xml
+
 # Pages web sauvegardées
 docs/*.htm
 docs/*_files/
