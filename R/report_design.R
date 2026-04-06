@@ -44,17 +44,7 @@ library(purrr)
   )
 }
 
-# Détermine le type de paramètre depuis son nom NONMEM
-.param_type <- function(param) {
-  case_when(
-    str_starts(param, "THETA")                              ~ "THETA",
-    str_detect(param, "^OMEGA\\((\\d+),\\1\\)$")           ~ "OMEGA (diag.)",
-    str_starts(param, "OMEGA")                             ~ "OMEGA (off-diag.)",
-    str_detect(param, "^SIGMA\\((\\d+),\\1\\)$")           ~ "SIGMA (diag.)",
-    str_starts(param, "SIGMA")                             ~ "SIGMA (off-diag.)",
-    TRUE                                                   ~ "Autre"
-  )
-}
+# .param_type() est defini dans parse_design_outputs.R (source commune)
 
 # Thème commun
 .theme_design <- function() {
@@ -355,24 +345,10 @@ plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
     return(ggplot() + labs(title = "Pas de matrice FIM disponible") + .theme_design())
   }
 
-  # Filtrer les paramètres avec des valeurs non-nulles sur la diagonale
-  nonzero <- diag(fim_matrix) != 0
-  if (sum(nonzero) < 2L) {
-    return(ggplot() + labs(title = "FIM trop creuse pour une heatmap") + .theme_design())
-  }
-  fim_sub <- fim_matrix[nonzero, nonzero]
-
-  # Inverser la FIM pour obtenir la variance-covariance, puis corrélation
-  corr_mat <- tryCatch({
-    vcov <- solve(fim_sub)
-    cov2cor(vcov)
-  }, error = function(e) {
-    warning("FIM singulière, impossible de calculer les corrélations : ", e$message)
-    return(NULL)
-  })
-
+  # Utiliser get_cor_matrix() pour filtrage + inversion + correlation
+  corr_mat <- get_cor_matrix(fim_matrix)
   if (is.null(corr_mat)) {
-    return(ggplot() + labs(title = "FIM singulière — corrélations non calculables") + .theme_design())
+    return(ggplot() + labs(title = "FIM singuliere -- correlations non calculables") + .theme_design())
   }
 
   # Renommer les paramètres si labels fournis
@@ -633,7 +609,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
 
   obs <- obs |>
     mutate(y_val = .data[[y_col]],
-           strate = paste0("Strate ", .data[[group_col]]))
+           strate_label = as.character(.data[[group_col]]))
+
+  # Detect multi-ID (e.g. IV vs SC elementary designs)
+  has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
+  if (has_multi_id) {
+    obs <- obs |> mutate(id_label = paste0("ID ", ID))
+  }
 
   # Detect multi-response (PK-PD) via CMT column
   has_cmt <- "CMT" %in% names(obs) && n_distinct(obs$CMT) > 1
@@ -647,13 +629,19 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
       arrange(TIME)
   }
 
+  # Sort within each ID for correct line drawing
+  if (has_multi_id) obs <- obs |> arrange(id_label, TIME)
+
   y_label <- if (has_cmt) "Prediction (IPRED)" else y_col
   ttl <- title %||% if (has_cmt) "Predictions PK/PD aux temps de sampling optimaux" else
                      paste0("Predictions (", y_col, ") aux temps de sampling optimaux")
 
+  # Build line group: within each ID (if multi-ID) or response (if multi-CMT)
+  line_group <- if (has_multi_id) "id_label" else if (has_cmt) "response" else NULL
+
   p <- ggplot(obs, aes(x = TIME, y = y_val))
 
-  # Draw curve(s) — connect points sorted by TIME within each response
+  # Draw curve(s) — connect points sorted by TIME within each group
   if (has_cmt) {
     p <- p +
       geom_line(aes(color = response, group = response),
@@ -664,6 +652,12 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
                          name = NULL) +
       scale_fill_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
                         name = NULL)
+  } else if (has_multi_id) {
+    p <- p +
+      geom_line(aes(group = id_label),
+                color = "#2563eb", size = 0.7, alpha = 0.35, linetype = "dashed") +
+      geom_point(fill = "#2563eb", shape = 21, size = 3.5,
+                 color = "white", stroke = 0.8)
   } else {
     p <- p +
       geom_line(color = "#2563eb", size = 0.7, alpha = 0.35, linetype = "dashed") +
@@ -671,16 +665,29 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
                  color = "white", stroke = 0.8)
   }
 
-  # Label sampling points with strate number
+  # Label sampling points with strate number (compact, no "Strate" prefix)
   p <- p +
-    geom_text(aes(label = strate), size = 2.8, color = "#374151",
-              vjust = -1.3, hjust = 0.5) +
-    labs(title = ttl, x = "Temps (h)", y = y_label,
-         caption = "Chaque point = prediction du modele a un temps optimal | Tirets = connexion des points (pas une courbe PK continue)") +
-    .theme_design() +
-    theme(plot.caption = element_text(size = 8, color = "#6b7280"))
+    geom_text(aes(label = strate_label), size = 2.8, color = "#374151",
+              vjust = -1.3, hjust = 0.5)
 
-  if (has_cmt) {
+  # Secondary x-axis with exact sampling times (PFIM-style)
+  sampling_breaks <- sort(unique(round(obs$TIME, 1)))
+  p <- p +
+    scale_x_continuous(
+      sec.axis = dup_axis(breaks = sampling_breaks, name = "Temps de sampling (h)")
+    ) +
+    labs(title = ttl, x = "Temps (h)", y = y_label,
+         caption = if (has_multi_id) "Chaque facette = un elementary design (ID) | Tirets = connexion des points"
+                   else "Chaque point = prediction du modele a un temps optimal") +
+    .theme_design() +
+    theme(plot.caption = element_text(size = 8, color = "#6b7280"),
+          axis.text.x.top = element_text(size = 6, angle = 45, hjust = 0,
+                                         color = "#9ca3af"))
+
+  # Facetting: multi-ID takes priority, then multi-CMT
+  if (has_multi_id) {
+    p <- p + facet_wrap(~ id_label, ncol = 1, scales = "free_y")
+  } else if (has_cmt) {
     p <- p + facet_wrap(~ response, scales = "free_y", ncol = 1)
   }
 

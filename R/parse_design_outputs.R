@@ -76,7 +76,7 @@ library(tidyr)
 
     dat <- as_tibble(do.call(rbind, rows), .name_repair = "minimal")
     names(dat) <- col_names
-    mutate(distinct(dat), table_no = tbl_no, .before = 1L)
+    mutate(dat, table_no = tbl_no, .before = 1L)
   }
 
   blocks <- map(seq_along(table_idx), parse_one) |> compact()
@@ -258,6 +258,22 @@ get_ofv <- function(ext, table_no = NULL) {
   result$OBJ
 }
 
+#' Determiner le type de parametre depuis son nom NONMEM
+#'
+#' @param param Vecteur de noms de parametres NONMEM
+#' @return Vecteur de types : THETA, OMEGA (diag.), OMEGA (off-diag.), SIGMA (diag.), SIGMA (off-diag.), Autre
+#' @export
+.param_type <- function(param) {
+  case_when(
+    str_starts(param, "THETA")                              ~ "THETA",
+    str_detect(param, "^OMEGA\\((\\d+),\\1\\)$")           ~ "OMEGA (diag.)",
+    str_starts(param, "OMEGA")                             ~ "OMEGA (off-diag.)",
+    str_detect(param, "^SIGMA\\((\\d+),\\1\\)$")           ~ "SIGMA (diag.)",
+    str_starts(param, "SIGMA")                             ~ "SIGMA (off-diag.)",
+    TRUE                                                   ~ "Autre"
+  )
+}
+
 #' Calculer les RSE (%) prédits par la FIM
 #'
 #' RSE = |SE / estimate| × 100. Les paramètres fixés (SE = NA) sont exclus.
@@ -364,7 +380,7 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
   # Joindre RELATIVEINF aux OMEGA diagonaux (ETAi ↔ i-ème OMEGA diagonal)
   if (nrow(omega_diag) > 0 && nrow(ri) > 0) {
     omega_diag <- omega_diag |>
-      mutate(eta_idx = row_number()) |>
+      mutate(eta_idx = as.integer(str_extract(param, "(?<=\\()\\d+"))) |>
       left_join(
         ri |> mutate(eta_idx = as.integer(str_extract(eta, "\\d+"))),
         by = "eta_idx"
@@ -441,20 +457,13 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
 
 
 # =============================================================================
-# read_coi() — Lecture du fichier .coi (Fisher Information Matrix nommée)
+# .read_named_matrix() — Parser interne pour .coi, .cov, .cor
 # =============================================================================
+#
+# Format commun NONMEM : TABLE NO. header, NAME + param names, puis lignes
+# nom + valeurs. Utilise par read_coi(), read_cov(), read_cor().
 
-#' Lire un fichier .coi NONMEM $DESIGN
-#'
-#' Le .coi contient la FIM complète sous forme de matrice nommée.
-#' Format : TABLE NO header, puis NAME + param names, puis lignes nom + valeurs.
-#'
-#' @param file     Chemin vers le fichier .coi
-#' @param table_no Numéro de table à lire (défaut : 1). Si introuvable,
-#'   la dernière table du fichier est utilisée avec un avertissement.
-#' @return Matrice numérique nommée (symétrique)
-#' @export
-read_coi <- function(file, table_no = 1L) {
+.read_named_matrix <- function(file, table_no = 1L, caller = "read_named_matrix") {
   if (!file.exists(file)) stop("Fichier introuvable : ", file)
 
   lines <- read_lines(file, progress = FALSE)
@@ -463,12 +472,12 @@ read_coi <- function(file, table_no = 1L) {
   table_idx <- which(str_starts(lines, "TABLE NO\\."))
   if (length(table_idx) == 0L) stop("Aucun bloc TABLE NO. dans : ", file)
 
-  # Sélectionner le bon bloc (fallback sur la dernière table si introuvable)
+  # Selectionner le bon bloc (fallback sur la derniere table si introuvable)
   tbl_nums <- as.integer(str_extract(lines[table_idx], "\\d+"))
   tbl_i <- which(tbl_nums == table_no)[1L]
   if (is.na(tbl_i)) {
     warning(
-      "read_coi(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
+      caller, "(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
       " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
     )
     tbl_i <- length(table_idx)
@@ -496,11 +505,67 @@ read_coi <- function(file, table_no = 1L) {
     if (length(vals) == n) {
       mat[i, ] <- vals
     } else {
-      warning("read_coi() ligne ", i, " : ", length(vals), " valeurs au lieu de ", n, " attendues — ligne ignorée")
+      warning(caller, "() ligne ", i, " : ", length(vals),
+              " valeurs au lieu de ", n, " attendues -- ligne ignoree")
     }
   }
 
   mat
+}
+
+
+# =============================================================================
+# read_coi() — Lecture du fichier .coi (Fisher Information Matrix nommee)
+# =============================================================================
+
+#' Lire un fichier .coi NONMEM $DESIGN
+#'
+#' Le .coi contient la FIM complete sous forme de matrice nommee.
+#'
+#' @param file     Chemin vers le fichier .coi
+#' @param table_no Numero de table a lire (defaut : 1). Si introuvable,
+#'   la derniere table du fichier est utilisee avec un avertissement.
+#' @return Matrice numerique nommee (symetrique)
+#' @export
+read_coi <- function(file, table_no = 1L) {
+  .read_named_matrix(file, table_no, caller = "read_coi")
+}
+
+
+# =============================================================================
+# read_cov() — Lecture du fichier .cov (variance-covariance)
+# =============================================================================
+
+#' Lire un fichier .cov NONMEM $DESIGN
+#'
+#' Le .cov contient la matrice variance-covariance calculee par NONMEM
+#' (inverse de la FIM). Meme format que .coi.
+#'
+#' @param file     Chemin vers le fichier .cov
+#' @param table_no Numero de table a lire (defaut : 1)
+#' @return Matrice numerique nommee (symetrique)
+#' @export
+read_cov <- function(file, table_no = 1L) {
+  .read_named_matrix(file, table_no, caller = "read_cov")
+}
+
+
+# =============================================================================
+# read_cor() — Lecture du fichier .cor (correlation + SE sur la diagonale)
+# =============================================================================
+
+#' Lire un fichier .cor NONMEM $DESIGN
+#'
+#' Le .cor contient la matrice de correlation calculee par NONMEM.
+#' Attention : la diagonale contient les SE (pas 1.0).
+#' Off-diagonale = correlations entre parametres.
+#'
+#' @param file     Chemin vers le fichier .cor
+#' @param table_no Numero de table a lire (defaut : 1)
+#' @return Matrice numerique nommee (diag = SE, off-diag = correlations)
+#' @export
+read_cor <- function(file, table_no = 1L) {
+  .read_named_matrix(file, table_no, caller = "read_cor")
 }
 
 
@@ -769,7 +834,7 @@ read_prior_nwpri <- function(file) {
   if (length(thetap_idx) > 0) {
     tp_line <- lines_clean[thetap_idx[1]]
     vals <- str_extract_all(tp_line, "\\(\\s*(-?[0-9.eEdD]+)")[[1]]
-    vals <- as.numeric(str_extract(vals, "-?[0-9.eEdD]+"))
+    vals <- as.numeric(gsub("[dD]", "E", str_extract(vals, "-?[0-9.eEdD]+")))
     result$thetap <- vals
   }
 
@@ -786,7 +851,7 @@ read_prior_nwpri <- function(file) {
         if (str_detect(lines_clean[i], "^\\s*\\$")) break
         nums <- str_extract_all(lines_clean[i], "-?[0-9.eEdD]+(?:[eEdD][+-]?\\d+)?")[[1]]
         nums <- nums[!nums %in% c("FIX", "FIXED")]
-        all_vals <- c(all_vals, as.numeric(nums))
+        all_vals <- c(all_vals, as.numeric(gsub("[dD]", "E", nums)))
         i <- i + 1
       }
       mat <- matrix(0, n, n)
@@ -833,6 +898,48 @@ get_cor_matrix <- function(fim_matrix) {
     vcov <- solve(fim_sub)
     cov2cor(vcov)
   }, error = function(e) NULL)
+}
+
+
+# =============================================================================
+# scale_fim() — Mise a l'echelle de la FIM par taille d'echantillon
+# =============================================================================
+
+#' Mettre a l'echelle la FIM pour une nouvelle taille d'echantillon
+#'
+#' FIM est additive par sujet : FIM(N2) = FIM(N1) * N2/N1.
+#' Utile pour le calcul de NSN (Number of Subjects Needed).
+#'
+#' @param fim    Matrice numerique nommee (FIM)
+#' @param n_from Taille d'echantillon d'origine (GROUPSIZE du run)
+#' @param n_to   Taille d'echantillon cible
+#' @return Matrice FIM mise a l'echelle
+#' @export
+scale_fim <- function(fim, n_from, n_to) {
+  if (is.null(fim)) return(NULL)
+  if (n_from <= 0) stop("n_from doit etre > 0")
+  fim * (n_to / n_from)
+}
+
+
+# =============================================================================
+# vcov_from_fim() — Variance-covariance depuis la FIM
+# =============================================================================
+
+#' Calculer la matrice variance-covariance a partir de la FIM
+#'
+#' VCOV = FIM^{-1}. Point d'entree canonique pour Wald power, TOST,
+#' intervalles de confiance par la methode delta.
+#'
+#' @param fim Matrice numerique nommee (FIM)
+#' @return Matrice VCOV nommee, ou NULL si FIM singuliere
+#' @export
+vcov_from_fim <- function(fim) {
+  if (is.null(fim) || nrow(fim) == 0L) return(NULL)
+  tryCatch(solve(fim), error = function(e) {
+    warning("FIM singuliere, inversion impossible : ", e$message)
+    NULL
+  })
 }
 
 

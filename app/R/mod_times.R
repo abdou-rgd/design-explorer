@@ -158,14 +158,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
           ),
           br(),
           fluidRow(
-            column(7,
-              div(class = "plot-card",
-                p(class = "section-title",
-                  "Temps de sampling optimaux par strate (TSTRAT)"),
-                plotOutput(ns("gantt"), height = "380px")
-              )
-            ),
-            column(5,
+            column(12,
               div(class = "param-table-wrap",
                 p(class = "section-title", "Donnees temps optimaux"),
                 DTOutput(ns("times_table"))
@@ -192,7 +185,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         if ("table_no" %in% names(tab) && dplyr::n_distinct(tab$table_no) > 1L)
           tab <- dplyr::filter(tab, table_no == 1L)
         if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
-        if (nrow(tab) > 1L) tab <- tab[-1L, , drop = FALSE]
         if (nrow(tab) == 0L) return(NULL)
         pred_col <- intersect(c("IPRED", "PRED", "DV"), names(tab))[1]
         if (is.na(pred_col)) return(NULL)
@@ -362,23 +354,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         )
       }
 
-      # Cas mono-run : detecter PK-PD (CMT multiple)
-      obs_single <- tab_single()
-      cmt_col <- if ("CMT" %in% names(obs_single) &&
-                     n_distinct(obs_single$CMT) > 1L) "CMT" else NULL
-
-      # Appliquer labels CMT dans le df avant le plot
-      lbls <- cmt_labels()
-      obs_plot <- obs_single
-      if (!is.null(lbls) && !is.null(cmt_col) && "CMT" %in% names(obs_plot)) {
-        obs_plot <- obs_plot |>
-          mutate(CMT = ifelse(
-            as.character(CMT) %in% names(lbls),
-            paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
-            as.character(CMT)
-          ))
-      }
-      plot_optimal_times(obs_plot, cmt_col = cmt_col)
+      # Cas mono-run : plot TSTRAT retire (redondant avec la courbe predite)
+      NULL
 
     }, res = 110)
 
@@ -396,7 +373,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       # Cas normal : table des temps individuels
       obs <- tab_single()
       if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-      if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
 
       cols_show <- intersect(
         c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
@@ -423,7 +399,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
 
       datatable(obs_display, rownames = FALSE,
                 class = "stripe hover compact",
-                options = list(pageLength = 20, dom = "tip",
+                options = list(pageLength = nrow(obs_display), dom = "t",
                                scrollX = TRUE))
     })
 
@@ -441,7 +417,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         } else {
           obs <- tab_single()
           if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
-          if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
           cols_show <- intersect(
             c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
             names(obs)

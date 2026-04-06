@@ -2,6 +2,33 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## Pre-V6 — 2026-04-03 (Bug fixes + API prep + plot improvements)
+
+### Parsers / API (`R/parse_design_outputs.R`)
+- [fix] **`distinct(dat)` supprime dans `.parse_table_blocks()`** : supprimait silencieusement les lignes dupliquees legitimees dans `.tab`/`.ext`. Certains designs NONMEM ont des timepoints repetes (ex: example3).
+- [fix] **Mapping OMEGA-ETA par index parse** : `row_number()` remplace par extraction de l'index depuis le nom du parametre (`OMEGA(3,3)` -> 3). Corrige le desalignement quand un OMEGA diagonal est fixe/absent.
+- [fix] **Normalisation exposants D/d** : `as.numeric("1D-3")` retournait `NA` en R. Ajout `gsub("[dD]", "E", ...)` dans `read_prior_nwpri()`.
+- [feat] **`read_cov()` et `read_cor()`** : parsers pour les fichiers `.cov` (variance-covariance) et `.cor` (correlation + SE sur diagonale) produits par NONMEM. Utilise un parser interne partage `.read_named_matrix()` (refactor de `read_coi()`).
+- [feat] **`scale_fim()` et `vcov_from_fim()`** : fonctions pre-V6 pour scaling FIM par N et inversion canonique avec gestion FIM singuliere.
+- [refactor] **`.param_type()` centralise** : deplace de `R/report_design.R` vers `R/parse_design_outputs.R` (partage entre plots et futurs metrics V6).
+
+### Plots (`R/report_design.R`)
+- [feat] **`plot_model_prediction()` — facet par ID** : multi-ID (ex: IV+SC elementary designs) affiche une facette par ID au lieu de tout superposer.
+- [feat] **`plot_model_prediction()` — labels numeriques** : labels TSTRAT compacts ("1", "2"...) au lieu de "Strate 1", "Strate 2"...
+- [feat] **`plot_model_prediction()` — axe secondaire PFIM-style** : temps de sampling exacts affiches sur l'axe x superieur (`sec.axis`).
+- [refactor] **`plot_fim_heatmap()` utilise `get_cor_matrix()`** : suppression de la logique `solve() + cov2cor()` dupliquee.
+
+### App Shiny (`app/R/mod_times.R`)
+- [fix] **TSTRAT 1 manquant** : `obs[-1L, ]` apres filtre `EVID == 0` supprimait la premiere observation au lieu de la premiere dose. Retire aux 3 endroits concernes.
+- [refactor] **Plot TSTRAT (gantt) retire en single-run** : redondant avec la courbe predite ; table elargie a 12 colonnes.
+- [refactor] **Pagination DT retiree** : `dom = "t"` et `pageLength = nrow(obs_display)` pour tout afficher d'un coup.
+
+### Docs / Tests
+- [docs] Inventaire complet des 15 types de fichiers $DESIGN NONMEM dans `nonmem-design-reference.md`.
+- [test] Mise a jour test `compute_robust_summary()` : 6 lignes/bloc attendues (distinct() retire).
+
+---
+
 ## V4.3.1 — 2026-03-30 (Review fixes) — PRs #23 #24
 
 - [fix] **RSE color tiers** (PR #23 — `R/report_design.R`, `app/R/mod_rse.R`) : ligne de référence 100% ajoutée en mode multi-run (`yintercept = c(20, 50, 100)`), accents restaurés dans les titres (`"RSE prédit"`), roxygen mis à jour (20%/50%/100%).

@@ -622,8 +622,8 @@ test_that("compute_robust_summary() works on real example3 .tab", {
   expect_true("TIME" %in% names(result))
   expect_true("IPRED" %in% names(result))
 
-  # read_tab() applies distinct() per block: 6 raw rows → 4 unique
-  expect_equal(nrow(result[["TIME"]]), 4L)
+  # 6 rows per block (1 dose + 5 obs, including repeated timepoints)
+  expect_equal(nrow(result[["TIME"]]), 6L)
 
   # n_sub metadata — example3 has 1000 subproblems
   expect_true(result[["n_sub"]] > 1L)
