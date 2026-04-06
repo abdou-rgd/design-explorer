@@ -68,6 +68,13 @@ docs/intern_work/
 docs/superpowers/
 docs/reading_list.md
 
+# Outputs d'optimisation (generes, pas du source code)
+docs/results/
+
+# Suivi de stage (tracke — livrable tutrice)
+!docs/suivi/*.csv
+!docs/suivi/*.xlsx
+
 # Documents non redistribuables
 docs/nonmem/manuel_nonmem.txt
 docs/nonmem/manuel_nonmem.pdf
