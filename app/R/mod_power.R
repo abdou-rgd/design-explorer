@@ -70,10 +70,13 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
                 sprintf("GROUPSIZE = %d", groupsize() %||% 1L))
             )
           ),
-          tags$p(style = "font-size:.75rem; color:#64748b; margin:4px 0 0 0;",
-            HTML("<em>Test de Wald : W = (&theta;<sub>0</sub> &minus; &theta;&#770;) / SE</em>"),
-            HTML(" &nbsp;|&nbsp; "),
-            HTML("<em>FIM scaling : RSE(N) = RSE(N<sub>0</sub>) &times; &radic;(N<sub>0</sub>/N)</em>")
+          tags$p(style = "font-size:.85rem; color:#475569; margin:6px 0 0 0;",
+            HTML(paste0(
+              "<em>Test de Wald : W = (&theta;<sub>0</sub> &minus; ",
+              "<span style='text-decoration:overline'>&theta;</span>) / SE</em>",
+              " &nbsp;&bull;&nbsp; ",
+              "<em>FIM scaling : RSE(N) = RSE(N<sub>0</sub>) &times; &radic;(N<sub>0</sub>/N)</em>"
+            ))
           )
         ),
 
@@ -90,6 +93,22 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
           ),
           tabPanel("Nombre de sujets (NSN)",
             br(),
+            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;",
+              HTML(paste0(
+                "<p style='margin:0 0 6px 0; font-weight:600;'>Comment lire ce tableau ?</p>",
+                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
+                "<b>RSE cible</b> = RSE maximum pour atteindre la puissance cible. ",
+                "Calcul : SE<sub>cible</sub> = |&theta;<sub>0</sub> &minus; ",
+                "<span style='text-decoration:overline'>&theta;</span>| / (z<sub>&alpha;</sub> + z<sub>&beta;</sub>), ",
+                "puis RSE<sub>cible</sub> = SE<sub>cible</sub> / |",
+                "<span style='text-decoration:overline'>&theta;</span>| &times; 100.<br>",
+                "<b>N necessaire</b> = nombre de sujets pour atteindre le RSE cible, ",
+                "par scaling lineaire de la FIM : N = N<sub>0</sub> &times; (RSE / RSE<sub>cible</sub>)&sup2;.<br>",
+                "<b>Ratio N</b> = N necessaire / N actuel. ",
+                "Ratio &le; 1 : puissance deja atteinte. ",
+                "Ratio &gt; 1 : il faut plus de sujets.</p>"
+              ))
+            ),
             div(class = "surface-card",
               p(class = "section-title", "N necessaire pour atteindre la puissance cible"),
               DTOutput(ns("nsn_table")),
@@ -152,14 +171,14 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
 
       display <- tbl |>
         transmute(
-          Parametre    = label,
-          Type         = param_type,
-          Estimate     = round(estimate, 5),
-          `RSE (%)`    = round(rse_pct, 2),
-          `N actuel`   = as.integer(gs),
+          Parametre      = label,
+          Type           = param_type,
+          Estimate       = round(estimate, 5),
+          `RSE (%)`      = round(rse_pct, 2),
+          `RSE cible (%)` = ifelse(is.na(rse_needed), NA_real_, round(rse_needed, 2)),
+          `N actuel`     = as.integer(gs),
           `N necessaire` = ifelse(is.na(n_needed), NA_integer_, as.integer(n_needed)),
-          `Ratio N`    = ifelse(is.na(n_needed), NA_real_, round(n_needed / gs, 2)),
-          `RSE cible (%)` = ifelse(is.na(rse_needed), NA_real_, round(rse_needed, 2))
+          `Ratio N`      = ifelse(is.na(n_needed), NA_real_, round(n_needed / gs, 2))
         )
 
       dt <- datatable(display, rownames = FALSE,
@@ -169,7 +188,6 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
                                        list(className = "dt-right", targets = 2:7)
                                      )))
 
-      # Color Ratio N : <= 1 = vert, 1-3 = orange, > 3 = rouge
       ratio_col <- which(names(display) == "Ratio N")
       dt |>
         formatStyle(ratio_col,
