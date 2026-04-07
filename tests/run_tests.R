@@ -18,3 +18,7 @@ cat("Running tests...\n\n")
 test_file(file.path(PROJECT_ROOT, "tests", "testthat",
                     "test-parse_design_outputs.R"),
           reporter = "progress")
+
+test_file(file.path(PROJECT_ROOT, "tests", "testthat",
+                    "test-fim_metrics.R"),
+          reporter = "progress")

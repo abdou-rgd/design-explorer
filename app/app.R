@@ -17,8 +17,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V4.3.0"
-.APP_VERSION_NAME <- "Les sept exemples"
+.APP_VERSION      <- "V4.4.0"
+.APP_VERSION_NAME <- "Power to the People"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -48,6 +48,7 @@ log_info("App demarree — R ", R.version.string,
 
 source("../R/parse_design_outputs.R", local = TRUE)
 source("../R/report_design.R",        local = TRUE)
+source("../R/fim_metrics.R",          local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -107,6 +108,10 @@ ui <- fluidPage(
       tags$button(class = "nav-item", id = "nav-prior",
         onclick = "navTo('prior', this)", "Design Robuste"),
 
+      div(class = "nav-section-label", "Decision"),
+      tags$button(class = "nav-item", id = "nav-power",
+        onclick = "navTo('power', this)", "Power / NSN"),
+
       div(class = "nav-section-label", "Diagnostic"),
       tags$button(class = "nav-item", id = "nav-conv",
         onclick = "navTo('conv', this)", "Convergence"),
@@ -138,7 +143,9 @@ ui <- fluidPage(
         conditionalPanel("input.active_tab == 'raw'",
           mod_raw_ui("raw")),
         conditionalPanel("input.active_tab == 'ctl'",
-          mod_ctl_stream_ui("ctl"))
+          mod_ctl_stream_ui("ctl")),
+        conditionalPanel("input.active_tab == 'power'",
+          mod_power_ui("power"))
       )
     )
   ),
@@ -176,6 +183,11 @@ ui <- fluidPage(
     div(class = "upload-box",
       tags$h6("Bloc $DESIGN (TABLE NO.)"),
       selectInput("table_no", NULL, choices = "1", selected = "1")
+    ),
+    div(class = "upload-box",
+      tags$h6("Effectif du groupe (GROUPSIZE)"),
+      numericInput("groupsize", NULL, value = 1L, min = 1L, step = 1L, width = "100%"),
+      helpText("Auto-rempli depuis le .ctl si detecte.")
     ),
     div(class = "upload-box",
       tags$h6("Metrique RSE"),
@@ -298,6 +310,12 @@ server <- function(input, output, session) {
     }
     lbl <- examples$labels()
     if (!is.null(lbl)) updateTextAreaInput(session, "param_labels", value = lbl)
+    # GROUPSIZE depuis le .ctl de l'exemple
+    ctl_ex <- example_ctl_lines()
+    if (!is.null(ctl_ex)) {
+      gs <- tryCatch(parse_groupsize(ctl_ex), error = function(e) NA_integer_)
+      if (!is.na(gs)) updateNumericInput(session, "groupsize", value = gs)
+    }
   })
 
   observeEvent(examples$compare_paths(), {
@@ -345,6 +363,9 @@ server <- function(input, output, session) {
       if (!is.null(design_name)) {
         updateTextInput(session, "primary_run_name", value = design_name)
       }
+      # GROUPSIZE -> numericInput groupsize
+      gs <- tryCatch(parse_groupsize(ctl_lines), error = function(e) NA_integer_)
+      if (!is.na(gs)) updateNumericInput(session, "groupsize", value = gs)
     }
   })
 
@@ -462,6 +483,7 @@ server <- function(input, output, session) {
     updateTextAreaInput(session, "param_labels", value = "")
     updateTextAreaInput(session, "cmt_labels",   value = "")
     updateTextInput(session, "primary_run_name", value = "Primary")
+    updateNumericInput(session, "groupsize", value = 1L)
     showNotification("Run retiree", type = "message")
   })
 
@@ -523,6 +545,13 @@ server <- function(input, output, session) {
 
   mod_ctl_stream_server("ctl",
     ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
+
+  mod_power_server("power",
+    ext_data     = merged_ext,
+    tbl_no       = tbl_no,
+    param_labels = param_labels_r,
+    groupsize    = reactive({ as.integer(input$groupsize %||% 1L) }),
+    all_runs     = all_runs)
 }
 
 

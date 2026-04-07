@@ -1243,3 +1243,26 @@ parse_cmt_labels <- function(lines) {
 
   setNames(names_vec, as.character(seq_along(names_vec)))
 }
+
+
+# =============================================================================
+# parse_groupsize() — Extraire GROUPSIZE du bloc $DESIGN
+# =============================================================================
+
+#' Extrait la valeur GROUPSIZE= du bloc $DESIGN d'un control stream
+#'
+#' @param lines Vecteur de lignes du fichier .ctl/.mod/.con
+#' @return Integer (GROUPSIZE) ou NA_integer_ si non trouve
+parse_groupsize <- function(lines) {
+  if (is.null(lines) || length(lines) == 0L) return(NA_integer_)
+  design_idx <- which(stringr::str_detect(lines, "^\\s*\\$DESIGN"))
+  if (length(design_idx) == 0L) return(NA_integer_)
+  # Scan du bloc $DESIGN jusqu'au prochain bloc $ ou fin de fichier
+  next_block <- which(stringr::str_detect(lines, "^\\s*\\$") &
+                        seq_along(lines) > design_idx[1L])
+  end_idx <- if (length(next_block) > 0L) next_block[1L] - 1L else length(lines)
+  block <- paste(lines[design_idx[1L]:end_idx], collapse = " ")
+  m <- regmatches(block, regexpr("GROUPSIZE\\s*=\\s*([0-9]+)", block, perl = TRUE))
+  if (length(m) == 0L) return(NA_integer_)
+  as.integer(sub(".*=\\s*", "", m))
+}
