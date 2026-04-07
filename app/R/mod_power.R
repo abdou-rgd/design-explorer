@@ -71,9 +71,9 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
             )
           ),
           tags$p(style = "font-size:.75rem; color:#64748b; margin:4px 0 0 0;",
-            tags$em("Test de Wald : W = (\\u03B80 - \\u03B8) / SE"),
-            " | ",
-            tags$em("FIM scaling : RSE(N) = RSE(N0) \\u00D7 \\u221A(N0/N)")
+            HTML("<em>Test de Wald : W = (&theta;<sub>0</sub> &minus; &theta;&#770;) / SE</em>"),
+            HTML(" &nbsp;|&nbsp; "),
+            HTML("<em>FIM scaling : RSE(N) = RSE(N<sub>0</sub>) &times; &radic;(N<sub>0</sub>/N)</em>")
           )
         ),
 
