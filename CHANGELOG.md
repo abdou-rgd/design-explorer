@@ -2,6 +2,30 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V4.4.0 — 2026-04-07 (Power / NSN) — PR #37
+
+### Nouveau module Power / NSN (`R/fim_metrics.R`, `app/R/mod_power.R`)
+- [feat] **`compute_power_wald()`** : puissance du test de Wald (H0: theta=0) a partir du RSE predit par la FIM. Formule portee de PopED `evaluate_power.R` (Retout et al. 2007).
+- [feat] **`compute_n_needed()`** : nombre de sujets necessaire (NSN) par scaling lineaire de la FIM. RSE(N) = RSE(N0) x sqrt(N0/N).
+- [feat] **`plot_power_curve()`** : courbe Power(N) avec markers N actuel, N cible et ligne puissance cible.
+- [feat] **`compute_power_table()`** : helper qui applique power + NSN a tous les parametres d'un run.
+- [feat] **`parse_groupsize()`** (`R/parse_design_outputs.R`) : extrait GROUPSIZE= du bloc $DESIGN d'un control stream.
+
+### App Shiny
+- [feat] **Section "Decision"** dans la sidebar avec onglet **Power / NSN**.
+- [feat] **Tab "Puissance (Wald)"** : tableau colore par parametre (vert >= 80%, orange 50-80%, rouge < 50%).
+- [feat] **Tab "Nombre de sujets (NSN)"** : tableau N necessaire + RSE cible + Ratio N colore, courbe Power(N) par parametre, encadre explicatif des formules.
+- [feat] **GROUPSIZE dans le drawer** : `numericInput` auto-rempli depuis le .ctl (upload ou exemples), reset a 1.
+- [feat] **Downloads CSV** : export power table et NSN table.
+- [fix] **Formules HTML** : entites HTML (&theta;, &radic;, &times;) au lieu d'escapes Unicode non interpretes.
+- [bump] **V4.4.0 "Power to the People"**.
+
+### Tests
+- [test] 28 nouveaux tests (`tests/testthat/test-fim_metrics.R`) : power Wald (edge cases theta=0, rse=0, rse=NA, negatif, H0=theta), NSN (scaling, consistency power), parse_groupsize, plot_power_curve. **151 total, 0 failures.**
+- [compat] R 4.2.0 clean (scan r42-compat-checker).
+
+---
+
 ## Pre-V6 — 2026-04-03 (Bug fixes + API prep + plot improvements)
 
 ### Parsers / API (`R/parse_design_outputs.R`)
