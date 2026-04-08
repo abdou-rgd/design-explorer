@@ -612,6 +612,29 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
   # Detect multi-ID (e.g. IV vs SC elementary designs)
   has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
   if (has_multi_id) {
+    # Elementary datasets (GROUPSIZE > 1): many IDs share the same design times.
+    # Keep only one representative ID per unique TSTRAT pattern (= per arm).
+    n_ids <- n_distinct(obs$ID)
+    if (n_ids > 4L) {
+      tstrat_col <- if (group_col %in% names(obs)) group_col else NULL
+      if (!is.null(tstrat_col)) {
+        arm_sig <- obs |>
+          dplyr::group_by(ID) |>
+          dplyr::summarise(sig = paste(sort(unique(.data[[tstrat_col]])),
+                                       collapse = ","),
+                           .groups = "drop")
+        rep_ids <- arm_sig |>
+          dplyr::group_by(sig) |>
+          dplyr::slice_min(ID, n = 1L) |>
+          dplyr::ungroup() |>
+          dplyr::pull(ID)
+        obs <- obs |> dplyr::filter(ID %in% rep_ids)
+      } else {
+        # Fallback: keep first 2 IDs only
+        first_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
+        obs <- obs |> dplyr::filter(ID %in% first_ids)
+      }
+    }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
 
