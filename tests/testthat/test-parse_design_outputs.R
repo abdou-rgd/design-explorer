@@ -35,7 +35,11 @@ if (is.na(project_root) || !nzchar(project_root)) {
 proj <- function(...) file.path(project_root, ...)
 
 # Source the script under test
-source(proj("R", "parse_design_outputs.R"))
+source(proj("R", "design_utils.R"))
+source(proj("R", "design_io.R"))
+source(proj("R", "design_metrics.R"))
+source(proj("R", "design_summary.R"))
+source(proj("R", "ctl_parsers.R"))
 
 # ── Paths to example files ────────────────────────────────────────────────────
 ex1_ext <- proj("app/examples/example1/warfarin.ext")
