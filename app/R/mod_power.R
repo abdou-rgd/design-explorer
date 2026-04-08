@@ -100,6 +100,21 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
         tabsetPanel(id = ns("power_tabs"), type = "tabs",
           tabPanel("Puissance (Wald)",
             br(),
+            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
+                         border-left: 4px solid #2563eb;",
+              HTML(paste0(
+                "<p style='margin:0 0 6px 0; font-weight:600;'>Qu'est-ce que le test de Wald ?</p>",
+                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
+                "Le test de Wald evalue si un parametre est <b>significativement different</b> ",
+                "d'une valeur de reference (H<sub>0</sub>, souvent 0). ",
+                "La statistique W = (&theta;<sub>0</sub> &minus; ",
+                "<span style='text-decoration:overline'>&theta;</span>) / SE suit une loi normale.<br>",
+                "<b>Puissance</b> = probabilite de rejeter H<sub>0</sub> quand l'effet existe reellement. ",
+                "Une puissance &ge; 80%% signifie que le design detectera l'effet dans 80%% des cas.<br>",
+                "<b>Usage</b> : \"Mon design a-t-il assez de sujets pour estimer ce parametre avec precision ?\"<br>",
+                "<em>Ref. : Retout et al. 2007, Mentre &amp; Rousseau 2011.</em></p>"
+              ))
+            ),
             div(class = "surface-card",
               p(class = "section-title", "Puissance par parametre"),
               DTOutput(ns("power_table")),
@@ -146,6 +161,23 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
           ),
           tabPanel("Equivalence (TOST)",
             br(),
+            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
+                         border-left: 4px solid #7c3aed;",
+              HTML(paste0(
+                "<p style='margin:0 0 6px 0; font-weight:600;'>Qu'est-ce que le test TOST ?</p>",
+                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
+                "Le test TOST (Two One-Sided Tests) evalue si un parametre est ",
+                "<b>equivalent</b> a une valeur de reference, c'est-a-dire compris dans une ",
+                "marge d'equivalence [&minus;&delta;, +&delta;].<br>",
+                "Contrairement au test de Wald (\"l'effet est-il different de zero ?\"), ",
+                "le TOST repond a la question : \"l'effet est-il <b>suffisamment proche</b> de zero ",
+                "pour etre considere comme negligeable ?\"<br>",
+                "<b>Usage</b> : effet d'une covariable, bioequivalence, absence d'effet clinique. ",
+                "Si le parametre est en dehors de la marge, la puissance est 0 ",
+                "(l'equivalence ne peut pas etre demontree).<br>",
+                "<em>Ref. : PFIM user guide (Retout et al.), eq. 4-7. Alpha une face (non divise).</em></p>"
+              ))
+            ),
             div(class = "surface-card", style = "margin-bottom: 16px;",
               p(class = "section-title", "Marge d'equivalence"),
               fluidRow(
