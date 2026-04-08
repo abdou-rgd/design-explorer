@@ -35,7 +35,11 @@ if (is.na(project_root) || !nzchar(project_root)) {
 proj <- function(...) file.path(project_root, ...)
 
 # Source dependencies
-source(proj("R", "parse_design_outputs.R"))
+source(proj("R", "design_utils.R"))
+source(proj("R", "design_io.R"))
+source(proj("R", "design_metrics.R"))
+source(proj("R", "design_summary.R"))
+source(proj("R", "ctl_parsers.R"))
 source(proj("R", "report_design.R"))
 source(proj("R", "fim_metrics.R"))
 

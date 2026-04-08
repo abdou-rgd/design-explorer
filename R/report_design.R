@@ -7,7 +7,7 @@
 #   plot_rse()         — Barplot RSE(%) par paramètre, facetté par type
 #   plot_convergence() — Courbe OFV vs itération (convergence optimisation)
 #
-# Prérequis : source("parse_design_outputs.R") avant d'utiliser ces fonctions
+# Prerequis : source design_utils.R, design_io.R, design_metrics.R
 # Compatibilité : R 4.1+, ggplot2, dplyr, stringr
 # =============================================================================
 
@@ -20,8 +20,6 @@ library(purrr)
 # =============================================================================
 # Utilitaires internes
 # =============================================================================
-
-`%||%` <- function(x, y) if (is.null(x)) y else x
 
 # Palette qualité RelInf : rouge (bas) → orange → vert (élevé)
 .ri_quality <- function(ri_pct) {
@@ -44,7 +42,7 @@ library(purrr)
   )
 }
 
-# .param_type() est defini dans parse_design_outputs.R (source commune)
+# .param_type() est defini dans design_metrics.R
 
 # Thème commun
 .theme_design <- function() {

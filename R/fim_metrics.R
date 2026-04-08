@@ -6,7 +6,7 @@
 #   - PopED evaluate_power.R (Retout et al. 2007, Mentre & Rousseau 2011)
 #   - PopED optimize_n_rse() (Ueckert et al. 2013)
 #
-# Prerequis : source("parse_design_outputs.R") et source("report_design.R")
+# Prerequis : source design_utils.R, design_io.R, design_metrics.R, report_design.R
 # Compatibilite : R 4.1+, ggplot2, dplyr
 # =============================================================================
 
