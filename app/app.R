@@ -17,8 +17,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V4.4.0"
-.APP_VERSION_NAME <- "Power to the People"
+.APP_VERSION      <- "V4.5.1"
+.APP_VERSION_NAME <- "Elementary, my dear Watson"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
