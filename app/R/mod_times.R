@@ -374,8 +374,24 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       obs <- tab_single()
       if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
 
+      # Elementary datasets (GROUPSIZE > 1): collapse to one row per unique
+      # sampling point. All IDs within the same arm share the same design times.
+      if ("ID" %in% names(obs) && dplyr::n_distinct(obs$ID) > 4L &&
+          "TSTRAT" %in% names(obs)) {
+        arm_sig <- obs |>
+          dplyr::group_by(ID) |>
+          dplyr::summarise(sig = paste(sort(unique(TSTRAT)), collapse = ","),
+                           .groups = "drop")
+        rep_ids <- arm_sig |>
+          dplyr::group_by(sig) |>
+          dplyr::slice_min(ID, n = 1L) |>
+          dplyr::ungroup() |>
+          dplyr::pull(ID)
+        obs <- obs |> dplyr::filter(ID %in% rep_ids)
+      }
+
       cols_show <- intersect(
-        c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
+        c("ID", "TSTRAT", "TMIN", "TIME", "TMAX", "IPRED", "CONC", "STRAT", "CMT"),
         names(obs)
       )
       if (length(cols_show) == 0L) {
@@ -417,8 +433,22 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         } else {
           obs <- tab_single()
           if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+          # Elementary datasets: keep one representative ID per arm
+          if ("ID" %in% names(obs) && dplyr::n_distinct(obs$ID) > 4L &&
+              "TSTRAT" %in% names(obs)) {
+            arm_sig <- obs |>
+              dplyr::group_by(ID) |>
+              dplyr::summarise(sig = paste(sort(unique(TSTRAT)), collapse = ","),
+                               .groups = "drop")
+            rep_ids <- arm_sig |>
+              dplyr::group_by(sig) |>
+              dplyr::slice_min(ID, n = 1L) |>
+              dplyr::ungroup() |>
+              dplyr::pull(ID)
+            obs <- obs |> dplyr::filter(ID %in% rep_ids)
+          }
           cols_show <- intersect(
-            c("TSTRAT", "TIME", "IPRED", "CONC", "STRAT", "CMT"),
+            c("ID", "TSTRAT", "TMIN", "TIME", "TMAX", "IPRED", "CONC", "STRAT", "CMT"),
             names(obs)
           )
           if (length(cols_show) == 0L) {
