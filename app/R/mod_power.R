@@ -97,7 +97,16 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
             column(3,
               numericInput(ns("n_total"), "N total (sujets)",
                            value = groupsize() %||% 1L,
-                           min = 1L, step = 1L, width = "100%")
+                           min = 1L, step = 1L, width = "100%"),
+              tags$p(style = "font-size:.72rem; color:#64748b; margin-top:2px;",
+                HTML(paste0(
+                  "Auto-rempli depuis GROUPSIZE du .ctl.<br>",
+                  "<b>Dataset normal</b> (1 ID = 1 sujet) : ",
+                  "N = nb d'IDs (GROUPSIZE=1).<br>",
+                  "<b>Dataset elementaire</b> (peu d'IDs, design replique) : ",
+                  "N = nb d'IDs &times; GROUPSIZE."
+                ))
+              )
             )
           ),
           tags$p(style = "font-size:.85rem; color:#475569; margin:6px 0 0 0;",
