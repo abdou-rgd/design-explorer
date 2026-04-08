@@ -17,6 +17,20 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # -- Sync N total from parent (auto-fill depuis .ctl) ----------------------
+    observeEvent(groupsize(), {
+      gs <- groupsize()
+      if (!is.null(gs) && !is.na(gs) && gs >= 1L) {
+        updateNumericInput(session, "n_total", value = gs)
+      }
+    })
+
+    # -- Local N reactive (from module input) ----------------------------------
+    n_total_r <- reactive({
+      val <- input$n_total
+      if (is.null(val) || is.na(val) || val < 1L) 1L else as.integer(val)
+    })
+
     # -- RSE table reactive (from primary run) ---------------------------------
     rse_r <- reactive({
       ext <- ext_data(); req(ext)
@@ -26,8 +40,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
     # -- Power table reactive --------------------------------------------------
     power_tbl <- reactive({
       ext <- ext_data(); req(ext)
-      gs <- groupsize()
-      if (is.null(gs) || is.na(gs) || gs < 1L) gs <- 1L
+      gs <- n_total_r()
       h0 <- input$h0 %||% 0
       alpha <- input$alpha %||% 0.05
       two_sided <- input$two_sided %||% TRUE
@@ -41,7 +54,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
     # -- Equiv table reactive (TOST) ------------------------------------------
     equiv_tbl <- reactive({
       ext <- ext_data(); req(ext)
-      gs <- groupsize()
+      gs <- n_total_r()
       if (is.null(gs) || is.na(gs) || gs < 1L) gs <- 1L
       h0    <- input$h0 %||% 0
       alpha <- input$alpha %||% 0.05
@@ -82,8 +95,9 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
               checkboxInput(ns("two_sided"), "Bilateral", value = TRUE)
             ),
             column(3,
-              tags$p(style = "font-size:.75rem; color:#64748b; margin-top:28px;",
-                sprintf("N total = %d sujets", groupsize() %||% 1L))
+              numericInput(ns("n_total"), "N total (sujets)",
+                           value = groupsize() %||% 1L,
+                           min = 1L, step = 1L, width = "100%")
             )
           ),
           tags$p(style = "font-size:.85rem; color:#475569; margin:6px 0 0 0;",
@@ -274,7 +288,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
     # -- NSN table -------------------------------------------------------------
     output$nsn_table <- renderDT({
       tbl <- power_tbl(); req(tbl)
-      gs <- groupsize() %||% 1L
+      gs <- n_total_r()
 
       display <- tbl |>
         transmute(
@@ -322,7 +336,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       sel <- input$curve_param; req(sel)
       row <- tbl |> filter(param == sel)
       req(nrow(row) == 1L)
-      gs <- groupsize() %||% 1L
+      gs <- n_total_r()
 
       plot_power_curve(
         theta_val    = row$estimate,
@@ -358,7 +372,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       content = function(file) {
         tbl <- power_tbl()
         if (is.null(tbl)) return()
-        gs <- groupsize() %||% 1L
+        gs <- n_total_r()
         out <- tbl |>
           transmute(param, label, estimate, rse_pct,
                     n_current = as.integer(gs), n_needed, rse_needed,
@@ -421,7 +435,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
     # -- TOST: NSN table -------------------------------------------------------
     output$equiv_nsn_table <- renderDT({
       tbl <- equiv_tbl(); req(tbl)
-      gs <- groupsize() %||% 1L
+      gs <- n_total_r()
 
       display <- tbl |>
         transmute(
@@ -471,7 +485,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       sel <- input$equiv_curve_param; req(sel)
       row <- tbl |> filter(param == sel)
       req(nrow(row) == 1L)
-      gs <- groupsize() %||% 1L
+      gs <- n_total_r()
       dL <- input$delta_L %||% 0.2
       h0 <- input$h0 %||% 0
       al <- input$alpha %||% 0.05
@@ -554,7 +568,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       content = function(file) {
         tbl <- equiv_tbl()
         if (is.null(tbl)) return()
-        gs <- groupsize() %||% 1L
+        gs <- n_total_r()
         out <- tbl |>
           transmute(param, label, estimate, rse_pct,
                     n_current = as.integer(gs), n_needed, rse_needed,
