@@ -46,7 +46,11 @@ log_info("App demarree — R ", R.version.string,
          ", dplyr ", packageVersion("dplyr"),
          ", shiny ", packageVersion("shiny"))
 
-source("../R/parse_design_outputs.R", local = TRUE)
+source("../R/design_utils.R",   local = TRUE)
+source("../R/design_io.R",      local = TRUE)
+source("../R/design_metrics.R", local = TRUE)
+source("../R/design_summary.R", local = TRUE)
+source("../R/ctl_parsers.R",    local = TRUE)
 source("../R/report_design.R",        local = TRUE)
 source("../R/fim_metrics.R",          local = TRUE)
 
