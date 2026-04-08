@@ -2,7 +2,7 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
-## V4.5.1 — 2026-04-08 (Elementary design display fix)
+## V4.5.1 — 2026-04-08 (Elementary design display fix) — PR #40
 
 ### Plot & Table — Temps optimaux (`R/report_design.R`, `app/R/mod_times.R`)
 - [fix] **`plot_model_prediction()`** : les runs d'optimisation avec GROUPSIZE > 1 generaient 180 facettes (une par elementary design ID). Detection automatique des bras via signature TSTRAT unique — un seul ID representatif par bras est affiche.
