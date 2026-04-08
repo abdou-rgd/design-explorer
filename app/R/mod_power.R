@@ -67,7 +67,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
             ),
             column(3,
               tags$p(style = "font-size:.75rem; color:#64748b; margin-top:28px;",
-                sprintf("GROUPSIZE = %d", groupsize() %||% 1L))
+                sprintf("N total = %d sujets", groupsize() %||% 1L))
             )
           ),
           tags$p(style = "font-size:.85rem; color:#475569; margin:6px 0 0 0;",

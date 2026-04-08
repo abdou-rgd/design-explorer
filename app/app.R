@@ -185,9 +185,9 @@ ui <- fluidPage(
       selectInput("table_no", NULL, choices = "1", selected = "1")
     ),
     div(class = "upload-box",
-      tags$h6("Effectif du groupe (GROUPSIZE)"),
+      tags$h6("Nombre total de sujets (N)"),
       numericInput("groupsize", NULL, value = 1L, min = 1L, step = 1L, width = "100%"),
-      helpText("Auto-rempli depuis le .ctl si detecte.")
+      helpText("N = nb IDs x GROUPSIZE. Auto-rempli depuis le .ctl (GROUPSIZE) si detecte ; ajustez si votre dataset est elementaire (peu d'IDs, GROUPSIZE > 1).")
     ),
     div(class = "upload-box",
       tags$h6("Metrique RSE"),
