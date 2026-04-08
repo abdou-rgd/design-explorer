@@ -2,6 +2,31 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V4.5.0 — 2026-04-08 (TOST Equivalence + UX N total) — PR #38
+
+### Test d'equivalence TOST (`R/fim_metrics.R`, `app/R/mod_power.R`)
+- [feat] **`compute_power_tost()`** : puissance du test TOST (Two One-Sided Tests) pour demontrer l'equivalence d'un parametre dans une marge [-delta, +delta]. Formules PFIM eq. 4-7, alpha une face.
+- [feat] **`compute_nsn_tost()`** : NSN pour equivalence, par scaling FIM (ratio carre). PFIM eq. 6-7.
+- [feat] **`compute_equiv_table()`** : wrapper appliquant TOST a tous les parametres d'un run.
+
+### App Shiny
+- [feat] **Tab "Equivalence (TOST)"** dans le module Power : table puissance TOST, table NSN equivalence, courbe Power(N) TOST (violet), 2 exports CSV.
+- [feat] **Input delta** (marge symetrique, defaut 0.2) avec formules H0/H1 en HTML.
+- [feat] **Detection hors-marge** : parametres avec |theta - h0| >= delta affiches en rouge "Oui", warning banner en haut.
+- [feat] **Encadres explicatifs** : cards Wald (bordure bleue) et TOST (bordure violette) expliquant chaque test, son usage, et ses references.
+- [feat] **N total editable** : `numericInput` directement dans le panneau Power (plus besoin de retourner au sidebar). Sync auto depuis le .ctl.
+- [feat] **HelpText dataset** : explique la distinction dataset normal (1 ID = 1 sujet, GROUPSIZE=1) vs elementaire (peu d'IDs, N = IDs x GROUPSIZE).
+- [fix] **Label GROUPSIZE clarifie** : sidebar affiche "Nombre total de sujets (N)" au lieu de "Effectif du groupe (GROUPSIZE)".
+- [fix] **`%%` dans `paste0()`** : corrige l'affichage "%%" literal sur l'axe Y de la courbe TOST.
+
+### Tests
+- [test] 17 nouveaux tests TOST : power centered/off-center, outside margin, negative branch, edge cases (theta=0, rse=NA, delta<=0), monotonicity, NSN consistency, equiv_table avec example1. **175 total, 0 failures.**
+- [verify] Formules cross-checkees : power a NSE = 0.800000 exactement. NSN scaling verifie pour cas frexa (2 IDs x GROUPSIZE=40 = 80 patients).
+- [verify] PFIM eq. (1)-(2) matchent exactement. Eq. (3) NNI : PFIM manual utilise ratio lineaire (conservatif), notre code utilise ratio carre (correct, valide par PopED).
+- [compat] R 4.2.0 clean (scan r42-compat-checker).
+
+---
+
 ## V4.4.0 — 2026-04-07 (Power / NSN) — PR #37
 
 ### Nouveau module Power / NSN (`R/fim_metrics.R`, `app/R/mod_power.R`)

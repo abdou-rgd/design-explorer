@@ -217,3 +217,149 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
 
   p
 }
+
+
+# =============================================================================
+# compute_power_tost() — Puissance du test d'equivalence TOST
+# =============================================================================
+
+#' Puissance du test d'equivalence TOST (Two One-Sided Tests)
+#'
+#' Calcule la puissance pour demontrer l'equivalence :
+#'   H0 : theta <= h0 - delta_L OU theta >= h0 + delta_L
+#'   H1 : h0 - delta_L < theta < h0 + delta_L
+#'
+#' Formules PFIM (user guide, eq. 4-5). Alpha est une face (non divise).
+#'
+#' @param theta_val Valeur estimee du parametre
+#' @param rse_pct   RSE en pourcentage
+#' @param delta_L   Demi-largeur de la marge d'equivalence (symetrique)
+#' @param h0        Centre de la marge (defaut 0)
+#' @param alpha     Niveau de significativite une face (defaut 0.05)
+#' @return Puissance [0,1], 0 si hors marge, NA_real_ si non calculable
+compute_power_tost <- function(theta_val, rse_pct, delta_L,
+                               h0 = 0, alpha = 0.05) {
+  if (is.na(theta_val) || abs(theta_val) < 1e-12 ||
+      is.na(rse_pct) || rse_pct <= 0 ||
+      is.na(delta_L) || delta_L <= 0) {
+    return(NA_real_)
+  }
+
+  beta1 <- theta_val - h0
+  se    <- abs(theta_val) * rse_pct / 100
+
+  # Hors marge : equivalence impossible
+
+  if (abs(beta1) >= delta_L) return(0)
+
+  z_alpha <- qnorm(1 - alpha)  # une face, PAS alpha/2
+
+  if (beta1 <= 0) {
+    # PFIM eq. (4) : beta1 in [-delta_L, 0]
+    1 - pnorm(z_alpha - (beta1 + delta_L) / se)
+  } else {
+    # PFIM eq. (5) : beta1 in (0, +delta_L)
+    pnorm(-z_alpha - (beta1 - delta_L) / se)
+  }
+}
+
+
+# =============================================================================
+# compute_nsn_tost() — NSN pour equivalence TOST
+# =============================================================================
+
+#' Nombre de sujets necessaire pour demontrer l'equivalence
+#'
+#' PFIM eq. (6)-(7) + scaling FIM : N = N0 * (SE/NSE)^2
+#'
+#' @param theta_val         Valeur estimee du parametre
+#' @param rse_pct           RSE en % au groupsize actuel
+#' @param groupsize_current Nombre de sujets actuel
+#' @param delta_L           Demi-largeur de la marge d'equivalence
+#' @param h0                Centre de la marge (defaut 0)
+#' @param alpha             Niveau une face (defaut 0.05)
+#' @param power_target      Puissance cible (defaut 0.80)
+#' @return Liste : n_needed (integer), rse_needed (numeric)
+compute_nsn_tost <- function(theta_val, rse_pct, groupsize_current,
+                             delta_L, h0 = 0, alpha = 0.05,
+                             power_target = 0.80) {
+  na_result <- list(n_needed = NA_integer_, rse_needed = NA_real_)
+
+  if (is.na(theta_val) || abs(theta_val) < 1e-12 ||
+      is.na(rse_pct) || rse_pct <= 0 ||
+      is.na(delta_L) || delta_L <= 0) {
+    return(na_result)
+  }
+
+  beta1   <- theta_val - h0
+  z_alpha <- qnorm(1 - alpha)
+
+  # Hors marge : equivalence impossible
+  if (abs(beta1) >= delta_L) return(na_result)
+
+  if (beta1 <= 0) {
+    # PFIM eq. (6) : beta1 in [-delta_L, 0]
+    nse <- (-beta1 - delta_L) / (-z_alpha + qnorm(1 - power_target))
+  } else {
+    # PFIM eq. (7) : beta1 in (0, +delta_L)
+    nse <- (-beta1 + delta_L) / (z_alpha + qnorm(power_target))
+  }
+
+  if (is.na(nse) || nse <= 0) return(na_result)
+
+  rse_needed <- nse / abs(theta_val) * 100
+  n_needed   <- ceiling((rse_pct / rse_needed)^2 * groupsize_current)
+
+  list(
+    n_needed   = as.integer(max(1L, n_needed)),
+    rse_needed = rse_needed
+  )
+}
+
+
+# =============================================================================
+# compute_equiv_table() — Tableau equivalence TOST pour tous les parametres
+# =============================================================================
+
+#' Tableau de puissance TOST et NSN pour tous les parametres d'un run
+#'
+#' @param ext       Tibble retourne par read_ext()
+#' @param table_no  Numero de table (NULL = derniere)
+#' @param groupsize Nombre de sujets
+#' @param delta_L   Demi-largeur marge d'equivalence (defaut 0.2)
+#' @param h0        Centre de la marge (defaut 0)
+#' @param alpha     Niveau une face (defaut 0.05)
+#' @param power_target Puissance cible (defaut 0.80)
+#' @param param_labels Vecteur nomme THETA1=CL, ... (optionnel)
+#' @return Tibble avec colonnes power, n_needed, rse_needed, outside_margin
+compute_equiv_table <- function(ext, table_no = NULL, groupsize = 1L,
+                                delta_L = 0.2, h0 = 0, alpha = 0.05,
+                                power_target = 0.80, param_labels = NULL) {
+  rse_df <- get_rse(ext, table_no = table_no)
+  if (is.null(rse_df) || nrow(rse_df) == 0L) return(NULL)
+
+  result <- rse_df |>
+    mutate(
+      label = if (!is.null(param_labels)) {
+        ifelse(param %in% names(param_labels), param_labels[param], param)
+      } else {
+        param
+      },
+      outside_margin = abs(estimate - h0) >= delta_L,
+      power = mapply(compute_power_tost,
+        theta_val = estimate, rse_pct = rse_pct,
+        MoreArgs = list(delta_L = delta_L, h0 = h0, alpha = alpha)
+      ),
+      n_needed = mapply(function(tv, rp) {
+        compute_nsn_tost(tv, rp, groupsize, delta_L, h0, alpha,
+                         power_target)$n_needed
+      }, tv = estimate, rp = rse_pct),
+      rse_needed = mapply(function(tv, rp) {
+        compute_nsn_tost(tv, rp, groupsize, delta_L, h0, alpha,
+                         power_target)$rse_needed
+      }, tv = estimate, rp = rse_pct),
+      param_type = .param_type(param)
+    )
+
+  result
+}
