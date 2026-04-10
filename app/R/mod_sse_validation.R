@@ -207,45 +207,74 @@ mod_sse_validation_ui <- function(id) {
       )
     ),
 
-    # --- Parameter filter ---
+    # --- Parameter filter + plot selector ---
     fluidRow(
       column(12,
         uiOutput(ns("param_filter_ui"))
       )
     ),
+    fluidRow(
+      column(12,
+        div(style = paste0(
+          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
+          " margin-bottom:10px; background:#fafafa;"
+        ),
+          div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
+            tags$strong("Plots to display:", style = "white-space:nowrap;"),
+            checkboxGroupInput(
+              ns("visible_plots"), label = NULL,
+              choices = c("Scatter" = "scatter",
+                          "REE Boxplot" = "ree",
+                          "RSE Bar Chart" = "rse"),
+              selected = c("scatter", "ree", "rse"),
+              inline = TRUE
+            )
+          )
+        )
+      )
+    ),
 
     # --- Scatter plot ---
-    fluidRow(
-      column(12,
-        div(class = "plot-card",
-          p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
-          plotOutput(ns("scatter"), height = "650px")
+    conditionalPanel(
+      condition = sprintf("input['%s'].indexOf('scatter') > -1", ns("visible_plots")),
+      fluidRow(
+        column(12,
+          div(class = "plot-card",
+            p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
+            plotOutput(ns("scatter"), height = "650px")
+          )
         )
-      )
+      ),
+      br()
     ),
-    br(),
 
     # --- REE Boxplot ---
-    fluidRow(
-      column(12,
-        div(class = "plot-card",
-          p(class = "section-title", "REE Distribution by Parameter"),
-          plotOutput(ns("ree_boxplot"), height = "450px")
+    conditionalPanel(
+      condition = sprintf("input['%s'].indexOf('ree') > -1", ns("visible_plots")),
+      fluidRow(
+        column(12,
+          div(class = "plot-card",
+            p(class = "section-title", "REE Distribution by Parameter"),
+            plotOutput(ns("ree_boxplot"), height = "450px")
+          )
         )
-      )
+      ),
+      br()
     ),
-    br(),
 
     # --- RSE Bar Chart ---
-    fluidRow(
-      column(12,
-        div(class = "plot-card",
-          p(class = "section-title", "FIM vs SSE: RSE Comparison"),
-          plotOutput(ns("rse_bar"), height = "400px")
+    conditionalPanel(
+      condition = sprintf("input['%s'].indexOf('rse') > -1", ns("visible_plots")),
+      fluidRow(
+        column(12,
+          div(class = "plot-card",
+            p(class = "section-title", "FIM vs SSE: RSE Comparison"),
+            plotOutput(ns("rse_bar"), height = "400px")
+          )
         )
-      )
+      ),
+      br()
     ),
-    br(),
 
     # --- D-criterion card ---
     uiOutput(ns("d_criterion_card")),
