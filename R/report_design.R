@@ -795,6 +795,8 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     # Keep only one representative ID per unique TSTRAT pattern (= per arm).
     n_ids <- n_distinct(obs$ID)
     if (n_ids > 4L) {
+      # Elementary dataset (GROUPSIZE > 1): many IDs share the same design.
+      # Keep 1 representative ID per arm (unique TSTRAT pattern), max 4 total.
       tstrat_col <- if (group_col %in% names(obs)) group_col else NULL
       if (!is.null(tstrat_col)) {
         arm_sig <- obs |>
@@ -807,17 +809,14 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
           dplyr::slice_min(ID, n = 1L) |>
           dplyr::ungroup() |>
           dplyr::pull(ID)
-        # If still too many IDs (e.g. optimised designs with unique times per ID),
-        # keep only the first 2 representative IDs
-        if (length(rep_ids) > 4L) {
-          rep_ids <- sort(rep_ids)[1:min(2L, length(rep_ids))]
-        }
-        obs <- obs |> dplyr::filter(ID %in% rep_ids)
       } else {
-        # Fallback: keep first 2 IDs only
-        first_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
-        obs <- obs |> dplyr::filter(ID %in% first_ids)
+        rep_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
       }
+      # Hard cap: never show more than 4 facets
+      if (length(rep_ids) > 4L) {
+        rep_ids <- sort(rep_ids)[1:2L]
+      }
+      obs <- obs |> dplyr::filter(ID %in% rep_ids)
     }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
