@@ -9,6 +9,9 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 - [feat] **CI 95%** sur les RSE SSE, **D-criterion** comparison, **panneau methodologie** explicatif
 - [feat] **Auto-detection format** fichiers SSE (raw_results vs pre-computed)
 - [feat] **Filtre parametres** sur le scatter plot (selectInput dynamique)
+- [feat] **REE Boxplot** : distribution REE par parametre (5e/95e whiskers, diamant RB, CI 95%) — inspire Fayette 2026 Fig. 2
+- [feat] **RSE Bar Chart** : barres groupees FIM vs SSE RSE avec lignes ref 20%/50% — inspire Fayette 2026 Fig. 3
+- [feat] **Selecteur de plots** : checkboxes pour afficher/masquer chaque plot (Scatter, REE Boxplot, RSE Bar)
 - [fix] **Hauteur scatter plot** augmentee + titre centre
 
 ### Convergence (`app/R/mod_convergence.R`)
