@@ -18,6 +18,7 @@
 library(ggplot2)
 library(dplyr)
 library(stringr)
+library(tidyr)
 
 
 # =============================================================================
@@ -777,6 +778,234 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     theme(legend.position = "right",
           plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5))
+
+  p
+}
+
+
+# =============================================================================
+# compute_ree_distribution() — REE distribution for boxplot
+# =============================================================================
+
+#' Compute per-run REE values and summary quantiles for each parameter.
+#'
+#' @param sse_raw      Tibble from read_sse_raw()
+#' @param true_values  Named numeric vector from read_true_values()
+#' @param param_labels Named character vector (optional)
+#' @return List with $individual (long tibble: param, param_type, ree) and
+#'         $summary (tibble: param, param_type, p5, q25, median, q75, p95,
+#'         rb, ci_lower, ci_upper)
+#' @export
+compute_ree_distribution <- function(sse_raw, true_values,
+                                     param_labels = NULL) {
+  available <- intersect(names(true_values), names(sse_raw))
+  if (length(available) == 0L) {
+    return(list(
+      individual = tibble::tibble(param = character(), param_type = character(),
+                                  param_label = character(), ree = numeric()),
+      summary = tibble::tibble(param = character(), param_type = character(),
+                               param_label = character(),
+                               p5 = numeric(), q25 = numeric(),
+                               median = numeric(), q75 = numeric(),
+                               p95 = numeric(), rb = numeric(),
+                               ci_lower = numeric(), ci_upper = numeric())
+    ))
+  }
+
+  indiv_list <- list()
+  summ_list  <- list()
+
+  for (pname in available) {
+    estimates <- as.numeric(sse_raw[[pname]])
+    estimates <- estimates[!is.na(estimates)]
+    true_val  <- true_values[[pname]]
+
+    if (length(estimates) < 2L || abs(true_val) < 1e-15) next
+
+    ree <- (estimates - true_val) / true_val * 100
+
+    label <- if (!is.null(param_labels) && pname %in% names(param_labels)) {
+      param_labels[[pname]]
+    } else {
+      pname
+    }
+
+    indiv_list[[pname]] <- data.frame(
+      param = pname,
+      param_type = .param_type(pname),
+      param_label = label,
+      ree = ree,
+      stringsAsFactors = FALSE
+    )
+
+    qs <- quantile(ree, probs = c(0.05, 0.25, 0.50, 0.75, 0.95),
+                   names = FALSE)
+    rb <- mean(ree)
+    se_rb <- sd(ree) / sqrt(length(ree))
+
+    summ_list[[pname]] <- data.frame(
+      param = pname,
+      param_type = .param_type(pname),
+      param_label = label,
+      p5 = qs[1], q25 = qs[2], median = qs[3], q75 = qs[4], p95 = qs[5],
+      rb = round(rb, 2),
+      ci_lower = round(rb - 1.96 * se_rb, 2),
+      ci_upper = round(rb + 1.96 * se_rb, 2),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  list(
+    individual = tibble::as_tibble(dplyr::bind_rows(indiv_list)),
+    summary    = tibble::as_tibble(dplyr::bind_rows(summ_list))
+  )
+}
+
+
+# =============================================================================
+# plot_ree_boxplot() — REE distribution boxplot per parameter
+# =============================================================================
+
+#' Boxplot of Relative Estimation Error (REE) per parameter.
+#'
+#' Uses pre-computed quantiles (5th/95th as whiskers), shows Relative Bias
+#' as a black diamond with 95% CI error bar.
+#' Inspired by Fayette et al. 2026, Fig. 2.
+#'
+#' @param ree_dist List from compute_ree_distribution()
+#' @param title    Plot title (NULL = auto)
+#' @return ggplot2 object
+#' @export
+plot_ree_boxplot <- function(ree_dist, title = NULL) {
+  summ <- ree_dist$summary
+  if (is.null(summ) || nrow(summ) == 0L) {
+    return(ggplot() +
+      labs(title = "No REE data available") +
+      .theme_design())
+  }
+
+  # Map type for colors
+  summ$type_group <- dplyr::case_when(
+    grepl("^THETA", summ$param_type) ~ "Fixed effects",
+    grepl("^OMEGA", summ$param_type) ~ "IIV",
+    grepl("^SIGMA", summ$param_type) ~ "Residual",
+    TRUE ~ summ$param_type
+  )
+
+  col_fixed <- "#6C2B91"
+  col_iiv   <- "#2B6991"
+  col_resid <- "#E07B39"
+
+  # Order params: THETA, OMEGA, SIGMA
+  summ$param_label <- factor(summ$param_label, levels = summ$param_label)
+
+  ttl <- title %||% "REE Distribution by Parameter"
+
+  p <- ggplot(summ, aes(x = param_label)) +
+    # Reference line at 0
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    # Boxplot with pre-computed quantiles
+    geom_boxplot(
+      aes(ymin = p5, lower = q25, middle = median,
+          upper = q75, ymax = p95, fill = type_group),
+      stat = "identity", width = 0.6, alpha = 0.7,
+      color = "grey30", size = 0.4
+    ) +
+    # Relative Bias as black diamond
+    geom_point(aes(y = rb), shape = 18, size = 3, color = "black") +
+    # 95% CI error bar for bias
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper),
+                  width = 0.2, size = 0.5, color = "black") +
+    scale_fill_manual(
+      values = c("Fixed effects" = col_fixed,
+                 "IIV" = col_iiv,
+                 "Residual" = col_resid),
+      name = NULL
+    ) +
+    labs(
+      title = ttl,
+      subtitle = paste0(
+        "Boxes = 25th-75th pct | Whiskers = 5th-95th pct | ",
+        "Diamond = Relative Bias | Error bar = 95% CI of bias"
+      ),
+      x = NULL,
+      y = "REE (%)"
+    ) +
+    .theme_design() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 8)
+    )
+
+  p
+}
+
+
+# =============================================================================
+# plot_rse_bar() — Grouped bar chart FIM RSE vs Empirical RSE
+# =============================================================================
+
+#' Grouped bar chart comparing FIM-predicted RSE with empirical SSE RSE.
+#'
+#' Inspired by Fayette et al. 2026, Fig. 3.
+#'
+#' @param comparison_df Tibble from compare_fim_sse()
+#' @param title         Plot title (NULL = auto)
+#' @return ggplot2 object
+#' @export
+plot_rse_bar <- function(comparison_df, title = NULL) {
+  df <- comparison_df |>
+    dplyr::filter(status == "matched",
+                  !is.na(rse_fim), !is.na(rse_sse))
+
+  if (nrow(df) == 0L) {
+    return(ggplot() +
+      labs(title = "No matched parameters for RSE comparison") +
+      .theme_design())
+  }
+
+  # Prepare long format for grouped bars
+  df$param_label <- factor(df$param_label, levels = df$param_label)
+
+  df_long <- tidyr::pivot_longer(
+    df,
+    cols = c(rse_fim, rse_sse),
+    names_to = "source",
+    values_to = "rse"
+  )
+  df_long$source <- dplyr::if_else(
+    df_long$source == "rse_fim",
+    "FIM predicted",
+    "SSE empirical"
+  )
+
+  ttl <- title %||% "FIM vs SSE: RSE Comparison"
+
+  p <- ggplot(df_long, aes(x = param_label, y = rse, fill = source)) +
+    geom_col(position = position_dodge(width = 0.7), width = 0.6, alpha = 0.85) +
+    # Reference lines
+    geom_hline(yintercept = 20, linetype = "dashed", color = "#16a34a",
+               size = 0.4, alpha = 0.7) +
+    geom_hline(yintercept = 50, linetype = "dashed", color = "#d97706",
+               size = 0.4, alpha = 0.7) +
+    scale_fill_manual(
+      values = c("FIM predicted" = "#4682B4",
+                 "SSE empirical" = "#CD5C5C"),
+      name = NULL
+    ) +
+    labs(
+      title = ttl,
+      subtitle = "Dashed lines at 20% (good) and 50% (acceptable)",
+      x = NULL,
+      y = "RSE (%)"
+    ) +
+    .theme_design() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 8)
+    )
 
   p
 }

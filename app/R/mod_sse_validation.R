@@ -214,12 +214,34 @@ mod_sse_validation_ui <- function(id) {
       )
     ),
 
-    # --- Plot ---
+    # --- Scatter plot ---
     fluidRow(
       column(12,
         div(class = "plot-card",
           p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
           plotOutput(ns("scatter"), height = "650px")
+        )
+      )
+    ),
+    br(),
+
+    # --- REE Boxplot ---
+    fluidRow(
+      column(12,
+        div(class = "plot-card",
+          p(class = "section-title", "REE Distribution by Parameter"),
+          plotOutput(ns("ree_boxplot"), height = "450px")
+        )
+      )
+    ),
+    br(),
+
+    # --- RSE Bar Chart ---
+    fluidRow(
+      column(12,
+        div(class = "plot-card",
+          p(class = "section-title", "FIM vs SSE: RSE Comparison"),
+          plotOutput(ns("rse_bar"), height = "400px")
         )
       )
     ),
@@ -484,6 +506,50 @@ mod_sse_validation_server <- function(id, ext_data,
           .theme_design())
       }
       plot_fim_vs_sse(comp)
+    }, res = 110)
+
+    # --- REE distribution (reactive) ---
+    ree_dist <- reactive({
+      parsed <- sse_parsed()
+      req(parsed, true_vals())
+      if (parsed$format == "summary") return(NULL)
+      compute_ree_distribution(parsed$data, true_vals(), param_labels())
+    })
+
+    # --- REE distribution filtered by selected params ---
+    ree_dist_filtered <- reactive({
+      rd <- ree_dist()
+      if (is.null(rd)) return(NULL)
+      sel <- input$selected_params
+      if (is.null(sel) || length(sel) == 0L) return(rd)
+      list(
+        individual = rd$individual |>
+          dplyr::filter(param_label %in% sel | param %in% sel),
+        summary = rd$summary |>
+          dplyr::filter(param_label %in% sel | param %in% sel)
+      )
+    })
+
+    # --- REE Boxplot ---
+    output$ree_boxplot <- renderPlot({
+      rd <- ree_dist_filtered()
+      if (is.null(rd)) {
+        return(ggplot() +
+          labs(title = "REE boxplot requires raw_results CSV (not summary)") +
+          .theme_design())
+      }
+      plot_ree_boxplot(rd)
+    }, res = 110)
+
+    # --- RSE Bar Chart ---
+    output$rse_bar <- renderPlot({
+      comp <- comparison_filtered()
+      if (is.null(comp) || nrow(comp) == 0L) {
+        return(ggplot() +
+          labs(title = "Upload SSE data to see RSE comparison") +
+          .theme_design())
+      }
+      plot_rse_bar(comp)
     }, res = 110)
 
     # --- Comparison table ---
