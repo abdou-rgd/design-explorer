@@ -568,7 +568,8 @@ server <- function(input, output, session) {
 
   mod_sse_validation_server("sse",
     ext_data     = merged_ext,
-    param_labels = param_labels_r)
+    param_labels = param_labels_r,
+    shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
 }
 
 

@@ -101,17 +101,171 @@ library(stringr)
 
 
 # =============================================================================
-# read_sse_raw() — Lire et filtrer un CSV PsN brut
+# .detect_sse_format() — Detect CSV format (raw_results vs sse_results summary)
 # =============================================================================
 
-#' Lit un fichier CSV de resultats SSE bruts (format PsN).
+.detect_sse_format <- function(file) {
+  first_line <- readLines(file, n = 1L, warn = FALSE)
+  if (grepl("^SSE run info", first_line, ignore.case = TRUE)) {
+    return("summary")
+  }
+  "raw"
+}
+
+
+# =============================================================================
+# read_sse_auto() — Auto-detect format and dispatch to appropriate reader
+# =============================================================================
+
+#' Read SSE results from either PsN raw_results CSV or sse_results summary.
 #'
-#' Filtre les runs avec minimization_successful == 1.
-#' Normalise les noms de colonnes vers le format NONMEM standard.
+#' Detects the file format automatically:
+#' - raw_results_*.csv: individual run estimates (one row per run)
+#' - sse_results.csv: PsN summary file with pre-computed statistics
 #'
-#' @param file Chemin vers le fichier CSV PsN
-#' @return Tibble filtre avec colonnes normalisees.
-#'         Attributs : n_total (nb total de runs), n_success (nb filtres)
+#' For raw_results, returns the filtered tibble (same as read_sse_raw()).
+#' For sse_results summary, returns a list with true_values and pre-computed
+#' metrics directly usable by the app.
+#'
+#' @param file Path to the CSV file
+#' @return List with format ("raw" or "summary") and data.
+#'   For "raw": $data = tibble (same as read_sse_raw())
+#'   For "summary": $true_values, $metrics (tibble), $n_samples, $sim_model
+#' @export
+read_sse_auto <- function(file) {
+  fmt <- .detect_sse_format(file)
+  if (fmt == "summary") {
+    summary_data <- read_sse_summary(file)
+    list(format = "summary", data = summary_data)
+  } else {
+    raw_data <- read_sse_raw(file)
+    list(format = "raw", data = raw_data)
+  }
+}
+
+
+# =============================================================================
+# read_sse_summary() — Parse PsN sse_results.csv summary file
+# =============================================================================
+
+#' Parse PsN sse_results.csv summary file.
+#'
+#' Extracts true values, sample count, and pre-computed metrics (mean, sd,
+#' rmse, relative_rmse, bias, relative_bias, rse) directly from the PsN
+#' summary output.
+#'
+#' @param file Path to sse_results.csv
+#' @return List: true_values (named numeric), metrics (tibble), n_samples,
+#'         sim_model (character)
+#' @export
+read_sse_summary <- function(file) {
+  lines <- readLines(file, warn = FALSE)
+
+  # Helper: parse a CSV line respecting quotes (handles OMEGA(1,1) etc.)
+  .parse_csv_line <- function(ln) {
+    row <- read.csv(textConnection(ln), header = FALSE,
+                    stringsAsFactors = FALSE, check.names = FALSE)
+    trimws(as.character(row[1, ]))
+  }
+
+  # --- Extract run info (line 3) ---
+  info_parts <- .parse_csv_line(lines[3])
+  n_samples <- as.integer(info_parts[3])
+  sim_model <- info_parts[4]
+
+  # --- Extract true values (lines 5-6) ---
+  # Line 5: header = "", "ofv", "THETA1", ..., "OMEGA(1,1)", ...
+  true_header <- .parse_csv_line(lines[5])
+  true_vals_line <- .parse_csv_line(lines[6])
+
+  # Drop first two columns (empty + ofv/label)
+  param_names <- true_header[-(1:2)]
+  param_vals  <- true_vals_line[-(1:2)]
+  valid <- suppressWarnings(!is.na(as.numeric(param_vals)))
+  param_names <- param_names[valid]
+  param_vals  <- as.numeric(param_vals[valid])
+  true_values <- setNames(param_vals, param_names)
+
+  # --- Extract statistics (lines 10+) ---
+  # Line 10: abbreviated header ("", "ofv", "TH_1", "OM_1", ...)
+  # Lines 11+: "mean", "sd", "rmse", "relative_bias", "rse", ...
+  # Map abbreviated -> NONMEM names by position
+  n_params <- length(param_names)
+
+  # Parse stat rows (lines 11+), using simple split (no parens in TH_1/OM_1)
+  stat_rows <- list()
+  for (i in 11:length(lines)) {
+    ln <- lines[i]
+    if (grepl("^\\s*$", ln) || grepl("^[A-Z]", ln) ||
+        grepl("standard error CI", ln, ignore.case = TRUE)) next
+    parts <- .parse_csv_line(ln)
+    row_label <- parts[1]
+    if (nchar(row_label) == 0L) next
+    if (grepl("^[0-9.]+%$", row_label)) next
+    vals <- parts[-(1:2)]  # drop label + ofv
+    stat_rows[[row_label]] <- suppressWarnings(
+      as.numeric(vals[seq_len(n_params)])
+    )
+  }
+
+  # --- Build metrics tibble ---
+  get_stat <- function(name) {
+    v <- stat_rows[[name]]
+    if (is.null(v)) rep(NA_real_, n_params) else v
+  }
+
+  metrics <- data.frame(
+    param = param_names,
+    param_label = param_names,
+    param_type = vapply(param_names, .param_type, character(1),
+                        USE.NAMES = FALSE),
+    true_value = param_vals,
+    mean_estimate = round(get_stat("mean"), 6),
+    rse_empirical = round(get_stat("rse"), 2),
+    rmse_relative = round(get_stat("relative_rmse"), 2),
+    relative_bias = round(get_stat("relative_bias"), 2),
+    rb_ci_lower = NA_real_,  # Not available in summary format
+    rb_ci_upper = NA_real_,
+    n = rep(n_samples, n_params),
+    stringsAsFactors = FALSE
+  )
+
+  # Compute CI from bias and rse if possible:
+  # sd(REE) ~ rse (since rse = sd/true*100 ~ sd(REE) when bias is small)
+  # CI = RB +/- 1.96 * sd(REE) / sqrt(K)
+  sd_vals <- get_stat("sd")
+  for (j in seq_len(n_params)) {
+    if (!is.na(sd_vals[j]) && abs(param_vals[j]) > 1e-15 && !is.na(n_samples)) {
+      sd_ree <- sd_vals[j] / abs(param_vals[j]) * 100
+      se_rb <- sd_ree / sqrt(n_samples)
+      metrics$rb_ci_lower[j] <- round(metrics$relative_bias[j] - 1.96 * se_rb, 2)
+      metrics$rb_ci_upper[j] <- round(metrics$relative_bias[j] + 1.96 * se_rb, 2)
+    }
+  }
+
+  list(
+    true_values = true_values,
+    metrics = tibble::as_tibble(metrics),
+    n_samples = n_samples,
+    sim_model = sim_model
+  )
+}
+
+
+# =============================================================================
+# read_sse_raw() — Read and filter PsN raw_results CSV
+# =============================================================================
+
+#' Read a PsN SSE raw results CSV file (one row per run).
+#'
+#' Filters runs with minimization_successful == 1 (if column exists).
+#' Normalizes column names to standard NONMEM format.
+#' If the minimization_successful column is absent, assumes the file was
+#' pre-filtered (e.g. via PsN -out_filter option).
+#'
+#' @param file Path to the raw results CSV
+#' @return Tibble with normalized columns.
+#'         Attributes: n_total, n_success, pre_filtered
 #' @export
 read_sse_raw <- function(file) {
   if (!file.exists(file)) stop("Fichier SSE introuvable : ", file)
@@ -122,18 +276,23 @@ read_sse_raw <- function(file) {
   # Normalize column names
   names(raw) <- .normalize_psn_cols(names(raw))
 
-  # Filter successful minimizations
+  # Filter successful minimizations (if column exists)
+  # If the column is absent, the user likely already filtered via PsN
+  # -out_filter=minimization_successful.eq.1 (PsN SSE User Guide v5.7.0)
+  pre_filtered <- FALSE
   if ("minimization_successful" %in% names(raw)) {
-    # Coerce to numeric in case of logical or character
     raw$minimization_successful <- as.numeric(raw$minimization_successful)
     raw <- raw[!is.na(raw$minimization_successful) &
                raw$minimization_successful == 1, , drop = FALSE]
+  } else {
+    pre_filtered <- TRUE
   }
 
   n_success <- nrow(raw)
   result <- tibble::as_tibble(raw)
   attr(result, "n_total") <- n_total
   attr(result, "n_success") <- n_success
+  attr(result, "pre_filtered") <- pre_filtered
   result
 }
 
@@ -370,6 +529,13 @@ compute_sse_metrics <- function(sse_raw, true_values,
       pname
     }
 
+    # 95% CI of relative bias: RB +/- 1.96 * sd(REE) / sqrt(K)
+    # where REE_k = (estimate_k - true) / true * 100
+    ree <- (estimates - true_val) / true_val * 100
+    se_rb <- sd(ree) / sqrt(length(ree))
+    ci_lower <- rel_bias - 1.96 * se_rb
+    ci_upper <- rel_bias + 1.96 * se_rb
+
     data.frame(
       param = pname,
       param_label = display,
@@ -379,12 +545,80 @@ compute_sse_metrics <- function(sse_raw, true_values,
       rse_empirical = round(rse_emp, 2),
       rmse_relative = round(rmse_rel, 2),
       relative_bias = round(rel_bias, 2),
+      rb_ci_lower = round(ci_lower, 2),
+      rb_ci_upper = round(ci_upper, 2),
       n = length(estimates),
       stringsAsFactors = FALSE
     )
   })
 
   dplyr::bind_rows(results)
+}
+
+
+# =============================================================================
+# compute_empirical_d_criterion() — D-criterion from SSE variance-covariance
+# =============================================================================
+
+#' Compute the empirical D-criterion from SSE parameter estimates.
+#'
+#' The empirical D-criterion is defined as det(VarCov)^(1/p) where VarCov is
+#' the full empirical variance-covariance matrix of the estimated parameters
+#' across K successful SSE runs, and p is the number of parameters.
+#' (Fayette et al. 2026, Pharm Res)
+#'
+#' When the empirical variance-covariance matrix is ill-conditioned
+#' (rcond < threshold), the D-criterion cannot be reliably estimated.
+#' This was observed by Fayette et al. 2026 in the crossover example
+#' with NONMEM-SAEM and NONMEM-FOCE.
+#'
+#' @param sse_raw    Tibble from read_sse_raw() (normalized column names)
+#' @param true_values Named numeric vector from read_true_values()
+#' @param rcond_threshold Minimum reciprocal condition number (default 1e-15)
+#' @return List with components:
+#'   d_criterion (numeric or NA), p (integer), rcond (numeric),
+#'   ill_conditioned (logical), vcov (matrix)
+#' @export
+compute_empirical_d_criterion <- function(sse_raw, true_values,
+                                          rcond_threshold = 1e-15) {
+  available <- intersect(names(true_values), names(sse_raw))
+  p <- length(available)
+
+  result <- list(
+    d_criterion = NA_real_,
+    p = p,
+    rcond = NA_real_,
+    ill_conditioned = FALSE,
+    vcov = NULL
+  )
+
+  if (p < 2L) return(result)
+
+  # Build matrix of estimates (K rows x p columns)
+  est_matrix <- as.matrix(sse_raw[, available, drop = FALSE])
+  est_matrix <- est_matrix[complete.cases(est_matrix), , drop = FALSE]
+
+  if (nrow(est_matrix) < p + 1L) return(result)
+
+  vcov <- cov(est_matrix)
+  result$vcov <- vcov
+
+  rc <- rcond(vcov)
+  result$rcond <- rc
+
+  if (is.na(rc) || rc < rcond_threshold) {
+    result$ill_conditioned <- TRUE
+    return(result)
+  }
+
+  det_val <- det(vcov)
+  if (is.na(det_val) || det_val <= 0) {
+    result$ill_conditioned <- TRUE
+    return(result)
+  }
+
+  result$d_criterion <- det_val^(1 / p)
+  result
 }
 
 
@@ -410,7 +644,7 @@ compare_fim_sse <- function(sse_metrics, fim_rse, max_rse = 200) {
   sse_df <- sse_metrics |>
     dplyr::select(param, param_type, param_label,
                   rse_sse = rse_empirical, rmse_sse = rmse_relative,
-                  relative_bias)
+                  relative_bias, rb_ci_lower, rb_ci_upper)
 
   # Full join to keep all params
 
@@ -470,7 +704,7 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
 
   if (nrow(df) == 0L) {
     return(ggplot() +
-      labs(title = "Pas de parametres communs FIM / SSE") +
+      labs(title = "No common parameters between FIM and SSE") +
       .theme_design())
   }
 
@@ -496,11 +730,11 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     df$param_label
   )
 
-  ttl <- title %||% "Validation FIM vs SSE"
+  ttl <- title %||% "FIM vs SSE Validation"
   n_pass <- sum(df$pass_20pct, na.rm = TRUE)
   n_total <- nrow(df)
   sub_txt <- sprintf(
-    "Ronds = RSE vs RSE | Triangles = RMSE (inclut biais) | Bande +/-20%% | %d/%d dans la bande",
+    "Circles = RSE vs RSE | Triangles = RRMSE (includes bias) | +/-20%% band | %d/%d within band",
     n_pass, n_total
   )
 
@@ -536,8 +770,8 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     labs(
       title = ttl,
       subtitle = sub_txt,
-      x = "SSE empirique RSE (%)",
-      y = "FIM RSE predite (%)"
+      x = "Empirical SSE RSE (%)",
+      y = "FIM predicted RSE (%)"
     ) +
     .theme_design() +
     theme(legend.position = "right")

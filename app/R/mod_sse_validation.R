@@ -1,8 +1,9 @@
 # =============================================================================
-# mod_sse_validation.R — Onglet Validation SSE
+# mod_sse_validation.R — SSE Validation Tab
 #
-# Compare les RSE predites par la FIM avec les RSE empiriques issues d'une SSE.
-# Inputs : CSV PsN brut + .ctl (valeurs vraies) + .ext deja charge (FIM RSE)
+# Compares FIM-predicted RSE with empirical RSE from SSE (Stochastic Simulation
+# and Estimation). Includes methodology panel with formulas and references.
+# Inputs: PsN raw CSV + .ctl (true values) + .ext already loaded (FIM RSE)
 # =============================================================================
 
 mod_sse_validation_ui <- function(id) {
@@ -10,45 +11,223 @@ mod_sse_validation_ui <- function(id) {
   tagList(
     # --- Info banner ---
     div(class = "alert alert-info", style = "border-radius:10px; margin-bottom:12px;",
-      tags$strong("Validation FIM vs SSE"),
+      tags$strong("FIM vs SSE Validation"),
       tags$p(style = "margin:6px 0 0; font-size:0.9em;",
-        "Comparez les RSE predites par la FIM (depuis le .ext charge) ",
-        "avec les RSE empiriques calculees sur les estimations SSE. ",
-        "Un point sur la diagonale = prediction parfaite."
+        "Compare FIM-predicted RSE (from the loaded .ext) ",
+        "with empirical RSE computed from SSE estimation results. ",
+        "A point on the diagonal = perfect prediction."
       )
     ),
 
-    # --- File uploads (STATIC, never inside renderUI) ---
+    # --- File uploads ---
     fluidRow(
       column(6,
-        fileInput(ns("sse_file"), "Resultats SSE bruts (CSV PsN)",
+        fileInput(ns("sse_file"), "SSE results (raw_results_*.csv)",
                   accept = ".csv", width = "100%")
       ),
       column(6,
-        fileInput(ns("ctl_file"), "Control stream simulation (.ctl/.mod/.con)",
-                  accept = c(".ctl", ".mod", ".con"), width = "100%")
+        fileInput(ns("ctl_file"),
+                  "Control stream for true values (.ctl/.mod/.con)",
+                  accept = c(".ctl", ".mod", ".con"), width = "100%"),
+        helpText(style = "margin-top:-10px; font-size:0.82em; color:#666;",
+          "Optional if a .ctl was already uploaded in the main panel.")
       )
     ),
 
     # --- Status banner ---
     uiOutput(ns("status_banner")),
 
-    # --- Plot + Table ---
+    # --- Methodology panel (collapsible) ---
+    tags$details(
+      style = paste0(
+        "border:1px solid #ccc; border-radius:8px; padding:10px 14px;",
+        " margin-bottom:14px; background:#f9f9fb;"
+      ),
+      tags$summary(style = "cursor:pointer; font-weight:600; font-size:0.95em;",
+        "Methodology and formulas"
+      ),
+      div(style = "margin-top:10px; font-size:0.88em; line-height:1.6;",
+
+        tags$h5("Empirical metrics from SSE", style = "margin-top:6px;"),
+        tags$p(
+          "For each model parameter x, over K successful SSE runs ",
+          "(filtered on minimization_successful = 1), ",
+          "the following metrics are computed:"
+        ),
+        tags$p(
+          "Note: by default, PsN does ", tags$strong("not"),
+          " filter on minimization success (PsN SSE User Guide, v5.7.0). ",
+          "This app applies the filter minimization_successful = 1 to exclude ",
+          "runs with convergence issues (e.g. rounding errors)."
+        ),
+
+        tags$table(
+          style = paste0(
+            "border-collapse:collapse; width:100%%; margin:8px 0;",
+            " font-size:0.92em;"
+          ),
+          tags$thead(
+            tags$tr(style = "border-bottom:2px solid #999;",
+              tags$th(style = "text-align:left; padding:4px 8px;", "Metric"),
+              tags$th(style = "text-align:left; padding:4px 8px;", "Formula"),
+              tags$th(style = "text-align:left; padding:4px 8px;", "Interpretation")
+            )
+          ),
+          tags$tbody(
+            tags$tr(style = "border-bottom:1px solid #ddd;",
+              tags$td(style = "padding:4px 8px;", "REE"),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("REE<sub>k</sub> = (&hat;x<sub>k</sub> &minus; x*) / x* &times; 100")),
+              tags$td(style = "padding:4px 8px;",
+                      "Relative Estimation Error for run k")
+            ),
+            tags$tr(style = "border-bottom:1px solid #ddd;",
+              tags$td(style = "padding:4px 8px;", "RB (%)"),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("RB = (1/K) &sum; REE<sub>k</sub>")),
+              tags$td(style = "padding:4px 8px;",
+                      "Relative Bias (accuracy)")
+            ),
+            tags$tr(style = "border-bottom:1px solid #ddd;",
+              tags$td(style = "padding:4px 8px;", "95% CI of RB"),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("RB &plusmn; 1.96 &times; sd(REE) / &radic;K")),
+              tags$td(style = "padding:4px 8px;",
+                      "If CI excludes 0, bias is significant")
+            ),
+            tags$tr(style = "border-bottom:1px solid #ddd;",
+              tags$td(style = "padding:4px 8px;", "RRMSE (%)"),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("RRMSE = &radic;((1/K) &sum; REE<sub>k</sub>&sup2;)")),
+              tags$td(style = "padding:4px 8px;",
+                      "Relative Root Mean Squared Error (precision + bias)")
+            ),
+            tags$tr(style = "border-bottom:1px solid #ddd;",
+              tags$td(style = "padding:4px 8px;", "Empirical RSE (%)"),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("RSE = 100 &times; sd(&hat;x) / |x*|")),
+              tags$td(style = "padding:4px 8px;",
+                      "Empirical precision (cf. FIM-predicted RSE)")
+            ),
+            tags$tr(
+              tags$td(style = "padding:4px 8px;", HTML("Empirical D-criterion")),
+              tags$td(style = "padding:4px 8px; font-family:monospace;",
+                      HTML("&phi;<sub>D</sub> = det(VarCov)^(1/p)")),
+              tags$td(style = "padding:4px 8px;",
+                      "Global summary of estimation uncertainty")
+            )
+          )
+        ),
+
+        tags$h5("D-criterion warning", style = "margin-top:10px;"),
+        tags$p(
+          "The empirical D-criterion requires the full variance-covariance ",
+          "matrix of the estimated parameters to be well-conditioned. ",
+          "When the matrix is ill-conditioned (near-singular), the determinant ",
+          "is unreliable and the D-criterion cannot be estimated. ",
+          "This was observed by Fayette et al. (2026) in the crossover example ",
+          "with NONMEM-SAEM and NONMEM-FOCE."
+        ),
+
+        tags$h5("Which file to upload", style = "margin-top:10px;"),
+        tags$p(
+          "Upload the ", tags$strong("raw_results_*.csv"),
+          " file from your PsN SSE output directory. ",
+          "This file contains one row per simulated dataset with individual ",
+          "parameter estimates, which allows this app to compute all metrics ",
+          "(including the empirical D-criterion) and filter on successful runs."
+        ),
+        tags$p(style = "font-size:0.88em; color:#555;",
+          "The PsN summary file (sse_results.csv) is also accepted as a ",
+          "fallback, but the raw_results file is preferred."
+        ),
+
+        tags$h5("Running SSE with PsN", style = "margin-top:10px;"),
+        tags$p("Command line to run an SSE on a Sanofi-type cluster with wrapsn:"),
+        tags$pre(style = paste0(
+          "font-size:0.85em; background:#f0f0f0; padding:8px;",
+          " border-radius:4px; overflow-x:auto;"
+        ),
+          paste0(
+            "# Syntax: wrapsn <ncpu> sse <model> [options]\n",
+            "wrapsn 10 sse model.mod -samples=200 -seed=12345"
+          )
+        ),
+        tags$p(style = "font-size:0.88em;",
+          "If wrapsn is not in your PATH, use the full path ",
+          "(e.g. /apps/wrapsn/wrapsn)."
+        ),
+
+        tags$h5("Recommendations", style = "margin-top:6px;"),
+        tags$ul(style = "margin:4px 0; font-size:0.9em;",
+          tags$li(
+            tags$strong("Number of samples:"), " at least 200 ",
+            "(Fayette et al. 2026 used K=200). More samples (500-1000) ",
+            "give more precise percentile estimates but take longer."
+          ),
+          tags$li(
+            tags$strong("Filtering:"),
+            " this app automatically filters on minimization_successful = 1. ",
+            "You do ", tags$strong("not"), " need to add -out_filter to your ",
+            "PsN command. The number of excluded runs is shown in the status ",
+            "banner above."
+          ),
+          tags$li(
+            tags$strong("Seed:"), " use -seed=N for reproducibility."
+          ),
+          tags$li(
+            tags$strong("Estimation method:"),
+            " use the same method as your $DESIGN evaluation ",
+            "(e.g. FOCE/FOCEI). Fayette et al. 2026 compared SAEM vs FOCE ",
+            "and found consistent results across methods."
+          )
+        ),
+
+        tags$h5("References", style = "margin-top:10px;"),
+        tags$ul(style = "margin:4px 0;",
+          tags$li(
+            "Fayette L, Brendel K, Mentre F. ",
+            tags$em(paste0(
+              "Advances and Further Comparison of Software Tools for ",
+              "Fisher Information Matrix-Based Design Evaluation ",
+              "in Pharmacometrics."
+            )),
+            " Pharm Res. 2026. doi:10.1007/s11095-026-04024-4"
+          ),
+          tags$li(
+            "PsN SSE User Guide v5.7.0. ",
+            tags$em(
+              "\"SSE does not check whether minimization was successful or not. ",
+              "Statistical computations include also parameter estimates from ",
+              "NONMEM runs terminated with e.g. rounding errors, unless the ",
+              "option -out_filter is used.\""
+            )
+          )
+        )
+      )
+    ),
+
+    # --- Plot ---
     fluidRow(
       column(12,
         div(class = "plot-card",
-          p(class = "section-title", "Scatter FIM RSE vs SSE RSE"),
+          p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
           plotOutput(ns("scatter"), height = "500px")
         )
       )
     ),
     br(),
+
+    # --- D-criterion card ---
+    uiOutput(ns("d_criterion_card")),
+
+    # --- Comparison table ---
     fluidRow(
       column(12,
         div(class = "param-table-wrap",
           div(style = "display:flex; justify-content:space-between; align-items:center;",
-            p(class = "section-title", style = "margin:0;", "Table de comparaison"),
-            downloadButton(ns("export_csv"), "Exporter CSV",
+            p(class = "section-title", style = "margin:0;", "Comparison table"),
+            downloadButton(ns("export_csv"), "Export CSV",
                            class = "btn-sm btn-default")
           ),
           DTOutput(ns("comp_table"))
@@ -60,16 +239,17 @@ mod_sse_validation_ui <- function(id) {
 
 
 mod_sse_validation_server <- function(id, ext_data,
-                                      param_labels = reactive(NULL)) {
+                                      param_labels = reactive(NULL),
+                                      shared_ctl_lines = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
-    # --- Parse SSE CSV ---
-    sse_raw <- reactive({
+    # --- Parse SSE file (auto-detect format) ---
+    sse_parsed <- reactive({
       req(input$sse_file)
       tryCatch(
-        read_sse_raw(input$sse_file$datapath),
+        read_sse_auto(input$sse_file$datapath),
         error = function(e) {
-          showNotification(paste("Erreur lecture SSE :", conditionMessage(e)),
+          showNotification(paste("SSE read error:", conditionMessage(e)),
                            type = "error", duration = 8)
           NULL
         }
@@ -77,16 +257,27 @@ mod_sse_validation_server <- function(id, ext_data,
     })
 
     # --- Parse true values from .ctl ---
+    # For "summary" format: true values come from the file itself
+    # For "raw" format: need .ctl (shared from main panel, or local upload)
     true_vals <- reactive({
-      req(input$ctl_file)
-      ctl_lines <- tryCatch(
-        readLines(input$ctl_file$datapath, warn = FALSE),
-        error = function(e) NULL
-      )
+      parsed <- sse_parsed()
+      if (!is.null(parsed) && parsed$format == "summary") {
+        return(parsed$data$true_values)
+      }
+
+      # Raw format: try shared .ctl first, then local upload
+      ctl_lines <- shared_ctl_lines()
+      if (is.null(ctl_lines) && !is.null(input$ctl_file)) {
+        ctl_lines <- tryCatch(
+          readLines(input$ctl_file$datapath, warn = FALSE),
+          error = function(e) NULL
+        )
+      }
+
       if (is.null(ctl_lines)) return(NULL)
       vals <- read_true_values(ctl_lines)
       if (length(vals) == 0L) {
-        showNotification("Aucune valeur vraie extraite du .ctl",
+        showNotification("No true values extracted from .ctl",
                          type = "warning", duration = 6)
         return(NULL)
       }
@@ -95,8 +286,29 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- Compute SSE metrics ---
     sse_metrics <- reactive({
-      req(sse_raw(), true_vals())
-      compute_sse_metrics(sse_raw(), true_vals(), param_labels())
+      parsed <- sse_parsed()
+      req(parsed)
+
+      if (parsed$format == "summary") {
+        return(parsed$data$metrics)
+      }
+
+      # Raw format: compute from individual estimates
+      req(true_vals())
+      compute_sse_metrics(parsed$data, true_vals(), param_labels())
+    })
+
+    # --- Empirical D-criterion ---
+    d_criterion <- reactive({
+      parsed <- sse_parsed()
+      req(parsed, true_vals())
+
+      if (parsed$format == "summary") {
+        # Cannot compute D-criterion from summary (no individual estimates)
+        return(NULL)
+      }
+
+      compute_empirical_d_criterion(parsed$data, true_vals())
     })
 
     # --- Get FIM RSE (from already-loaded .ext, last table) ---
@@ -115,24 +327,93 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- Status banner ---
     output$status_banner <- renderUI({
-      raw <- sse_raw()
-      if (is.null(raw)) return(NULL)
-
-      n_total <- attr(raw, "n_total") %||% "?"
-      n_success <- attr(raw, "n_success") %||% nrow(raw)
+      parsed <- sse_parsed()
+      if (is.null(parsed)) return(NULL)
 
       tv <- true_vals()
       n_params <- if (!is.null(tv)) length(tv) else 0L
 
+      if (parsed$format == "summary") {
+        n_samples <- parsed$data$n_samples %||% "?"
+        sim_model <- parsed$data$sim_model %||% ""
+        filter_msg <- sprintf(
+          "PsN summary format detected: %s runs | Model: %s",
+          n_samples, sim_model
+        )
+        ctl_source <- " (from sse_results.csv)"
+      } else {
+        raw <- parsed$data
+        n_total <- attr(raw, "n_total") %||% "?"
+        n_success <- attr(raw, "n_success") %||% nrow(raw)
+        pre_filtered <- isTRUE(attr(raw, "pre_filtered"))
+
+        filter_msg <- if (pre_filtered) {
+          sprintf(
+            paste0("SSE: %s runs loaded (no minimization_successful column ",
+                   "-- assuming pre-filtered, e.g. via PsN -out_filter)"),
+            n_success
+          )
+        } else {
+          sprintf("SSE: %s/%s valid runs (minimization_successful = 1)",
+                  n_success, n_total)
+        }
+
+        ctl_source <- if (!is.null(shared_ctl_lines())) {
+          " (from main upload)"
+        } else if (!is.null(input$ctl_file)) {
+          " (from local upload)"
+        } else {
+          ""
+        }
+      }
+
       div(class = "alert alert-success",
           style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
-        tags$strong(sprintf("SSE : %s/%s runs valides (minimization_successful = 1)",
-                            n_success, n_total)),
+        tags$strong(filter_msg),
         if (n_params > 0L) {
           tags$span(style = "margin-left:16px;",
-            sprintf("| %d parametres (valeurs vraies du .ctl)", n_params))
+            sprintf("| %d parameters%s", n_params, ctl_source))
         }
       )
+    })
+
+    # --- D-criterion card ---
+    output$d_criterion_card <- renderUI({
+      dc <- d_criterion()
+      if (is.null(dc)) return(NULL)
+
+      if (dc$ill_conditioned) {
+        div(class = "alert alert-warning",
+            style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
+          tags$strong("Empirical D-criterion: not estimable"),
+          tags$p(style = "margin:4px 0 0; font-size:0.9em;",
+            sprintf(
+              paste0(
+                "The empirical variance-covariance matrix is ill-conditioned ",
+                "(rcond = %.2e, p = %d parameters). The determinant is ",
+                "unreliable and the D-criterion cannot be computed. ",
+                "This may indicate near-collinear or non-identifiable parameters ",
+                "(Fayette et al. 2026)."
+              ),
+              dc$rcond, dc$p
+            )
+          )
+        )
+      } else if (!is.na(dc$d_criterion)) {
+        div(class = "alert alert-success",
+            style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
+          tags$strong(sprintf(
+            "Empirical D-criterion: %.4g  (p = %d parameters, rcond = %.2e)",
+            dc$d_criterion, dc$p, dc$rcond
+          )),
+          tags$p(style = "margin:4px 0 0; font-size:0.85em; color:#555;",
+            HTML(paste0(
+              "&phi;<sub>D</sub> = det(VarCov)<sup>1/p</sup> ",
+              "&mdash; lower values indicate better estimation precision"
+            ))
+          )
+        )
+      }
     })
 
     # --- Scatter plot ---
@@ -140,7 +421,7 @@ mod_sse_validation_server <- function(id, ext_data,
       comp <- comparison()
       if (is.null(comp) || nrow(comp) == 0L) {
         return(ggplot() +
-          labs(title = "Chargez un CSV SSE et un .ctl pour voir le scatter plot") +
+          labs(title = "Upload an SSE CSV and a .ctl to see the scatter plot") +
           .theme_design())
       }
       plot_fim_vs_sse(comp)
@@ -154,18 +435,21 @@ mod_sse_validation_server <- function(id, ext_data,
       display <- comp |>
         dplyr::filter(status == "matched") |>
         dplyr::select(
-          Parametre = param_label,
+          Parameter = param_label,
           Type = param_type,
           `RSE FIM (%)` = rse_fim,
           `RSE SSE (%)` = rse_sse,
-          `RMSE SSE (%)` = rmse_sse,
-          `Biais rel. (%)` = relative_bias,
+          `RRMSE SSE (%)` = rmse_sse,
+          `Rel. Bias (%)` = relative_bias,
+          `Bias CI low` = rb_ci_lower,
+          `Bias CI high` = rb_ci_upper,
           Ratio = ratio,
           `+/-20%` = pass_20pct
         ) |>
         dplyr::mutate(
+          `RSE FIM (%)` = round(`RSE FIM (%)`, 2),
           Ratio = round(Ratio, 2),
-          `+/-20%` = ifelse(`+/-20%`, "OK", "Hors bande")
+          `+/-20%` = ifelse(`+/-20%`, "OK", "Out of band")
         )
 
       datatable(display, rownames = FALSE,
@@ -174,12 +458,12 @@ mod_sse_validation_server <- function(id, ext_data,
                   pageLength = 20, dom = "t",
                   scrollX = TRUE,
                   columnDefs = list(
-                    list(className = "dt-center", targets = 6:7)
+                    list(className = "dt-center", targets = 8:9)
                   )
                 )) |>
         formatStyle("+/-20%",
           backgroundColor = styleEqual(
-            c("OK", "Hors bande"),
+            c("OK", "Out of band"),
             c("#d4edda", "#f8d7da")
           ))
     })
@@ -194,8 +478,9 @@ mod_sse_validation_server <- function(id, ext_data,
         req(comp)
         export <- comp |>
           dplyr::select(param, param_type, status,
-                        rse_fim, rse_sse = rse_sse, rmse_sse,
-                        relative_bias, ratio, pass_20pct)
+                        rse_fim, rse_sse, rmse_sse,
+                        relative_bias, rb_ci_lower, rb_ci_upper,
+                        ratio, pass_20pct)
         tryCatch(
           write.csv(export, file, row.names = FALSE),
           error = function(e) warning("CSV export failed: ", conditionMessage(e))
