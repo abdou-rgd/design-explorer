@@ -324,6 +324,165 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
 
 
 # =============================================================================
+# build_convergence_steps() — Resume par phase d'optimisation
+# =============================================================================
+
+#' Construit un data.frame resume de la convergence par phase.
+#'
+#' Chaque TABLE NO. dans le .ext correspond a une phase d'optimisation.
+#' Cette fonction extrait l'OBJ final de chaque phase pour un step chart.
+#'
+#' @param ext         Tibble retourne par read_ext()
+#' @param cpu_secs    Temps CPU total (scalaire) ou NA
+#' @param method_labels Named character vector de parse_design_methods() ou NULL
+#'
+#' @return data.frame avec colonnes: step (factor), obj, cpu, table_no, is_eval
+#' @export
+build_convergence_steps <- function(ext, cpu_secs = NA_real_,
+                                    method_labels = NULL) {
+  finals <- ext |>
+    filter(type == "final") |>
+    group_by(table_no) |>
+    summarise(obj = OBJ[1L], .groups = "drop") |>
+    filter(!is.na(obj)) |>
+    arrange(table_no)
+
+  if (nrow(finals) == 0L) return(NULL)
+
+  # Apply method labels or fallback
+  if (!is.null(method_labels)) {
+    finals$label <- vapply(as.character(finals$table_no), function(tn) {
+      method_labels[tn] %||% paste0("Bloc ", tn)
+    }, character(1L))
+  } else {
+    finals$label <- paste0("Bloc ", finals$table_no)
+  }
+
+  # Detect eval step (first step is usually eval if label starts with "Eval")
+  finals$is_eval <- grepl("^Eval", finals$label, ignore.case = TRUE)
+
+  # CPU: total only, displayed on last step
+  finals$cpu <- NA_character_
+  if (!is.na(cpu_secs) && cpu_secs > 0) {
+    cpu_fmt <- if (cpu_secs < 60) {
+      sprintf("%.1fs", cpu_secs)
+    } else if (cpu_secs < 3600) {
+      sprintf("%.0f min", cpu_secs / 60)
+    } else {
+      sprintf("%.1fh", cpu_secs / 3600)
+    }
+    finals$cpu[nrow(finals)] <- paste0("CPU total: ", cpu_fmt)
+  }
+
+  finals$step <- factor(finals$label, levels = finals$label)
+  finals[, c("step", "obj", "cpu", "table_no", "is_eval")]
+}
+
+
+# =============================================================================
+# plot_convergence_steps() — Step chart du critere D par phase
+# =============================================================================
+
+#' Trace un step chart montrant l'OBJ final par phase d'optimisation.
+#'
+#' Reproduit le style du plot de presentation : points connectes par une ligne,
+#' labels OBJ au-dessus, CPU en-dessous, annotation du gain total.
+#'
+#' @param steps_df data.frame de build_convergence_steps()
+#' @param title    Titre du graphique (NULL = titre automatique)
+#'
+#' @return Objet ggplot2
+#' @export
+plot_convergence_steps <- function(steps_df, title = NULL) {
+  if (is.null(steps_df) || nrow(steps_df) == 0L) {
+    return(ggplot() +
+      labs(title = "Pas de donnees de convergence par phase") +
+      .theme_design())
+  }
+
+  col_eval <- "#D4883A"
+  col_opti <- "#6C2B91"
+  col_gain <- "#1B8C4E"
+
+  n <- nrow(steps_df)
+  steps_df$x <- seq_len(n)
+  point_colors <- ifelse(steps_df$is_eval, col_eval, col_opti)
+
+  # Gain calculation
+  gain <- steps_df$obj[n] - steps_df$obj[1L]
+
+  # Y-axis range: use the actual data range, not abs() which inflates for negative values
+  obj_range <- max(steps_df$obj) - min(steps_df$obj)
+  # Ensure minimum range so the plot is not too zoomed
+  obj_range <- max(obj_range, abs(min(steps_df$obj)) * 0.1, 2)
+  y_pad <- obj_range * 0.35  # enough room for labels above and below
+
+  # Build subtitle: chain of algos + CPU per step
+  chain_parts <- steps_df$step
+  sub_txt <- paste("Chainage :", paste(chain_parts, collapse = " -> "))
+  # Add total CPU if available
+  cpu_vals <- steps_df$cpu[!is.na(steps_df$cpu)]
+  if (length(cpu_vals) > 0L) {
+    sub_txt <- paste0(sub_txt, " | ", cpu_vals[length(cpu_vals)])
+  }
+
+  ttl <- title %||% "Convergence de l'optimisation : D-critere"
+
+  p <- ggplot(steps_df, aes(x = step, y = obj)) +
+    # Shaded gain region
+    annotate("rect", xmin = 0.5, xmax = n + 0.5,
+             ymin = min(steps_df$obj), ymax = max(steps_df$obj),
+             fill = col_gain, alpha = 0.08) +
+    # Line connecting points
+    geom_line(aes(group = 1), color = col_opti, size = 1.2) +
+    # Points with per-step colors
+    geom_point(size = 5, color = point_colors) +
+    # OBJ labels above
+    geom_text(aes(label = sprintf("%.2f", obj)),
+              vjust = -1.5, size = 4.2, fontface = "bold",
+              color = point_colors) +
+    scale_y_continuous(
+      breaks = pretty(c(min(steps_df$obj) - y_pad, max(steps_df$obj) + y_pad), n = 6),
+      limits = c(min(steps_df$obj) - y_pad, max(steps_df$obj) + y_pad)
+    ) +
+    labs(
+      title = ttl,
+      subtitle = sub_txt,
+      x = NULL,
+      y = "-log(det(FIM))"
+    ) +
+    .theme_design() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 11))
+
+  # CPU labels below points (where available)
+  cpu_data <- steps_df[!is.na(steps_df$cpu), , drop = FALSE]
+  if (nrow(cpu_data) > 0L) {
+    p <- p +
+      geom_text(data = cpu_data, aes(label = cpu),
+                vjust = 2.8, size = 3.5, color = "grey50")
+  }
+
+  # Gain annotation (only if > 1 step)
+  if (n > 1L) {
+    x_arrow <- n + 0.4
+    y_mid <- (steps_df$obj[1L] + steps_df$obj[n]) / 2
+
+    p <- p +
+      annotate("segment", x = x_arrow, xend = x_arrow,
+               y = steps_df$obj[1L], yend = steps_df$obj[n],
+               arrow = arrow(ends = "both", length = unit(0.15, "cm")),
+               color = col_gain, size = 0.8) +
+      annotate("text", x = x_arrow + 0.15, y = y_mid,
+               label = sprintf("Gain\n%.2f", gain), color = col_gain,
+               fontface = "bold", size = 4, hjust = 0) +
+      coord_cartesian(xlim = c(0.5, n + 0.9), clip = "off")
+  }
+
+  p
+}
+
+
+# =============================================================================
 # plot_fim_heatmap() — Heatmap de corrélation de la FIM
 # =============================================================================
 
@@ -584,11 +743,32 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
 #' @param tab_data   Tibble retourne par read_tab()
 #' @param group_col  Colonne de groupement (defaut : "TSTRAT")
 #' @param title      Titre (NULL = automatique)
+#' @param time_unit  "hours" ou "days" (divise TIME par 24 si "days")
+#' @param show_doses Si TRUE, affiche des lignes verticales aux temps de dose
+#' @param arm_labels Named character vector pour renommer les facettes ID
+#'                   (ex: c("1"="IV", "2"="SC"))
+#' @param cmt_labels Named character vector pour renommer les CMT
 #' @return Objet ggplot2
 #' @export
-plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) {
+plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
+                                  time_unit = "hours", show_doses = TRUE,
+                                  arm_labels = NULL, cmt_labels = NULL) {
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
     return(ggplot() + labs(title = "Pas de donnees .tab") + .theme_design())
+  }
+
+  # Extract dose times BEFORE filtering (for dose markers)
+  dose_times <- NULL
+  if (show_doses && "EVID" %in% names(tab_data)) {
+    if ("AMT" %in% names(tab_data)) {
+      dose_rows <- tab_data |>
+        dplyr::filter(EVID == 1 | (!is.na(AMT) & AMT > 0))
+    } else {
+      dose_rows <- tab_data |> dplyr::filter(EVID == 1)
+    }
+    if (nrow(dose_rows) > 0L) {
+      dose_times <- dose_rows
+    }
   }
 
   obs <- tab_data
@@ -691,13 +871,60 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL) 
     geom_text(aes(label = strate_label), size = 2.8, color = "#374151",
               vjust = -1.3, hjust = 0.5)
 
-  # Secondary x-axis with exact sampling times (PFIM-style)
+  # --- Time unit conversion ---
+  use_days <- identical(time_unit, "days")
+  time_label <- if (use_days) "Temps (jours)" else "Temps (h)"
+  sec_label  <- if (use_days) "Temps de sampling (jours)" else "Temps de sampling (h)"
+  if (use_days) {
+    obs$TIME <- obs$TIME / 24
+    if (!is.null(dose_times)) dose_times$TIME <- dose_times$TIME / 24
+  }
+
+  # --- Dose markers ---
+  if (!is.null(dose_times) && nrow(dose_times) > 0L) {
+    dose_df <- dose_times
+    # If multi-ID with arm labels, match dose times to facets
+    if (has_multi_id && "ID" %in% names(dose_df)) {
+      dose_df <- dose_df |> dplyr::mutate(id_label = paste0("ID ", ID))
+      if (!is.null(arm_labels)) {
+        dose_df$id_label <- ifelse(
+          as.character(dose_df$ID) %in% names(arm_labels),
+          arm_labels[as.character(dose_df$ID)],
+          dose_df$id_label
+        )
+      }
+    }
+    p <- p +
+      geom_vline(data = dose_df, aes(xintercept = TIME),
+                 linetype = "dotted", color = "firebrick3",
+                 size = 0.3, alpha = 0.6)
+  }
+
+  # --- Arm labels (rename ID facets) ---
+  if (has_multi_id && !is.null(arm_labels)) {
+    obs$id_label <- ifelse(
+      as.character(obs$ID) %in% names(arm_labels),
+      arm_labels[as.character(obs$ID)],
+      obs$id_label
+    )
+  }
+
+  # --- CMT labels ---
+  if (has_cmt && !is.null(cmt_labels)) {
+    obs$response <- ifelse(
+      as.character(obs$CMT) %in% names(cmt_labels),
+      cmt_labels[as.character(obs$CMT)],
+      obs$response
+    )
+  }
+
+  # Secondary x-axis with exact sampling times
   sampling_breaks <- sort(unique(round(obs$TIME, 1)))
   p <- p +
     scale_x_continuous(
-      sec.axis = dup_axis(breaks = sampling_breaks, name = "Temps de sampling (h)")
+      sec.axis = dup_axis(breaks = sampling_breaks, name = sec_label)
     ) +
-    labs(title = ttl, x = "Temps (h)", y = y_label,
+    labs(title = ttl, x = time_label, y = y_label,
          caption = if (has_multi_id) "Chaque facette = un elementary design (ID) | Tirets = connexion des points"
                    else "Chaque point = prediction du modele a un temps optimal") +
     .theme_design() +

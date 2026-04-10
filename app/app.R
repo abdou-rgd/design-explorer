@@ -53,6 +53,7 @@ source("../R/design_summary.R", local = TRUE)
 source("../R/ctl_parsers.R",    local = TRUE)
 source("../R/report_design.R",        local = TRUE)
 source("../R/fim_metrics.R",          local = TRUE)
+source("../R/sse_metrics.R",          local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -122,7 +123,11 @@ ui <- fluidPage(
       tags$button(class = "nav-item", id = "nav-raw",
         onclick = "navTo('raw', this)", "Donnees brutes"),
       tags$button(class = "nav-item", id = "nav-ctl",
-        onclick = "navTo('ctl', this)", "Control Stream")
+        onclick = "navTo('ctl', this)", "Control Stream"),
+
+      div(class = "nav-section-label", "Validation"),
+      tags$button(class = "nav-item", id = "nav-sse",
+        onclick = "navTo('sse', this)", "Validation SSE")
     ),
 
     # -- Main area -----------------------------------------------------------
@@ -149,7 +154,9 @@ ui <- fluidPage(
         conditionalPanel("input.active_tab == 'ctl'",
           mod_ctl_stream_ui("ctl")),
         conditionalPanel("input.active_tab == 'power'",
-          mod_power_ui("power"))
+          mod_power_ui("power")),
+        conditionalPanel("input.active_tab == 'sse'",
+          mod_sse_validation_ui("sse"))
       )
     )
   ),
@@ -542,7 +549,9 @@ server <- function(input, output, session) {
     all_runs = all_runs)
 
   mod_convergence_server("conv",
-    ext_data = merged_ext, log_conv = log_conv_r, all_runs = all_runs)
+    ext_data = merged_ext, log_conv = log_conv_r, all_runs = all_runs,
+    ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }),
+    cpu_secs = merged_cpu)
 
   mod_raw_server("raw",
     ext_data = merged_ext, all_runs = all_runs)
@@ -556,6 +565,10 @@ server <- function(input, output, session) {
     param_labels = param_labels_r,
     groupsize    = reactive({ as.integer(input$groupsize %||% 1L) }),
     all_runs     = all_runs)
+
+  mod_sse_validation_server("sse",
+    ext_data     = merged_ext,
+    param_labels = param_labels_r)
 }
 
 

@@ -264,6 +264,87 @@ parse_cmt_labels <- function(lines) {
 # parse_groupsize() — Extraire GROUPSIZE du bloc $DESIGN
 # =============================================================================
 
+# =============================================================================
+# parse_design_methods() — Extraire les methodes d'optimisation de chaque $DESIGN
+# =============================================================================
+
+#' Identifie la methode de chaque bloc $DESIGN dans un control stream.
+#'
+#' Chaque $DESIGN dans le .ctl produit un TABLE NO. dans le .ext.
+#' Cette fonction retourne un vecteur nomme mappant table_no -> label methode.
+#'
+#' @param lines Character vector des lignes du fichier .ctl
+#' @return Named character vector c("1" = "Eval (CTP)", "2" = "RS", ...)
+#'         ou NULL si aucun $DESIGN trouve
+#' @export
+parse_design_methods <- function(lines) {
+  if (is.null(lines) || length(lines) == 0L) return(NULL)
+
+  lines_clean <- str_replace(lines, ";.*$", "")
+  design_starts <- which(str_detect(lines_clean, "^\\s*\\$DESIGN\\b"))
+  if (length(design_starts) == 0L) return(NULL)
+
+  dollar_lines <- which(str_detect(lines_clean, "^\\s*\\$"))
+
+  labels <- character(length(design_starts))
+  for (k in seq_along(design_starts)) {
+    ds <- design_starts[k]
+    later <- dollar_lines[dollar_lines > ds]
+    block_end <- if (length(later) > 0L) later[1L] - 1L else length(lines_clean)
+    block <- paste(lines_clean[ds:block_end], collapse = " ")
+    block <- toupper(block)
+
+    # Extract key arguments
+    get_val <- function(key) {
+      m <- regmatches(block, regexpr(paste0("\\b", key, "\\s*=\\s*([A-Za-z0-9]+)"),
+                                     block, perl = TRUE))
+      if (length(m) == 0L || nchar(m) == 0L) return(NULL)
+      toupper(sub(paste0(".*", key, "\\s*=\\s*"), "", m))
+    }
+
+    maxeval <- get_val("MAXEVAL")
+    is_eval <- !is.null(maxeval) && maxeval == "0"
+
+    # Detect method from METHOD= or from optimization keywords
+    method <- NULL
+    if (grepl("\\bNELDER\\b", block) || grepl("\\bSIMPLEX\\b", block)) {
+      method <- "NELDER"
+    } else if (grepl("\\bSTGR\\b", block) || grepl("\\bSTAGGER\\b", block)) {
+      method <- "STGR"
+    } else if (grepl("\\bFEDOROV\\b", block)) {
+      method <- "FEDOROV"
+    } else if (grepl("\\bDISCRETE\\b", block)) {
+      method <- "DISCRETE"
+    } else if (grepl("\\bRS\\b", block) || grepl("\\bRANDOM\\b", block)) {
+      method <- "RS"
+    }
+
+    # Fallback: check METHOD= argument
+    if (is.null(method)) {
+      method_val <- get_val("METHOD")
+      if (!is.null(method_val)) {
+        method <- switch(method_val,
+          "RANDOM" = "RS", "STAGGER" = "STGR",
+          "SIMPLEX" = "NELDER", "NELDER" = "NELDER",
+          "FEDOROV" = "FEDOROV",
+          method_val  # fallback to raw value
+        )
+      }
+    }
+
+    if (is_eval) {
+      labels[k] <- "Eval"
+    } else if (!is.null(method)) {
+      labels[k] <- method
+    } else {
+      labels[k] <- paste0("Bloc ", k)
+    }
+  }
+
+  setNames(labels, as.character(seq_along(design_starts)))
+}
+
+
 #' Extrait la valeur GROUPSIZE= du bloc $DESIGN d'un control stream
 #'
 #' @param lines Vecteur de lignes du fichier .ctl/.mod/.con

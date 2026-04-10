@@ -124,6 +124,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
                        class = "btn-sm btn-default")
       )
 
+      # Time unit toggle (shown for all non-robust views)
+      time_toggle <- if (!is_robust()) {
+        div(style = "text-align: right; margin-bottom: 6px;",
+          radioButtons(ns("time_unit"), NULL,
+            choices = c("Heures" = "hours", "Jours" = "days"),
+            selected = "hours", inline = TRUE)
+        )
+      } else {
+        NULL
+      }
+
       if (is_robust()) {
         # Design robuste : pas de courbe predite, boxplot central + table resume
         tagList(
@@ -148,6 +159,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       } else {
         tagList(
           export_btn,
+          time_toggle,
           fluidRow(
             column(12,
               div(class = "plot-card",
@@ -174,7 +186,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       runs <- all_runs()
       if (length(runs) <= 1L) {
         req(tab_single())
-        return(plot_model_prediction(tab_single()))
+        tu <- input$time_unit %||% "hours"
+        return(plot_model_prediction(tab_single(), time_unit = tu))
       }
 
       # Multi-run : overlay des courbes predites par run

@@ -1,19 +1,51 @@
 # =============================================================================
-# mod_convergence.R — Onglet Convergence (+ multi-run overlay)
+# mod_convergence.R — Onglet Convergence (+ multi-run overlay + step chart)
 # =============================================================================
 
 mod_convergence_ui <- function(id) {
   ns <- NS(id)
   tagList(
     div(class = "plot-card",
-      p(class = "section-title", "Evolution du critere d'optimalite (OFV) par iteration"),
+      uiOutput(ns("toggle_ui")),
+      p(class = "section-title", "Evolution du critere d'optimalite (OFV)"),
       plotOutput(ns("plot"), height = "420px")
     )
   )
 }
 
-mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(list())) {
+mod_convergence_server <- function(id, ext_data, log_conv,
+                                   all_runs = reactive(list()),
+                                   ctl_lines = reactive(NULL),
+                                   cpu_secs = reactive(NA_real_)) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    # Detect whether step chart is available:
+    # single-run, 2-5 table_nos (multi-step optimization, not robust)
+    show_toggle <- reactive({
+      runs <- all_runs()
+      if (length(runs) > 1L) return(FALSE)
+      ext <- ext_data()
+      if (is.null(ext)) return(FALSE)
+      n_blocs <- dplyr::n_distinct(ext$table_no)
+      n_blocs >= 2L && n_blocs <= 5L
+    })
+
+    output$toggle_ui <- renderUI({
+      if (!show_toggle()) return(NULL)
+      div(style = "text-align: right; margin-bottom: 6px;",
+        radioButtons(ns("conv_view"), NULL,
+          choices = c("Detail" = "detail", "Resume" = "summary"),
+          selected = "detail", inline = TRUE)
+      )
+    })
+
+    # Current view mode (default = detail)
+    view_mode <- reactive({
+      if (!show_toggle()) return("detail")
+      input$conv_view %||% "detail"
+    })
+
     output$plot <- renderPlot({
       runs <- all_runs()
 
@@ -21,8 +53,9 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
         ext <- ext_data()
         if (is.null(ext)) return(NULL)
 
-        # Robust design : beaucoup de sous-problèmes → histogramme OFV finaux
         n_blocs <- dplyr::n_distinct(ext$table_no)
+
+        # Robust design : beaucoup de sous-problemes -> histogramme OFV finaux
         if (n_blocs > 5L) {
           finals <- ext |>
             dplyr::filter(type == "final") |>
@@ -61,8 +94,18 @@ mod_convergence_server <- function(id, ext_data, log_conv, all_runs = reactive(l
           )
         }
 
+        # Step chart (summary view) -- only for 2-5 blocs
+        if (view_mode() == "summary" && n_blocs >= 2L) {
+          method_labels <- parse_design_methods(ctl_lines())
+          steps <- build_convergence_steps(ext, cpu_secs(), method_labels)
+          return(plot_convergence_steps(steps))
+        }
+
+        # Default: iteration-level convergence curve
         return(plot_convergence(ext, log_iter = log_conv()))
       }
+
+      # --- Multi-run mode (unchanged from V4) ---
 
       run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                              names(runs))
