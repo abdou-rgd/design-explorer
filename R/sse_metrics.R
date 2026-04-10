@@ -774,7 +774,9 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
       y = "FIM predicted RSE (%)"
     ) +
     .theme_design() +
-    theme(legend.position = "right")
+    theme(legend.position = "right",
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
 
   p
 }

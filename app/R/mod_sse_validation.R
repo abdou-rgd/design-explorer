@@ -219,7 +219,7 @@ mod_sse_validation_ui <- function(id) {
       column(12,
         div(class = "plot-card",
           p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
-          plotOutput(ns("scatter"), height = "500px")
+          plotOutput(ns("scatter"), height = "650px")
         )
       )
     ),
