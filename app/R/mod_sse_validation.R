@@ -207,6 +207,13 @@ mod_sse_validation_ui <- function(id) {
       )
     ),
 
+    # --- Parameter filter ---
+    fluidRow(
+      column(12,
+        uiOutput(ns("param_filter_ui"))
+      )
+    ),
+
     # --- Plot ---
     fluidRow(
       column(12,
@@ -325,6 +332,58 @@ mod_sse_validation_server <- function(id, ext_data,
       compare_fim_sse(sse_metrics(), fim_rse())
     })
 
+    # --- Parameter filter UI (dynamic) ---
+    output$param_filter_ui <- renderUI({
+      comp <- comparison()
+      if (is.null(comp) || nrow(comp) == 0L) return(NULL)
+
+      matched <- comp |> dplyr::filter(status == "matched")
+      if (nrow(matched) == 0L) return(NULL)
+
+      all_params <- matched$param_label %||% matched$param
+      # Pre-select: exclude params with RSE > 100% (outliers that distort scale)
+      rse_max <- pmax(matched$rse_fim, matched$rse_sse, na.rm = TRUE)
+      default_selected <- all_params[is.na(rse_max) | rse_max <= 100]
+      # If that removes everything, keep all
+      if (length(default_selected) == 0L) default_selected <- all_params
+
+      has_outliers <- any(!is.na(rse_max) & rse_max > 100)
+
+      tagList(
+        div(style = paste0(
+          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
+          " margin-bottom:10px; background:#fafafa;"
+        ),
+          div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
+            tags$strong("Parameters to display:", style = "white-space:nowrap;"),
+            checkboxGroupInput(
+              session$ns("selected_params"), label = NULL,
+              choices = all_params, selected = default_selected,
+              inline = TRUE
+            )
+          ),
+          if (has_outliers) {
+            tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#888;",
+              "Parameters with RSE > 100% are hidden by default to improve ",
+              "readability. Check them above to include them."
+            )
+          }
+        )
+      )
+    })
+
+    # --- Filtered comparison (for plot) ---
+    comparison_filtered <- reactive({
+      comp <- comparison()
+      req(comp)
+      sel <- input$selected_params
+      if (is.null(sel) || length(sel) == 0L) return(comp)
+      # Filter on param_label (display name)
+      comp |> dplyr::filter(
+        status != "matched" | param_label %in% sel | param %in% sel
+      )
+    })
+
     # --- Status banner ---
     output$status_banner <- renderUI({
       parsed <- sse_parsed()
@@ -418,7 +477,7 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- Scatter plot ---
     output$scatter <- renderPlot({
-      comp <- comparison()
+      comp <- comparison_filtered()
       if (is.null(comp) || nrow(comp) == 0L) {
         return(ggplot() +
           labs(title = "Upload an SSE CSV and a .ctl to see the scatter plot") +
