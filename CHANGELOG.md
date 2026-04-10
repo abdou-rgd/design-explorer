@@ -2,6 +2,27 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V4.5.2 — 2026-04-10 (SSE Validation + Convergence + Upload fix)
+
+### Validation SSE (`app/R/mod_sse_validation.R`, `R/sse_metrics.R`) — PR #41 (GH)
+- [feat] **Module SSE Validation** : nouveau tab comparant RSE FIM vs RSE SSE (scatter, table, metriques)
+- [feat] **CI 95%** sur les RSE SSE, **D-criterion** comparison, **panneau methodologie** explicatif
+- [feat] **Auto-detection format** fichiers SSE (raw_results vs pre-computed)
+- [feat] **Filtre parametres** sur le scatter plot (selectInput dynamique)
+- [fix] **Hauteur scatter plot** augmentee + titre centre
+
+### Convergence (`app/R/mod_convergence.R`)
+- [feat] **Steps de convergence** : detection et affichage des etapes d'optimisation (RS, STGR, NELDER)
+
+### PK Timeline (`app/R/mod_times.R`, `R/report_design.R`)
+- [fix] **Hard cap 4 facettes max** pour les elementary designs (evite surcharge graphique)
+- [fix] **Zoom convergence** trop large corrige
+
+### Upload / RStudio compat — PR #41
+- [fix] **`launch.browser = TRUE`** force par defaut : contourne bug fileInput dans le viewer RStudio integre (anciennes versions). Confirme sur machine collegue (meme R 4.2.0, RStudio different).
+
+---
+
 ## V4.5.1 — 2026-04-08 (Elementary design display fix) — PR #40
 
 ### Plot & Table — Temps optimaux (`R/report_design.R`, `app/R/mod_times.R`)
@@ -57,6 +78,37 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 ### Tests
 - [test] 28 nouveaux tests (`tests/testthat/test-fim_metrics.R`) : power Wald (edge cases theta=0, rse=0, rse=NA, negatif, H0=theta), NSN (scaling, consistency power), parse_groupsize, plot_power_curve. **151 total, 0 failures.**
 - [compat] R 4.2.0 clean (scan r42-compat-checker).
+
+---
+
+## V4.3.2 — 2026-04-01 (Multi-run audit + Refactor) — PRs #28–#36
+
+### Refactor
+- [refactor] **Split `parse_design_outputs.R`** (1268 lignes, 34 fonctions) en 5 fichiers < 425 lignes : `design_utils.R`, `design_io.R`, `design_metrics.R`, `design_summary.R`, `ctl_parsers.R` (PR #39)
+
+### Multi-run fixes (PRs #31–#33)
+- [fix] **`robust_summary()` multi-run** : itere sur `all_runs()` avec colonne `Run` en long-format (PR #31)
+- [fix] **Convergence density multi-run** : detection robuste → `geom_density` par run robuste + `geom_vline` pour non-robustes (PR #32)
+- [fix] **FIM cards + eigenvalues** synchronises avec le selecteur de run heatmap (PR #32)
+- [fix] **RSE toggle Barplot/Waterfall** cache en multi-run (PR #32)
+- [fix] **`vapply(r$name)` sans garde** : ajout `%||% "?"` dans 6 modules (PRs #31-#33)
+- [fix] **Bootstrap 3 `btn-default`** : remplace `btn-outline-secondary` dans mod_raw et mod_examples (PR #33)
+
+### Multi-run polish (PRs #29–#30)
+- [feat] **`compute_robust_summary()`** : reimpl en R de `summary.f90` (Bauer) — percentiles par variable sur N subproblemes (PR #29)
+- [feat] **n_sub dynamique** dans le bandeau Design Robuste (PR #30)
+- [feat] **Dedup noms de runs** : suffixe " (2)" quand deux runs ont les memes args $DESIGN (PR #30)
+- [feat] **Strates robustes** par position de ligne quand TSTRAT absent (PR #30)
+- [feat] **Overlay multi-run** sur gantt robuste et plot Design Robuste (PR #30)
+
+### Upload & Parsers (PR #28)
+- [fix] **`.ctl/.mod/.con` acceptes** dans le `fileInput` des runs de comparaison
+- [fix] **`parse_theta_labels()` reecrit** : gere multiples blocs `$THETA`, format Sanofi, index corrects
+
+### Navigation (PRs #34–#36)
+- [feat] **Architecture steps** : navigation multi-etapes ex2 (3 steps) et ex4 (4 steps), boutons Precedent/Suivant (PR #35)
+- [feat] **6 slots comparaison** (1 primaire + 5), pagination RSE supprimee, RSE median FIM (PR #36)
+- [fix] **`effective_tab_data()` fallback** pour multi-run sans .tab principal (PR #34)
 
 ---
 
