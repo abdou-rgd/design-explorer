@@ -411,11 +411,10 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
   # Gain calculation
   gain <- steps_df$obj[n] - steps_df$obj[1L]
 
-  # Y-axis range: use the actual data range, not abs() which inflates for negative values
+  # Y-axis range: use the actual data range with moderate padding for labels
   obj_range <- max(steps_df$obj) - min(steps_df$obj)
-  # Ensure minimum range so the plot is not too zoomed
-  obj_range <- max(obj_range, abs(min(steps_df$obj)) * 0.1, 2)
-  y_pad <- obj_range * 0.35  # enough room for labels above and below
+  obj_range <- max(obj_range, 1)  # minimum 1 unit range
+  y_pad <- obj_range * 0.6  # room for OBJ labels above + CPU labels below
 
   # Build subtitle: chain of algos + CPU per step
   chain_parts <- steps_df$step
@@ -808,6 +807,11 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
           dplyr::slice_min(ID, n = 1L) |>
           dplyr::ungroup() |>
           dplyr::pull(ID)
+        # If still too many IDs (e.g. optimised designs with unique times per ID),
+        # keep only the first 2 representative IDs
+        if (length(rep_ids) > 4L) {
+          rep_ids <- sort(rep_ids)[1:min(2L, length(rep_ids))]
+        }
         obs <- obs |> dplyr::filter(ID %in% rep_ids)
       } else {
         # Fallback: keep first 2 IDs only
