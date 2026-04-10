@@ -1,7 +1,9 @@
 # =============================================================================
 # app.R — NONMEM $DESIGN Post-Processing Shiny App  (V4)
 #
-# Usage : shiny::runApp("app/")  depuis la racine ClaudeProjets/
+# Usage : shiny::runApp("app/", launch.browser = TRUE)  depuis la racine ClaudeProjets/
+#         launch.browser = TRUE force l'ouverture dans le navigateur externe
+#         (contourne les bugs d'upload du viewer RStudio integre sur certaines versions)
 # =============================================================================
 
 library(shiny)
