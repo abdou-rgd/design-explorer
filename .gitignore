@@ -93,6 +93,12 @@ docs/papers/FIM_cov_allocation_scripts/
 docs/*.htm
 docs/*_files/
 
+# Temp scripts
+tmp_*.py
+
+# Presentations (binary, large)
+*.pptx
+
 # OS
 .DS_Store
 Thumbs.db
