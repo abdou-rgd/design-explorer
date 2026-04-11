@@ -2,6 +2,20 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V5.0.0 — 2026-04-11 (Refonte V5 — Home page, kill drawer, English labels)
+
+### Architecture (`app/app.R`, `app/R/mod_home.R`, `app/www/styles.css`)
+- [feat] **Home landing page** : nouveau module `mod_home.R` affiche les infos du run charge (OFV, params, CPU time) ou message d'accueil
+- [feat] **Upload + Examples dans le Home tab** : `mod_upload_ui` et `mod_examples_ui` places directement dans la Home page (plus besoin d'ouvrir le drawer)
+- [refactor] **Drawer supprime** : overlay, panel, CSS, JS (ESC handler), bouton "Runs actifs" — tout retire de `app.R` et `styles.css`
+- [refactor] **Labels sidebar en anglais** : Parametres → Parameters, Temps optimaux → Optimal Times, Design Robuste → Robust Design, Donnees brutes → Raw Data, FIM & Criteres → FIM & Criteria
+
+### Modules (17 fichiers modifies)
+- [refactor] Adaptation de tous les modules a la suppression du drawer (references drawer retirees)
+- [refactor] Settings (param labels, CMT labels, GROUPSIZE, run name, table_no) migres vers les settings bars des modules concernes
+
+---
+
 ## V4.5.2 — 2026-04-10 (SSE Validation + Convergence + Upload fix)
 
 ### Validation SSE (`app/R/mod_sse_validation.R`, `R/sse_metrics.R`) — PR #41 (GH)
