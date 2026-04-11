@@ -71,17 +71,7 @@ ui <- fluidPage(
   tags$head(
     google_fonts_link(),
     includeCSS("www/styles.css"),
-    # Keyboard shortcut: ESC closes drawer
-    tags$script(HTML("
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') Shiny.setInputValue('drawer_close_trigger',
-          Math.random());
-      });
-    "))
   ),
-
-  # -- Guide banner (from examples) -----------------------------------------
-  uiOutput("guide_banner"),
 
   # -- App shell -------------------------------------------------------------
   div(id = "app-shell",
@@ -95,13 +85,12 @@ ui <- fluidPage(
         div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
       ),
 
-      tags$button(id = "btn-runs", onclick = "Shiny.setInputValue('open_drawer', Math.random())",
-        "\u25A3 Runs actifs"
-      ),
+      tags$button(class = "nav-item active", id = "nav-home",
+        onclick = "navTo('home', this)", icon("home"), " Home"),
 
-      div(class = "nav-section-label", "Resultats"),
-      tags$button(class = "nav-item active", id = "nav-params",
-        onclick = "navTo('params', this)", "Parametres"),
+      div(class = "nav-section-label", "Results"),
+      tags$button(class = "nav-item", id = "nav-params",
+        onclick = "navTo('params', this)", "Parameters"),
       tags$button(class = "nav-item", id = "nav-rse",
         onclick = "navTo('rse', this)", "RSE / SE"),
       tags$button(class = "nav-item", id = "nav-ri",
@@ -109,11 +98,11 @@ ui <- fluidPage(
 
       div(class = "nav-section-label", "Design"),
       tags$button(class = "nav-item", id = "nav-fim",
-        onclick = "navTo('fim', this)", "FIM & Criteres"),
+        onclick = "navTo('fim', this)", "FIM & Criteria"),
       tags$button(class = "nav-item", id = "nav-times",
-        onclick = "navTo('times', this)", "Temps optimaux"),
+        onclick = "navTo('times', this)", "Optimal Times"),
       tags$button(class = "nav-item", id = "nav-prior",
-        onclick = "navTo('prior', this)", "Design Robuste"),
+        onclick = "navTo('prior', this)", "Robust Design"),
 
       div(class = "nav-section-label", "Decision"),
       tags$button(class = "nav-item", id = "nav-power",
@@ -123,7 +112,7 @@ ui <- fluidPage(
       tags$button(class = "nav-item", id = "nav-conv",
         onclick = "navTo('conv', this)", "Convergence"),
       tags$button(class = "nav-item", id = "nav-raw",
-        onclick = "navTo('raw', this)", "Donnees brutes"),
+        onclick = "navTo('raw', this)", "Raw Data"),
       tags$button(class = "nav-item", id = "nav-ctl",
         onclick = "navTo('ctl', this)", "Control Stream"),
 
@@ -137,7 +126,16 @@ ui <- fluidPage(
 
       # Tab content
       div(id = "tab-content",
-        conditionalPanel("input.active_tab == 'params' || !input.active_tab",
+        conditionalPanel("input.active_tab == 'home' || !input.active_tab",
+          tags$div(class = "home-upload-zone",
+            tags$h5(style = "margin-bottom:12px; font-weight:700;", "Load NONMEM $DESIGN Output"),
+            mod_upload_ui("upload"),
+            tags$hr(style = "margin:12px 0;"),
+            mod_examples_ui("examples")
+          ),
+          mod_home_ui("home")
+        ),
+        conditionalPanel("input.active_tab == 'params'",
           mod_params_ui("params")),
         conditionalPanel("input.active_tab == 'rse'",
           mod_rse_ui("rse")),
@@ -163,71 +161,14 @@ ui <- fluidPage(
     )
   ),
 
-  # -- Drawer overlay --------------------------------------------------------
-  div(id = "drawer-overlay", class = "",
-    onclick = "Shiny.setInputValue('drawer_close_trigger', Math.random())"
+  # -- Settings inputs (labels + run name — global, accessed via modal later) --
+  div(style = "display:none;",
+    textInput("primary_run_name", NULL, value = "Primary"),
+    textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
+    textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
   ),
 
-  # -- Drawer panel ----------------------------------------------------------
-  div(id = "drawer-panel", class = "",
-    tags$button(id = "drawer-close", onclick = "Shiny.setInputValue('drawer_close_trigger', Math.random())", "\u2715"),
-    div(class = "drawer-title", "Gestion des runs"),
-    uiOutput("reset_run_btn"),
-    mod_examples_ui("examples"),
-    mod_upload_ui("upload"),
-    mod_compare_ui("compare"),
-    tags$hr(),
-    div(class = "upload-box",
-      tags$h6("Nom du run principal"),
-      textInput("primary_run_name", NULL, value = "Primary", width = "100%")
-    ),
-    div(class = "upload-box",
-      tags$h6("Labels parametres (THETA)"),
-      textAreaInput("param_labels", NULL,
-        placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
-      helpText("Un label par ligne, format THETA1=CL")
-    ),
-    div(class = "upload-box",
-      tags$h6("Labels compartiments (CMT)"),
-      textAreaInput("cmt_labels", NULL,
-        placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3),
-      helpText("Un label par ligne, format 1=Nom")
-    ),
-    div(class = "upload-box",
-      tags$h6("Bloc $DESIGN (TABLE NO.)"),
-      selectInput("table_no", NULL, choices = "1", selected = "1")
-    ),
-    div(class = "upload-box",
-      tags$h6("Nombre total de sujets (N)"),
-      numericInput("groupsize", NULL, value = 1L, min = 1L, step = 1L, width = "100%"),
-      helpText("N = nb IDs x GROUPSIZE. Auto-rempli depuis le .ctl (GROUPSIZE) si detecte ; ajustez si votre dataset est elementaire (peu d'IDs, GROUPSIZE > 1).")
-    ),
-    div(class = "upload-box",
-      tags$h6("Metrique RSE"),
-      radioButtons("se_mode", NULL,
-        choices  = c("RSE (%)", "SE absolues"),
-        selected = "RSE (%)", inline = TRUE)
-    ),
-    div(class = "upload-box",
-      checkboxInput("log_conv", "Axe X log (Convergence)", FALSE)
-    ),
-    div(class = "upload-box",
-      tags$p(style = "font-size:.78rem; color:#64748b; margin:0;",
-        tags$strong("Seuils indicatifs RSE :"), tags$br(),
-        "< 20% bon / 20-50% acceptable / > 50% mediocre", tags$br(),
-        tags$strong("RelInf :"),
-        " > 50% bon / 20-50% acceptable / < 20% insuffisant", tags$br(),
-        tags$br(),
-        tags$em(style = "font-size:.72rem;",
-          "Ref. : Bauer 2021, Ex. 5 : \u00ab RSE no larger than 20% \u00bb.",
-          " Mentens (PFIM) : \u00ab SE < 20-30% pour chaque parametre cle \u00bb.",
-          " Ces seuils sont indicatifs et dependent du contexte de l'etude."
-        )
-      )
-    )
-  ),
-
-  # -- JS: nav + drawer -------------------------------------------------------
+  # -- JS: nav ----------------------------------------------------------------
   tags$script(HTML("
     function navTo(tab, el) {
       Shiny.setInputValue('active_tab', tab, {priority: 'event'});
@@ -238,8 +179,6 @@ ui <- fluidPage(
     }
   ")),
 
-  # -- JS eval handler (MUST be in UI for Shiny to register it) --------------
-  uiOutput("js_handler")
 )
 
 
@@ -259,23 +198,11 @@ server <- function(input, output, session) {
     })
   }
 
-  # -- Drawer open/close ------------------------------------------------------
-  observeEvent(input$open_drawer, {
-    session$sendCustomMessage("evalJS", "
-      document.getElementById('drawer-panel').classList.add('open');
-      document.getElementById('drawer-overlay').classList.add('open');
-    ")
-  }, ignoreNULL = TRUE)
-
-  observeEvent(input$drawer_close_trigger, {
-    session$sendCustomMessage("evalJS", "
-      document.getElementById('drawer-panel').classList.remove('open');
-      document.getElementById('drawer-overlay').classList.remove('open');
-    ")
-  }, ignoreNULL = TRUE)
-
   # -- Reset trigger (universal) ----------------------------------------------
   reset_trigger <- reactiveVal(0L)
+
+  # -- Suggested groupsize (set by upload/examples, consumed by mod_params) ---
+  suggested_gs <- reactiveVal(1L)
 
   # -- Upload module ----------------------------------------------------------
   upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
@@ -327,7 +254,7 @@ server <- function(input, output, session) {
     ctl_ex <- example_ctl_lines()
     if (!is.null(ctl_ex)) {
       gs <- tryCatch(parse_groupsize(ctl_ex), error = function(e) NA_integer_)
-      if (!is.na(gs)) updateNumericInput(session, "groupsize", value = gs)
+      if (!is.na(gs)) suggested_gs(gs)
     }
   })
 
@@ -376,9 +303,9 @@ server <- function(input, output, session) {
       if (!is.null(design_name)) {
         updateTextInput(session, "primary_run_name", value = design_name)
       }
-      # GROUPSIZE -> numericInput groupsize
+      # GROUPSIZE -> mod_params via suggested_gs
       gs <- tryCatch(parse_groupsize(ctl_lines), error = function(e) NA_integer_)
-      if (!is.na(gs)) updateNumericInput(session, "groupsize", value = gs)
+      if (!is.na(gs)) suggested_gs(gs)
     }
   })
 
@@ -437,22 +364,8 @@ server <- function(input, output, session) {
     runs
   })
 
-  # -- TABLE NO. update -------------------------------------------------------
-  observe({
-    ext <- merged_ext(); req(ext)
-    tabs <- sort(unique(ext$table_no))
-    tnr  <- examples$table_no_range()
-    if (!is.null(tnr) && length(tnr) == 2L) {
-      tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
-      if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
-    }
-    updateSelectInput(session, "table_no",
-      choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
-      selected = as.character(max(tabs)))
-  })
-
   # -- Shared reactives -------------------------------------------------------
-  tbl_no <- reactive({ as.integer(input$table_no) })
+  # tbl_no and groupsize are now owned by mod_params (returned as reactives)
   param_labels_r <- reactive({
     raw <- trimws(input$param_labels)
     if (raw == "") return(NULL)
@@ -477,63 +390,31 @@ server <- function(input, output, session) {
     if (length(lbl) == 0L) return(NULL)
     lbl
   })
-  se_mode_r  <- reactive({ input$se_mode  %||% "RSE (%)" })
-  log_conv_r <- reactive({ input$log_conv })
-
-  # -- KPI bar — pills runs actifs --------------------------------------------
-  # -- Universal reset button -------------------------------------------------
-  output$reset_run_btn <- renderUI({
-    if (is.null(merged_ext())) return(NULL)
-    actionButton("reset_run", "Retirer la run",
-      icon  = icon("times"),
-      class = "btn-sm btn-danger w-100",
-      style = "margin-bottom: 8px;"
-    )
-  })
-
-  observeEvent(input$reset_run, {
-    reset_trigger(reset_trigger() + 1L)
+  # -- Reset handler (triggered by mod_home) -----------------------------------
+  observeEvent(reset_trigger(), {
     updateTextAreaInput(session, "param_labels", value = "")
     updateTextAreaInput(session, "cmt_labels",   value = "")
     updateTextInput(session, "primary_run_name", value = "Primary")
-    updateNumericInput(session, "groupsize", value = 1L)
-    showNotification("Run retiree", type = "message")
-  })
-
-  observeEvent(reset_trigger(), {
-    updateSelectInput(session, "table_no", choices = "1", selected = "1")
+    suggested_gs(1L)
   }, ignoreInit = TRUE)
 
-  # -- Guide banner -----------------------------------------------------------
-  output$guide_banner <- renderUI({
-    if (isTRUE(examples$banner_dismissed())) return(NULL)
-    render_guide_banner(
-      ns         = NS("examples"),
-      guide      = examples$guide(),
-      paths      = examples$file_paths(),
-      step_idx   = examples$step_idx(),
-      n_steps    = examples$n_steps(),
-      step_label = examples$step_label()
-    )
-  })
-
-  # -- JS eval handler --------------------------------------------------------
-  output$js_handler <- renderUI({
-    tags$script(HTML("
-      Shiny.addCustomMessageHandler('evalJS', function(code) { eval(code); });
-    "))
-  })
-  outputOptions(output, "js_handler", suspendWhenHidden = FALSE)
-
   # -- Module servers ---------------------------------------------------------
-  mod_params_server("params",
+  # mod_params owns table_no + groupsize — call first, capture return values
+  params_out <- mod_params_server("params",
     ext_data = merged_ext, shk_data = merged_shk,
-    ext_lines = upload$ext_lines, tbl_no = tbl_no,
-    param_labels = param_labels_r, all_runs = all_runs)
+    ext_lines = upload$ext_lines,
+    param_labels = param_labels_r,
+    table_no_range = examples$table_no_range,
+    suggested_groupsize = suggested_gs,
+    reset_trigger = reset_trigger,
+    all_runs = all_runs)
+
+  tbl_no     <- params_out$tbl_no
+  groupsize_r <- params_out$groupsize
 
   mod_rse_server("rse",
     ext_data = merged_ext, tbl_no = tbl_no,
-    param_labels = param_labels_r, se_mode = se_mode_r, all_runs = all_runs)
+    param_labels = param_labels_r, all_runs = all_runs)
 
   mod_relativeinf_server("ri",
     shk_data = merged_shk, tbl_no = tbl_no,
@@ -551,7 +432,7 @@ server <- function(input, output, session) {
     all_runs = all_runs)
 
   mod_convergence_server("conv",
-    ext_data = merged_ext, log_conv = log_conv_r, all_runs = all_runs,
+    ext_data = merged_ext, all_runs = all_runs,
     ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }),
     cpu_secs = merged_cpu)
 
@@ -565,13 +446,24 @@ server <- function(input, output, session) {
     ext_data     = merged_ext,
     tbl_no       = tbl_no,
     param_labels = param_labels_r,
-    groupsize    = reactive({ as.integer(input$groupsize %||% 1L) }),
+    groupsize    = groupsize_r,
     all_runs     = all_runs)
 
   mod_sse_validation_server("sse",
     ext_data     = merged_ext,
     param_labels = param_labels_r,
     shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
+
+  mod_home_server("home",
+    merged_ext   = merged_ext,
+    merged_cpu   = merged_cpu,
+    merged_tab   = merged_tab,
+    ext_lines    = upload$ext_lines,
+    primary_name = primary_name,
+    tbl_no       = tbl_no,
+    param_labels = param_labels_r,
+    groupsize    = groupsize_r,
+    reset_trigger = reset_trigger)
 }
 
 

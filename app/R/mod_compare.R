@@ -6,9 +6,9 @@ mod_compare_ui <- function(id) {
   ns <- NS(id)
   tagList(
     div(class = "upload-box",
-      tags$h6("Comparaison"),
-      actionButton(ns("add_run"), "Ajouter un run", icon = icon("plus"),
-                   class = "btn-sm btn-outline-primary w-100"),
+      tags$h6("Comparison"),
+      actionButton(ns("add_run"), "Add a run", icon = icon("plus"),
+                   class = "btn-sm btn-default w-100"),
       uiOutput(ns("run_list"))
     )
   )
@@ -26,7 +26,7 @@ mod_compare_server <- function(id) {
 
     observeEvent(input$add_run, {
       if (length(run_ids()) >= 5L) {
-        showNotification("Maximum 5 runs de comparaison (6 total)",
+        showNotification("Maximum 5 comparison runs (6 total)",
                          type = "warning")
         return()
       }
@@ -62,13 +62,13 @@ mod_compare_server <- function(id) {
                                 value = rname, width = "100%")),
             column(4, actionButton(ns(paste0("rm_", rid)), NULL,
                                    icon = icon("times"),
-                                   class = "btn-sm btn-outline-danger"))
+                                   class = "btn-sm btn-danger"))
           ),
           fileInput(ns(paste0("upload_", rid)), NULL, multiple = TRUE,
                     accept = c(".ext", ".shk", ".coi", ".clt", ".tab",
                                ".ctl", ".mod", ".con",
                                ".tar.gz", ".tgz", ".gz"),
-                    buttonLabel = "Fichiers"),
+                    buttonLabel = "Files"),
           uiOutput(ns(paste0("status_", rid)))
         )
       })
@@ -170,7 +170,7 @@ mod_compare_server <- function(id) {
             n_loaded <- sum(!sapply(parsed, is.null))
             showNotification(
               paste0(run_names[[local_rid]], " : ", n_loaded,
-                     " fichier(s) charge(s)"),
+                     " file(s) loaded"),
               type = "message"
             )
           }, ignoreInit = TRUE)

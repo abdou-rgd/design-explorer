@@ -18,7 +18,7 @@ mod_ctl_stream_server <- function(id, ctl_lines) {
       lines <- ctl_lines()
       if (is.null(lines) || length(lines) == 0L) {
         div(class = "alert alert-info", style = "border-radius: 10px;",
-            "Aucun fichier .ctl / .mod / .con charge.")
+            "No .ctl / .mod / .con file loaded.")
       }
     })
 

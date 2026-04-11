@@ -4,19 +4,19 @@
 
 .EXAMPLES <- list(
   example1 = list(
-    title = "Exemple 1 : Evaluation d'un design",
-    desc = "Modele warfarin 1-CMT, evaluation FIM bloc-diagonale (FIMDIAG=1). Pas d'optimisation.",
+    title = "Example 1: Design evaluation",
+    desc = "Warfarin 1-CMT model, block-diagonal FIM evaluation (FIMDIAG=1). No optimization.",
     dir = "examples/example1",
     prefix = "warfarin",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
     guide = list(
-      context = "Modele warfarin 1-compartiment (ADVAN2 TRANS2), absorption premier ordre, erreur combinee. 32 sujets (GROUPSIZE=32), 3 temps de prelevement a 0.5, 2 et 8 h. Valeurs de reference Bauer 2021 Table 3 : OFV = -39.518.",
+      context = "Warfarin 1-compartment model (ADVAN2 TRANS2), first-order absorption, combined error. 32 subjects (GROUPSIZE=32), 3 sampling times at 0.5, 2 and 8 h. Reference values Bauer 2021 Table 3: OFV = -39.518.",
       points = c(
-        "FIMDIAG=1 (bloc-diagonal) : hypothese d'independance entre sujets et entre parametres de variabilite. Plus rapide mais moins precis que la FIM complete (FIMDIAG=0)",
-        "MAXEVAL=0 : evaluation pure, aucun temps n'est modifie. Sert de baseline pour comparer avec l'optimisation (Ex. 2)",
-        "RSE(CL) = 36.9%, RSE(V) = 5.0% (Bauer Table 3) : V est bien estime avec ce design, CL beaucoup moins. Un seul temps precoce est insuffisant pour CL",
-        "RELATIVEINF (onglet ddie) = contribution de chaque observation a la reduction de la variance de l'ETA. Une RELATIVEINF faible indique un ETA mal supporte par le design",
-        "La FIM (onglet FIM) est une matrice 3x3 (CL, V, KA) : les elements hors-diagonale mesurent la correlation entre les incertitudes des parametres"
+        "FIMDIAG=1 (block-diagonal): independence assumption between subjects and variability parameters. Faster but less precise than the full FIM (FIMDIAG=0)",
+        "MAXEVAL=0: pure evaluation, no times are modified. Serves as baseline for comparison with optimization (Ex. 2)",
+        "RSE(CL) = 36.9%, RSE(V) = 5.0% (Bauer Table 3): V is well estimated with this design, CL much less so. A single early time is insufficient for CL",
+        "RELATIVEINF (dedicated tab) = contribution of each observation to ETA variance reduction. Low RELATIVEINF indicates an ETA poorly supported by the design",
+        "The FIM (FIM tab) is a 3x3 matrix (CL, V, KA): off-diagonal elements measure correlation between parameter uncertainties"
       )
     )
   ),
@@ -24,205 +24,205 @@
   # compare_with      = cle d'une autre entree .EXAMPLES (cross-exemple)
   # prev_step_prefix  = prefix fichier de l'etape precedente dans le meme dir (intra-exemple)
   example2 = list(
-    title = "Exemple 2 : Optimisation des temps (3 etapes)",
-    desc = "Chaine d'optimisations NELDER : 3 passes successives ou chaque etape demarre depuis le design optimal precedent.",
+    title = "Example 2: Time optimization (3 steps)",
+    desc = "Chain of NELDER optimizations: 3 successive passes where each step starts from the previous optimal design.",
     dir = "examples/example2",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
     steps = list(
       list(
-        label = "Etape 1/3 : Premiere passe NELDER (warfarin2)",
+        label = "Step 1/3: First NELDER pass (warfarin2)",
         prefix = "warfarin2",
         prev_step_prefix = NULL,
         guide = list(
-          context = "Premiere optimisation NELDER a partir du design initial (3 temps dans des fenetres TMIN/TMAX). GROUPSIZE=32, FIMDIAG=1, MAXEVAL=9999.",
+          context = "First NELDER optimization from initial design (3 times within TMIN/TMAX windows). GROUPSIZE=32, FIMDIAG=1, MAXEVAL=9999.",
           points = c(
-            "Point de depart : memes temps que l'Exemple 1 (evaluation pure)",
-            "NELDER explore les fenetres de temps pour minimiser -log(det(FIM))",
-            "Consultez l'onglet Convergence : le NELDER trouve-t-il un minimum stable ?",
-            "Les temps optimaux dans l'onglet 'Temps optimaux' montrent le premier design optimise"
+            "Starting point: same times as Example 1 (pure evaluation)",
+            "NELDER explores time windows to minimize -log(det(FIM))",
+            "Check the Convergence tab: does NELDER find a stable minimum?",
+            "Optimal times in the 'Optimal Times' tab show the first optimized design"
           )
         )
       ),
       list(
-        label = "Etape 2/3 : Deuxieme passe NELDER (warfarin2b)",
+        label = "Step 2/3: Second NELDER pass (warfarin2b)",
         prefix = "warfarin2b",
         prev_step_prefix = "warfarin2",
         guide = list(
-          context = "Deuxieme passe NELDER : demarre depuis les temps optimaux de l'etape 1. Le dataset warfarin2b.csv contient le design optimise de l'etape precedente.",
+          context = "Second NELDER pass: starts from step 1 optimal times. The warfarin2b.csv dataset contains the optimized design from the previous step.",
           points = c(
-            "Comparez les RSE avec l'etape precedente (auto-chargee en comparaison)",
-            "L'OFV devrait etre inferieur ou egal a l'etape 1 (raffinement)",
-            "Si l'OFV est identique, le NELDER a deja converge a l'etape 1",
-            "Consultez la convergence pour verifier la stabilite"
+            "Compare RSEs with the previous step (auto-loaded as comparison)",
+            "OFV should be less than or equal to step 1 (refinement)",
+            "If OFV is identical, NELDER already converged at step 1",
+            "Check convergence to verify stability"
           )
         )
       ),
       list(
-        label = "Etape 3/3 : Troisieme passe NELDER (warfarin2c)",
+        label = "Step 3/3: Third NELDER pass (warfarin2c)",
         prefix = "warfarin2c",
         prev_step_prefix = "warfarin2b",
         guide = list(
-          context = "Troisieme et derniere passe NELDER. Confirme que l'optimum est stable en redemarrant depuis l'etape 2.",
+          context = "Third and final NELDER pass. Confirms that the optimum is stable by restarting from step 2.",
           points = c(
-            "Comparez les RSE avec l'etape 2 : les valeurs devraient etre quasi-identiques si l'optimum est atteint",
-            "L'OFV final est le meilleur critere D-optimal obtenu pour ce design",
-            "Strategie anti-minima locaux (Bauer 2021) : enchainer RS -> STGR -> NELDER ou plusieurs passes NELDER",
-            "Les temps optimaux finaux sont ceux a retenir pour le protocole"
+            "Compare RSEs with step 2: values should be nearly identical if the optimum is reached",
+            "Final OFV is the best D-optimal criterion obtained for this design",
+            "Anti-local-minima strategy (Bauer 2021): chain RS -> STGR -> NELDER or multiple NELDER passes",
+            "Final optimal times are the ones to retain for the protocol"
           )
         )
       )
     )
   ),
   example3 = list(
-    title = "Exemple 3 : Robust design ($PRIOR)",
-    desc = "Optimisation robuste via $SIM TRUE=PRIOR SUBPROB=1000. Distribution des temps sur 1000 jeux de parametres.",
+    title = "Example 3: Robust design ($PRIOR)",
+    desc = "Robust optimization via $SIM TRUE=PRIOR SUBPROB=1000. Time distribution over 1000 parameter sets.",
     dir = "examples/example3",
     prefix = "priortrue",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA",
     has_summary = TRUE,
     summary_file = "examples/example3/summary.tab",
     guide = list(
-      context = "Meme modele warfarin, optimisation robuste : $SIM TRUE=PRIOR SUBPROB=1000 tire 1000 jeux de parametres (THETA) depuis leur distribution a priori, puis optimise le design pour chacun. L'OFV minimise est E[-log(det(FIM))] sur le prior = critere standard du robust design (Nyberg et al., Bauer 2021).",
+      context = "Same warfarin model, robust optimization: $SIM TRUE=PRIOR SUBPROB=1000 draws 1000 parameter sets (THETA) from their prior distribution, then optimizes the design for each. The minimized OFV is E[-log(det(FIM))] over the prior = standard robust design criterion (Nyberg et al., Bauer 2021).",
       points = c(
-        "Mecanisme : SUBPROB=1000 genere 1000 sous-problemes independants. Pour chaque subprob, les vrais THETAs sont tires du prior ($PRIOR NWPRI ou $OMEGA/$SIGMA) et la FIM est evaluee/optimisee avec ces valeurs",
-        "Onglet 'Temps optimaux' : le tableau P10/mediane/P90 par strate montre la distribution des temps optimaux. Nos donnees : medianes 0.13 h, triplet groupe autour de 6.9 h [P2.5=1.5, P97.5=23], 158.1 h. Bauer rapporte 159.9 h avec un seed different",
-        "Interpretation pratique (Bauer) : choisir les temps comme 0.13, 1.5, 7.0, 23.0, 160.0 h. OFV resultant = -51.374, proche de l'optimal (mean OFV = -51.95 dans nos donnees, -51.598 dans Bauer)",
-        "Onglet 'Parametres' : la ligne 'D-critere robuste' affiche exp(-mean(OFV_i)/p) avec ses bornes P10/P90 — c'est la moyenne geometrique de det(FIM)^(1/p) sur les 1000 realisations du prior",
-        "RSE et RELATIVEINF refletent le sous-probleme 1000 (dernier). Ils ne sont pas une moyenne — la distribution des RSE n'est pas directement accessible ici"
+        "Mechanism: SUBPROB=1000 generates 1000 independent sub-problems. For each subprob, true THETAs are drawn from the prior ($PRIOR NWPRI or $OMEGA/$SIGMA) and the FIM is evaluated/optimized with those values",
+        "'Optimal Times' tab: the P10/median/P90 table by stratum shows the optimal times distribution. Our data: medians 0.13 h, triplet grouped around 6.9 h [P2.5=1.5, P97.5=23], 158.1 h. Bauer reports 159.9 h with a different seed",
+        "Practical interpretation (Bauer): choose times as 0.13, 1.5, 7.0, 23.0, 160.0 h. Resulting OFV = -51.374, close to optimal (mean OFV = -51.95 in our data, -51.598 in Bauer)",
+        "'Parameters' tab: the 'Robust D-criterion' row shows exp(-mean(OFV_i)/p) with P10/P90 bounds -- the geometric mean of det(FIM)^(1/p) over 1000 prior realizations",
+        "RSE and RELATIVEINF reflect sub-problem 1000 (last). They are not averages -- the RSE distribution is not directly accessible here"
       )
     )
   ),
   example4 = list(
-    title = "Exemple 4 : PK-PD multi-reponses (4 etapes)",
-    desc = "Modele warfarin PK-PD (concentration + effet). 4 etapes : evaluation FO, evaluation FOCEI, optimisation, raffinement.",
+    title = "Example 4: PK-PD multi-response (4 steps)",
+    desc = "Warfarin PK-PD model (concentration + effect). 4 steps: FO evaluation, FOCEI evaluation, optimization, refinement.",
     dir = "examples/example4",
     labels = "THETA1=KA\nTHETA2=CL\nTHETA3=V\nTHETA4=RIN\nTHETA5=IC50\nTHETA6=KOUT",
     steps = list(
       list(
-        label = "Etape 1/4 : Evaluation FO (eval)",
+        label = "Step 1/4: FO evaluation (eval)",
         prefix = "warfarin_pkpd_eval",
         prev_step_prefix = NULL,
         guide = list(
-          context = "Modele PK-PD (ADVAN13 ODE) : CMT=2 PK, CMT=3 PD Emax. GROUPSIZE=52, FIMDIAG=1, VARCROSS=1. Evaluation du design initial (MAXEVAL=0).",
+          context = "PK-PD model (ADVAN13 ODE): CMT=2 PK, CMT=3 PD Emax. GROUPSIZE=52, FIMDIAG=1, VARCROSS=1. Initial design evaluation (MAXEVAL=0).",
           points = c(
             "6 THETAs (KA, CL, V, RIN, IC50, KOUT) + 6 OMEGAs + 2 SIGMAs",
-            "FIMDIAG=1 + VARCROSS=1 : FIM bloc-diagonale style PFIM",
-            "Les RSE des parametres PD (RIN, IC50, KOUT) sont generalement plus grands que les PK",
-            "Ce design initial sert de baseline pour les etapes suivantes"
+            "FIMDIAG=1 + VARCROSS=1: block-diagonal FIM (PFIM style)",
+            "RSEs for PD parameters (RIN, IC50, KOUT) are generally larger than PK",
+            "This initial design serves as baseline for the following steps"
           )
         )
       ),
       list(
-        label = "Etape 2/4 : Evaluation FOCEI (eval2)",
+        label = "Step 2/4: FOCEI evaluation (eval2)",
         prefix = "warfarin_pkpd_eval2",
         prev_step_prefix = "warfarin_pkpd_eval",
         guide = list(
-          context = "Meme modele, mais FIMTYPE=1 (au lieu de FIMDIAG=1) et GROUPSIZE=26. Evaluation FOCEI du design.",
+          context = "Same model, but FIMTYPE=1 (instead of FIMDIAG=1) and GROUPSIZE=26. FOCEI design evaluation.",
           points = c(
-            "FIMTYPE=1 vs FIMDIAG=1 : hypotheses differentes sur la structure de la FIM",
-            "GROUPSIZE=26 (moitie de l'etape 1) : impact direct sur la precision (FIM proportionnelle a N)",
-            "Comparez les RSE avec l'etape 1 : l'effet du GROUPSIZE et du FIMTYPE",
-            "Pas de .tab pour cette etape (pas de $TABLE) — les temps optimaux ne sont pas disponibles"
+            "FIMTYPE=1 vs FIMDIAG=1: different assumptions on FIM structure",
+            "GROUPSIZE=26 (half of step 1): direct impact on precision (FIM proportional to N)",
+            "Compare RSEs with step 1: effect of GROUPSIZE and FIMTYPE",
+            "No .tab for this step (no $TABLE) -- optimal times not available"
           )
         )
       ),
       list(
-        label = "Etape 3/4 : Optimisation (opt)",
+        label = "Step 3/4: Optimization (opt)",
         prefix = "warfarin_pkpd_opt",
         prev_step_prefix = "warfarin_pkpd_eval2",
         guide = list(
-          context = "Optimisation des temps PK et PD via NELDER. GROUPSIZE=52, FIMTYPE=1, VARCROSS=1, APPROX=FO, MAXEVAL=9999.",
+          context = "PK and PD time optimization via NELDER. GROUPSIZE=52, FIMTYPE=1, VARCROSS=1, APPROX=FO, MAXEVAL=9999.",
           points = c(
-            "DESEL=TIME optimise les temps dans les fenetres TMIN/TMAX pour chaque CMT",
-            "Les RSE devraient diminuer par rapport a l'evaluation (etape 1/2)",
-            "Les temps optimaux PK et PD sont distincts (CMT=2 vs CMT=3)",
-            "APPROX=FO : approximation first-order pour le calcul de la FIM"
+            "DESEL=TIME optimizes times within TMIN/TMAX windows for each CMT",
+            "RSEs should decrease compared to evaluation (step 1/2)",
+            "PK and PD optimal times are distinct (CMT=2 vs CMT=3)",
+            "APPROX=FO: first-order approximation for FIM computation"
           )
         )
       ),
       list(
-        label = "Etape 4/4 : Optimisation affinee (opt2)",
+        label = "Step 4/4: Refined optimization (opt2)",
         prefix = "warfarin_pkpd_opt2",
         prev_step_prefix = "warfarin_pkpd_opt",
         guide = list(
-          context = "Deuxieme passe d'optimisation NELDER avec GROUPSIZE=26. Raffine le design de l'etape 3.",
+          context = "Second NELDER optimization pass with GROUPSIZE=26. Refines the design from step 3.",
           points = c(
-            "GROUPSIZE=26 : moitie des sujets — impact sur les RSE attendus",
-            "Comparez avec l'etape 3 : les temps optimaux changent-ils avec moins de sujets ?",
-            "L'OFV devrait etre different (FIM proportionnelle a N)",
-            "Les temps optimaux finaux sont dans l'onglet 'Temps optimaux'"
+            "GROUPSIZE=26: half the subjects -- impact on expected RSEs",
+            "Compare with step 3: do optimal times change with fewer subjects?",
+            "OFV should be different (FIM proportional to N)",
+            "Final optimal times are in the 'Optimal Times' tab"
           )
         )
       )
     )
   ),
   example5 = list(
-    title = "Exemple 5 : DS-optimality",
-    desc = "Critere DS-optimality (OFVTYPE=6) avec parametres non-interessants (UNINT). Modele warfarin etendu.",
+    title = "Example 5: DS-optimality",
+    desc = "DS-optimality criterion (OFVTYPE=6) with uninteresting parameters (UNINT). Extended warfarin model.",
     dir = "examples/example5",
     prefix = "optdesign2",
     labels = "THETA1=CL\nTHETA2=V\nTHETA3=KA\nTHETA4=F1",
     compare_with = "example1",
     guide = list(
-      context = "DS-optimality : maximise la precision sur un sous-ensemble de parametres d'interet, en traitant les autres comme non-interessants (UNINT). Ici F1 (biodisponibilite) est le parametre cible.",
+      context = "DS-optimality: maximizes precision on a subset of parameters of interest, treating others as uninteresting (UNINT). Here F1 (bioavailability) is the target parameter.",
       points = c(
-        "Le critere DS-OFV = -log(det(FIM_interet)) : seule la FIM des parametres d'interet compte",
-        "UNINT designe les parametres non-interessants (nuisance parameters)",
-        "Comparez avec l'Exemple 1 (D-optimality) : les temps optimaux different selon le critere",
-        "Utile quand certains parametres sont deja bien estimes ou non pertinents pour la decision"
+        "DS-OFV criterion = -log(det(FIM_interest)): only the FIM of parameters of interest counts",
+        "UNINT designates uninteresting (nuisance) parameters",
+        "Compare with Example 1 (D-optimality): optimal times differ depending on the criterion",
+        "Useful when some parameters are already well estimated or irrelevant for the decision"
       )
     )
   ),
   example6 = list(
-    title = "Exemple 6 : TMDD, STRAT/STRATF",
-    desc = "Modele TMDD ODE (ADVAN13), optimisation avec stratification dose. 4 blocs $DESIGN chaines.",
+    title = "Example 6: TMDD, STRAT/STRATF",
+    desc = "TMDD ODE model (ADVAN13), optimization with dose stratification. 4 chained $DESIGN blocks.",
     dir = "examples/example6",
     table_no_range = c(1L, 4L),
     prefix = "tmdd2",
     labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
     guide = list(
-      context = "Modele TMDD (Target-Mediated Drug Disposition) a 3 compartiments avec ODE (ADVAN13). 8 parametres PK (VC, K10, K12, K21, VM, KMC, K03, K30), 2 niveaux de dose (300 et 10000), 5 temps par strate. GROUPSIZE=50, FIMDIAG=1, VARCROSS=1.",
+      context = "TMDD (Target-Mediated Drug Disposition) model with 3 compartments and ODE (ADVAN13). 8 PK parameters (VC, K10, K12, K21, VM, KMC, K03, K30), 2 dose levels (300 and 10000), 5 times per stratum. GROUPSIZE=50, FIMDIAG=1, VARCROSS=1.",
       points = c(
-        "4 blocs $DESIGN chaines avec NELDER : strategie de redemarrage pour eviter les minima locaux. Comparer les OFV des 4 tables dans l'onglet convergence",
-        "STRAT/STRATF : stratification par dose. STRATF optimise la proportion de sujets par strate (~59%/41%)",
-        "Multi-CMT : CMT=1 (drug) et CMT=3 (receptor) observes. 2 erreurs residuelles separees (EPS(1-2) PK, EPS(3-4) receptor)",
-        "Modele ODE (ADVAN13) : necessaire pour la cinetique TMDD non-lineaire. TOL=12, ATOL=12 pour precision",
-        "8 OMEGAs diagonaux + 4 SIGMAs (dont 2 FIXED a 0.001) -- matrice FIM 20x20"
+        "4 chained $DESIGN blocks with NELDER: restart strategy to avoid local minima. Compare OFVs of 4 tables in the convergence tab",
+        "STRAT/STRATF: dose stratification. STRATF optimizes the subject proportion per stratum (~59%/41%)",
+        "Multi-CMT: CMT=1 (drug) and CMT=3 (receptor) observed. 2 separate residual errors (EPS(1-2) PK, EPS(3-4) receptor)",
+        "ODE model (ADVAN13): required for non-linear TMDD kinetics. TOL=12, ATOL=12 for precision",
+        "8 diagonal OMEGAs + 4 SIGMAs (2 FIXED at 0.001) -- 20x20 FIM matrix"
       )
     )
   ),
   example7 = list(
-    title = "Exemple 7 : Bayes FIM (OFVTYPE=8)",
-    desc = "FIM bayesienne individuelle. Workflow D-opt (optimisation) puis Bayes (evaluation).",
+    title = "Example 7: Bayes FIM (OFVTYPE=8)",
+    desc = "Individual Bayesian FIM. D-opt workflow (optimization) then Bayes (evaluation).",
     dir = "examples/example7",
     prefix = "tmdd2b",
     labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
     compare_with = "example7_bayes",
     guide = list(
-      context = "Meme modele TMDD qu'exemple 6. Workflow en 2 problemes : (1) optimisation D-opt classique (OFVTYPE=1, MAXEVAL=50000), (2) evaluation Bayesian FIM (OFVTYPE=8, MAXEVAL=0) sur le design optimise. Le fichier .bfm contient la matrice de variance conditionnelle individuelle.",
+      context = "Same TMDD model as example 6. 2-problem workflow: (1) classic D-opt optimization (OFVTYPE=1, MAXEVAL=50000), (2) Bayesian FIM evaluation (OFVTYPE=8, MAXEVAL=0) on the optimized design. The .bfm file contains the individual conditional variance matrix.",
       points = c(
-        "Workflow 2 etapes (Bauer) : optimiser avec D-opt (rapide, robuste) puis evaluer avec Bayes FIM (plus realiste)",
-        "OFVTYPE=8 = FIM bayesienne : integre l'information a priori ($OMEGA) dans le critere",
-        "Le .bfm contient la matrice ETC (conditional variance-covariance) -- mesure la precision individuelle, pas populationnelle (visualisation prevue en V5)",
-        "Comparez avec l'optimisation Bayes pure (bouton Comparer) : memes parametres mais critere different",
-        "Optimisation TIME+DOSE simultanee (DESEL=TIME et DESEL=AMT dans le meme bloc $DESIGN)"
+        "2-step workflow (Bauer): optimize with D-opt (fast, robust) then evaluate with Bayes FIM (more realistic)",
+        "OFVTYPE=8 = Bayesian FIM: incorporates prior information ($OMEGA) into the criterion",
+        "The .bfm contains the ETC matrix (conditional variance-covariance) -- measures individual precision, not population-level (visualization planned)",
+        "Compare with pure Bayes optimization (Compare button): same parameters but different criterion",
+        "Simultaneous TIME+DOSE optimization (DESEL=TIME and DESEL=AMT in the same $DESIGN block)"
       )
     )
   ),
   example7_bayes = list(
-    title = "Exemple 7b : Optimisation Bayes pure",
-    desc = "Optimisation directe OFVTYPE=8 (Bayes FIM). Comparez avec le workflow D-opt puis Bayes.",
+    title = "Example 7b: Pure Bayes optimization",
+    desc = "Direct OFVTYPE=8 optimization (Bayes FIM). Compare with the D-opt then Bayes workflow.",
     dir = "examples/example7",
     prefix = "optex6d17_8",
     labels = "THETA1=VC\nTHETA2=K10\nTHETA3=K12\nTHETA4=K21\nTHETA5=VM\nTHETA6=KMC\nTHETA7=K03\nTHETA8=K30",
     guide = list(
-      context = "Meme modele TMDD, mais optimisation directe avec OFVTYPE=8 (Bayes FIM). Contrairement a l'Exemple 7 qui optimise d'abord en D-opt puis evalue en Bayes, ici l'optimisation utilise directement le critere bayesien.",
+      context = "Same TMDD model, but direct optimization with OFVTYPE=8 (Bayes FIM). Unlike Example 7 which first optimizes with D-opt then evaluates with Bayes, here the optimization directly uses the Bayesian criterion.",
       points = c(
-        "OFVTYPE=8 des le depart : le critere d'optimisation est la FIM bayesienne, pas la FIM populationnelle",
-        "Plusieurs blocs $DESIGN chaines (6 tables) : exploration progressive du paysage d'optimisation",
-        "Comparez les temps optimaux avec l'Exemple 7 : le critere bayesien peut favoriser des designs differents",
-        "Les OFV D-opt et Bayes ne sont pas comparables directement (echelles differentes)",
-        "Le fichier .bfm contient la progression de la variance conditionnelle au fil des iterations (visualisation prevue en V5)"
+        "OFVTYPE=8 from the start: the optimization criterion is the Bayesian FIM, not the population FIM",
+        "Multiple chained $DESIGN blocks (6 tables): progressive exploration of the optimization landscape",
+        "Compare optimal times with Example 7: the Bayesian criterion may favor different designs",
+        "D-opt and Bayes OFVs are not directly comparable (different scales)",
+        "The .bfm file contains the conditional variance progression across iterations (visualization planned)"
       )
     )
   )
@@ -231,7 +231,7 @@
 mod_examples_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    actionButton(ns("open_examples"), "Exemples", icon = icon("book-open"),
+    actionButton(ns("open_examples"), "Examples", icon = icon("book-open"),
                  class = "btn-sm btn-default w-100",
                  style = "margin-bottom: 8px;")
   )
@@ -338,7 +338,7 @@ mod_examples_server <- function(id, session_main = NULL,
     # -- Modal: example picker ----------------------------------------------
     observeEvent(input$open_examples, {
       showModal(modalDialog(
-        title = "Exemples Bauer 2021",
+        title = "Bauer 2021 Examples",
         size = "l",
         easyClose = TRUE,
         fluidRow(
@@ -347,7 +347,7 @@ mod_examples_server <- function(id, session_main = NULL,
             step_badge <- if (!is.null(ex$steps)) {
               tags$span(
                 style = "font-size:.72rem; color:#6b7280;",
-                paste0(" (", length(ex$steps), " etapes)")
+                paste0(" (", length(ex$steps), " steps)")
               )
             }
             column(3,
@@ -358,7 +358,7 @@ mod_examples_server <- function(id, session_main = NULL,
                         style = "font-size:.9rem;"),
                 tags$p(style = "font-size:.8rem; color:#4b5563;",
                        ex$desc),
-                actionButton(ns(paste0("load_", eid)), "Charger",
+                actionButton(ns(paste0("load_", eid)), "Load",
                              class = "btn-sm btn-primary w-100")
               )
             )
@@ -373,27 +373,11 @@ mod_examples_server <- function(id, session_main = NULL,
         load_step(ex_id, 1L)
         removeModal()
         showNotification(
-          paste("Exemple charge :",
+          paste("Example loaded:",
                 .EXAMPLES[[ex_id]]$title),
           type = "message"
         )
       })
-    })
-
-    # -- Step navigation observers ------------------------------------------
-    observeEvent(input$step_prev, {
-      req(selected$step_idx > 1L)
-      load_step(selected$ex_id, selected$step_idx - 1L)
-    })
-
-    observeEvent(input$step_next, {
-      req(selected$step_idx < selected$n_steps)
-      load_step(selected$ex_id, selected$step_idx + 1L)
-    })
-
-    # -- Dismiss banner observer --------------------------------------------
-    observeEvent(input$dismiss_banner, {
-      selected$banner_dismissed <- TRUE
     })
 
     # -- Return reactives ---------------------------------------------------
@@ -404,16 +388,6 @@ mod_examples_server <- function(id, session_main = NULL,
       compare_paths    = reactive(selected$compare_paths),
       compare_name     = reactive(selected$compare_name),
       summary_data     = reactive(selected$summary_data),
-      step_idx         = reactive(selected$step_idx),
-      n_steps          = reactive(selected$n_steps),
-      banner_dismissed = reactive(selected$banner_dismissed),
-      step_label       = reactive({
-        ex <- if (!is.null(selected$ex_id)) {
-          .EXAMPLES[[selected$ex_id]]
-        }
-        if (is.null(ex) || is.null(ex$steps)) return(NULL)
-        ex$steps[[selected$step_idx]]$label
-      }),
       table_no_range   = reactive({
         if (is.null(selected$ex_id)) return(NULL)
         .EXAMPLES[[selected$ex_id]]$table_no_range

@@ -7,9 +7,9 @@ mod_raw_ui <- function(id) {
   tagList(
     div(class = "surface-card",
       fluidRow(
-        column(8, p(class = "section-title", "Contenu complet du fichier .ext")),
+        column(8, p(class = "section-title", "Full .ext file content")),
         column(2, uiOutput(ns("run_selector"))),
-        column(2, downloadButton(ns("export_csv"), "Telecharger CSV",
+        column(2, downloadButton(ns("export_csv"), "Download CSV",
                                  class = "btn btn-sm btn-default",
                                  style = "margin-top:22px; width:100%;"))
       ),

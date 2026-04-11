@@ -241,7 +241,8 @@ mod_sse_validation_ui <- function(id) {
         column(12,
           div(class = "plot-card",
             p(class = "section-title", "FIM RSE vs SSE RSE Scatter"),
-            plotOutput(ns("scatter"), height = "650px")
+            plotOutput(ns("scatter"), height = "650px"),
+            plot_export_ui(ns, "scatter_export", default_fname = "fim_vs_sse_scatter")
           )
         )
       ),
@@ -255,7 +256,8 @@ mod_sse_validation_ui <- function(id) {
         column(12,
           div(class = "plot-card",
             p(class = "section-title", "REE Distribution by Parameter"),
-            plotOutput(ns("ree_boxplot"), height = "450px")
+            plotOutput(ns("ree_boxplot"), height = "450px"),
+            plot_export_ui(ns, "ree_export", default_fname = "ree_boxplot")
           )
         )
       ),
@@ -269,7 +271,8 @@ mod_sse_validation_ui <- function(id) {
         column(12,
           div(class = "plot-card",
             p(class = "section-title", "FIM vs SSE: RSE Comparison"),
-            plotOutput(ns("rse_bar"), height = "400px")
+            plotOutput(ns("rse_bar"), height = "400px"),
+            plot_export_ui(ns, "rse_bar_export", default_fname = "rse_comparison")
           )
         )
       ),
@@ -527,7 +530,7 @@ mod_sse_validation_server <- function(id, ext_data,
     })
 
     # --- Scatter plot ---
-    output$scatter <- renderPlot({
+    scatter_plot <- reactive({
       comp <- comparison_filtered()
       if (is.null(comp) || nrow(comp) == 0L) {
         return(ggplot() +
@@ -535,7 +538,9 @@ mod_sse_validation_server <- function(id, ext_data,
           .theme_design())
       }
       plot_fim_vs_sse(comp)
-    }, res = 110)
+    })
+    output$scatter <- renderPlot({ scatter_plot() }, res = 110)
+    plot_export_server(input, output, session, "scatter_export", scatter_plot)
 
     # --- REE distribution (reactive) ---
     ree_dist <- reactive({
@@ -560,7 +565,7 @@ mod_sse_validation_server <- function(id, ext_data,
     })
 
     # --- REE Boxplot ---
-    output$ree_boxplot <- renderPlot({
+    ree_plot <- reactive({
       rd <- ree_dist_filtered()
       if (is.null(rd)) {
         return(ggplot() +
@@ -568,10 +573,12 @@ mod_sse_validation_server <- function(id, ext_data,
           .theme_design())
       }
       plot_ree_boxplot(rd)
-    }, res = 110)
+    })
+    output$ree_boxplot <- renderPlot({ ree_plot() }, res = 110)
+    plot_export_server(input, output, session, "ree_export", ree_plot)
 
     # --- RSE Bar Chart ---
-    output$rse_bar <- renderPlot({
+    rse_bar_plot <- reactive({
       comp <- comparison_filtered()
       if (is.null(comp) || nrow(comp) == 0L) {
         return(ggplot() +
@@ -579,7 +586,9 @@ mod_sse_validation_server <- function(id, ext_data,
           .theme_design())
       }
       plot_rse_bar(comp)
-    }, res = 110)
+    })
+    output$rse_bar <- renderPlot({ rse_bar_plot() }, res = 110)
+    plot_export_server(input, output, session, "rse_bar_export", rse_bar_plot)
 
     # --- Comparison table ---
     output$comp_table <- renderDT({

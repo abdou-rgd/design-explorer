@@ -6,19 +6,26 @@ mod_convergence_ui <- function(id) {
   ns <- NS(id)
   tagList(
     div(class = "plot-card",
-      uiOutput(ns("toggle_ui")),
-      p(class = "section-title", "Evolution du critere d'optimalite (OFV)"),
-      plotOutput(ns("plot"), height = "420px")
+      settings_bar(
+        checkboxInput(ns("log_conv"), "Log X axis", FALSE),
+        uiOutput(ns("toggle_ui"))
+      ),
+      p(class = "section-title", "Optimality criterion convergence (OFV)"),
+      plotOutput(ns("plot"), height = "420px"),
+      plot_export_ui(ns, "conv_export", default_fname = "convergence_plot")
     )
   )
 }
 
-mod_convergence_server <- function(id, ext_data, log_conv,
+mod_convergence_server <- function(id, ext_data,
                                    all_runs = reactive(list()),
                                    ctl_lines = reactive(NULL),
                                    cpu_secs = reactive(NA_real_)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Log X axis is now internal
+    log_conv <- reactive({ isTRUE(input$log_conv) })
 
     # Detect whether step chart is available:
     # single-run, 2-5 table_nos (multi-step optimization, not robust)
@@ -46,7 +53,7 @@ mod_convergence_server <- function(id, ext_data, log_conv,
       input$conv_view %||% "detail"
     })
 
-    output$plot <- renderPlot({
+    conv_plot <- reactive({
       runs <- all_runs()
 
       if (length(runs) <= 1) {
@@ -55,7 +62,6 @@ mod_convergence_server <- function(id, ext_data, log_conv,
 
         n_blocs <- dplyr::n_distinct(ext$table_no)
 
-        # Robust design : beaucoup de sous-problemes -> histogramme OFV finaux
         if (n_blocs > 5L) {
           finals <- ext |>
             dplyr::filter(type == "final") |>
@@ -64,8 +70,8 @@ mod_convergence_server <- function(id, ext_data, log_conv,
 
           if (nrow(finals) == 0L) {
             return(ggplot() +
-              labs(title = paste0("Design robuste (", n_blocs,
-                                  " sous-problemes) — pas de donnees OFV final")) +
+              labs(title = paste0("Robust design (", n_blocs,
+                                  " subproblems) -- no final OFV data")) +
               .theme_design())
           }
 
@@ -77,42 +83,34 @@ mod_convergence_server <- function(id, ext_data, log_conv,
               geom_vline(xintercept = med_val, linetype = "dashed",
                          color = "#dc2626", size = 0.8) +
               annotate("text", x = med_val, y = Inf, vjust = 1.5, hjust = -0.1,
-                       label = sprintf("mediane = %.3f", med_val),
+                       label = sprintf("median = %.3f", med_val),
                        color = "#dc2626", size = 3.5) +
               labs(
-                title = paste0("Distribution du critere D-optimalite",
-                               " (N = ", nrow(finals), " sous-problemes)"),
-                subtitle = "Design robuste : OFV evalue sous chaque realisation du prior",
+                title = paste0("D-optimality criterion distribution",
+                               " (N = ", nrow(finals), " subproblems)"),
+                subtitle = "Robust design: OFV evaluated under each prior realization",
                 x = "OFV  (-log det FIM)",
-                y = "Nombre de sous-problemes",
-                caption = paste0(
-                  "Ligne tiretee = mediane | ",
-                  "Dispersion = sensibilite du critere a l'incertitude du prior"
-                )
+                y = "Number of subproblems",
+                caption = "Dashed line = median | Spread = criterion sensitivity to prior uncertainty"
               ) +
               .theme_design()
           )
         }
 
-        # Step chart (summary view) -- only for 2-5 blocs
         if (view_mode() == "summary" && n_blocs >= 2L) {
           method_labels <- parse_design_methods(ctl_lines())
           steps <- build_convergence_steps(ext, cpu_secs(), method_labels)
           return(plot_convergence_steps(steps))
         }
 
-        # Default: iteration-level convergence curve
         return(plot_convergence(ext, log_iter = log_conv()))
       }
-
-      # --- Multi-run mode (unchanged from V4) ---
 
       run_labels <- setNames(vapply(runs, function(r) r$name %||% "?", character(1L)),
                              names(runs))
       run_colors <- setNames(vapply(names(runs), run_color, character(1L)),
                              names(runs))
 
-      # Detecter si au moins un run est un design robuste
       any_robust <- any(vapply(runs, function(r) {
         !is.null(r$ext_data) &&
         "table_no" %in% names(r$ext_data) &&
@@ -120,7 +118,6 @@ mod_convergence_server <- function(id, ext_data, log_conv,
       }, logical(1L)))
 
       if (any_robust) {
-        # Density pour les runs robustes, vline pour les non-robustes
         all_finals <- purrr::imap(runs, function(r, rid) {
           if (is.null(r$ext_data)) return(NULL)
           is_rob <- "table_no" %in% names(r$ext_data) &&
@@ -132,7 +129,7 @@ mod_convergence_server <- function(id, ext_data, log_conv,
         }) |> dplyr::bind_rows()
 
         if (nrow(all_finals) == 0L) {
-          return(ggplot() + labs(title = "Pas de donnees OFV final") + .theme_design())
+          return(ggplot() + labs(title = "No final OFV data") + .theme_design())
         }
 
         rob_data    <- all_finals[all_finals$robust,  , drop = FALSE]
@@ -153,24 +150,23 @@ mod_convergence_server <- function(id, ext_data, log_conv,
                               linetype = "solid", size = 1.1)
         }
 
-        caption_txt <- "Courbe = distribution OFV des sous-problemes robustes"
+        caption_txt <- "Curve = OFV distribution of robust subproblems"
         if (nrow(nonrob_data) > 0L)
           caption_txt <- paste0(caption_txt,
-                                " | Ligne verticale = OFV final du run non-robuste")
+                                " | Vertical line = final OFV of non-robust run")
 
         return(
           p +
             scale_fill_manual(values  = run_colors, labels = run_labels, name = NULL) +
             scale_color_manual(values = run_colors, labels = run_labels, name = NULL) +
-            labs(title   = "Distribution OFV final -- Comparaison multi-runs",
+            labs(title   = "Final OFV distribution -- Multi-run comparison",
                  x       = "OFV (-log det FIM)",
-                 y       = "Densite",
+                 y       = "Density",
                  caption = caption_txt) +
             .theme_design()
         )
       }
 
-      # Tous les runs sont non-robustes : overlay de courbes de convergence
       combined <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$ext_data)) return(NULL)
         r$ext_data |>
@@ -180,19 +176,22 @@ mod_convergence_server <- function(id, ext_data, log_conv,
           dplyr::mutate(run = idx)
       }) |> dplyr::bind_rows()
 
-      if (nrow(combined) == 0) return(ggplot() + labs(title = "Pas de convergence") + .theme_design())
+      if (nrow(combined) == 0) return(ggplot() + labs(title = "No convergence data") + .theme_design())
 
       p <- ggplot(combined, aes(x = ITERATION, y = OBJ, color = run)) +
         geom_line(size = 0.75, alpha = 0.9) +
         scale_color_manual(values = run_colors, labels = run_labels,
                            name = NULL) +
-        labs(title = "Convergence -- Comparaison multi-runs",
+        labs(title = "Convergence -- Multi-run comparison",
              x = "Iteration ($DESIGN)", y = "OFV (-log det FIM)",
-             caption = "Source : .ext") +
+             caption = "Source: .ext") +
         .theme_design()
 
       if (log_conv()) p <- p + scale_x_log10()
       p
-    }, res = 110)
+    })
+
+    output$plot <- renderPlot({ conv_plot() }, res = 110)
+    plot_export_server(input, output, session, "conv_export", conv_plot)
   })
 }

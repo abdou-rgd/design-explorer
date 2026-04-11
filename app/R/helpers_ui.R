@@ -69,7 +69,7 @@ run_color <- function(rid) {
   .RUN_COLORS[rid] %||% "#6b7280"
 }
 
-# -- Run pill (header/drawer) -----------------------------------------------
+# -- Run pill (multi-run comparison) ----------------------------------------
 run_pill <- function(name, color) {
   span(
     style = sprintf(
@@ -94,64 +94,87 @@ detect_criterion <- function(lines) {
   "D-OPTIMALITY"
 }
 
-# -- Guide banner with optional step navigation ----------------------------
-render_guide_banner <- function(ns, guide, paths,
-                                step_idx = 1L, n_steps = 0L,
-                                step_label = NULL) {
-  if (is.null(guide)) return(NULL)
+# =============================================================================
+# V5 UI Components — PopkinR-inspired
+# =============================================================================
 
-  # Read .ctl source for display
-  ctl_content <- NULL
-  if (!is.null(paths$ext)) {
-    base <- tools::file_path_sans_ext(basename(paths$ext))
-    ctl_path <- file.path(dirname(paths$ext), paste0(base, ".ctl"))
-    if (file.exists(ctl_path)) {
-      ctl_content <- paste(readLines(ctl_path, warn = FALSE),
-                           collapse = "\n")
-    }
-  }
-
-  # Step navigation bar (only for multi-step examples)
-  has_steps <- isTRUE(n_steps > 1L)
-  step_nav <- if (has_steps) {
-    lbl <- if (!is.null(step_label)) {
-      step_label
-    } else {
-      paste("Etape", step_idx, "/", n_steps)
-    }
-    prev_disabled <- isTRUE(step_idx <= 1L)
-    next_disabled <- isTRUE(step_idx >= n_steps)
-    tags$div(
-      class = "guide-step-nav",
-      tags$span(class = "guide-step-label", lbl),
-      tags$button(
-        id = ns("step_prev"), type = "button",
-        class = "btn btn-sm btn-default action-button",
-        `data-val` = 0,
-        disabled = if (prev_disabled) "disabled" else NULL,
-        "Precedent"
-      ),
-      tags$button(
-        id = ns("step_next"), type = "button",
-        class = "btn btn-sm btn-default action-button",
-        `data-val` = 0,
-        disabled = if (next_disabled) "disabled" else NULL,
-        "Suivant"
-      )
-    )
-  }
-
+# -- Settings bar (horizontal strip of controls at top of a module) ----------
+settings_bar <- function(...) {
   tags$div(
-    class = "guide-banner",
-    tags$button(
-      id = ns("dismiss_banner"), type = "button",
-      class = "dismiss-btn action-button",
-      `data-val` = 0,
-      "\u00d7"
-    ),
-    step_nav,
-    tags$h6(guide$context),
-    if (!is.null(ctl_content)) tags$code(ctl_content),
-    tags$ul(lapply(guide$points, tags$li))
+    class = "settings-bar",
+    ...
   )
 }
+
+# -- Plot export UI (below plotOutput) ----------------------------------------
+plot_export_ui <- function(ns, id, default_fname = "plot") {
+  tags$div(
+    class = "plot-export-bar",
+    selectInput(
+      ns(paste0(id, "_format")), NULL,
+      choices = c("PNG" = "png", "PDF" = "pdf", "SVG" = "svg"),
+      width = "80px"
+    ),
+    numericInput(ns(paste0(id, "_width")),  "Width (in)",  value = 10, min = 2, max = 30, step = 1, width = "90px"),
+    numericInput(ns(paste0(id, "_height")), "Height (in)", value = 6,  min = 2, max = 20, step = 1, width = "90px"),
+    textInput(ns(paste0(id, "_fname")), NULL, value = default_fname, width = "140px"),
+    downloadButton(ns(paste0(id, "_dl")), "Export", class = "btn btn-sm btn-default")
+  )
+}
+
+# -- Plot export server (factory for downloadHandler + ggsave) ----------------
+plot_export_server <- function(input, output, session, id, plot_fn) {
+  output[[paste0(id, "_dl")]] <- downloadHandler(
+    filename = function() {
+      fmt   <- input[[paste0(id, "_format")]] %||% "png"
+      fname <- input[[paste0(id, "_fname")]]  %||% "plot"
+      paste0(fname, ".", fmt)
+    },
+    content = function(file) {
+      p <- plot_fn()
+      req(p)
+      fmt <- input[[paste0(id, "_format")]] %||% "png"
+      w   <- input[[paste0(id, "_width")]]  %||% 10
+      h   <- input[[paste0(id, "_height")]] %||% 6
+      ggplot2::ggsave(file, plot = p, device = fmt,
+                      width = w, height = h, dpi = 300)
+    }
+  )
+}
+
+# -- Metric card V5 (PopkinR style: icon block + label/value horizontal) ------
+metric_card_v5 <- function(label, value, icon_name = "chart-bar",
+                           color = "#2563eb", sub = NULL) {
+  tags$div(
+    class = "metric-card-v5",
+    tags$div(
+      class = "metric-icon-block",
+      style = sprintf("background:%s22; color:%s;", color, color),
+      icon(icon_name)
+    ),
+    tags$div(
+      class = "metric-body",
+      tags$div(class = "metric-v5-label", label),
+      tags$div(class = "metric-v5-value", value),
+      if (!is.null(sub)) tags$div(class = "metric-v5-sub", sub)
+    )
+  )
+}
+
+# -- Section header (consistent section title) --------------------------------
+section_header <- function(title, subtitle = NULL) {
+  tags$div(
+    class = "section-header-v5",
+    tags$h4(class = "section-title", title),
+    if (!is.null(subtitle)) tags$span(class = "section-subtitle", subtitle)
+  )
+}
+
+# -- Popkin-style tabs (underline style tabsetPanel wrapper) -------------------
+popkin_tabs <- function(ns, ..., id = "sub_tabs") {
+  tags$div(
+    class = "popkin-tabs",
+    tabsetPanel(id = ns(id), ...)
+  )
+}
+

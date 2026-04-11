@@ -7,13 +7,13 @@ mod_upload_ui <- function(id) {
   tagList(
     div(
       class = "upload-box",
-      tags$h6("Fichiers NONMEM"),
-      fileInput(ns("upload"), "Dossier tar.gz ou fichiers",
+      tags$h6("NONMEM Files"),
+      fileInput(ns("upload"), "tar.gz archive or individual files",
                 multiple = TRUE,
                 accept   = c(".ext", ".shk", ".coi", ".clt", ".tab", ".bfm", ".cpu",
                              ".ctl", ".mod", ".con", ".tar.gz", ".tgz", ".gz"),
-                buttonLabel = "Parcourir"),
-      helpText("Upload un .tar.gz (workflow nrm) ou plusieurs fichiers individuels."),
+                buttonLabel = "Browse"),
+      helpText("Upload a .tar.gz (nrm workflow) or multiple individual files."),
       uiOutput(ns("file_status"))
     )
   )
@@ -107,7 +107,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       if (is.null(path)) return(NULL)
       tryCatch(parser(path), error = function(e) {
         log_error("Parse ", label, " [", basename(path), "]: ", e$message)
-        showNotification(paste0("Erreur ", label, " : ", e$message), type = "error")
+        showNotification(paste0("Error ", label, ": ", e$message), type = "error")
         NULL
       })
     }
@@ -127,11 +127,11 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       p <- file_paths()
       status_line <- function(ext_name, detected, required = FALSE) {
         if (!is.null(detected)) {
-          div(span(class = "status-ok", paste(ext_name, "detecte")))
+          div(span(class = "status-ok", paste(ext_name, "detected")))
         } else if (required) {
-          div(span(class = "status-miss", paste(ext_name, "requis")))
+          div(span(class = "status-miss", paste(ext_name, "required")))
         } else {
-          div(span(class = "status-miss", paste(ext_name, "optionnel")))
+          div(span(class = "status-miss", paste(ext_name, "optional")))
         }
       }
       tagList(

@@ -37,44 +37,42 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
 
       if (is.null(ext)) {
         return(div(class = "alert alert-info",
-                   "Chargez un fichier .ext pour voir les criteres FIM."))
+                   "Load a .ext file to see FIM criteria."))
       }
 
-      compare_ui <- NULL
-      if (length(all_runs()) > 1) {
-        compare_ui <- tagList(
-          div(class = "surface-card",
-            p(class = "section-title", "Comparaison FIM multi-runs"),
-            DTOutput(ns("compare_table"))
-          ),
-          br()
-        )
-      }
-
-      tagList(
-        uiOutput(ns("cards")),
-        br(),
-        compare_ui,
-        fluidRow(
-          column(6,
-            div(class = "plot-card",
-              p(class = "section-title", "Eigenvalues de la matrice de correlation"),
-              DTOutput(ns("eigen_table"))
+      popkin_tabs(ns,
+        tabPanel("Criteria Summary",
+          uiOutput(ns("cards")),
+          br(),
+          if (length(all_runs()) > 1) {
+            div(class = "surface-card",
+              p(class = "section-title", "FIM multi-run comparison"),
+              DTOutput(ns("compare_table"))
             )
-          ),
-          column(6,
-            div(class = "plot-card",
-              p(class = "section-title", "Matrice de correlation (FIM)"),
-              uiOutput(ns("heatmap_run_selector")),
-              if (!is.null(fim)) {
-                plotOutput(ns("heatmap"), height = "400px")
-              } else {
-                div(class = "alert alert-warning", style = "margin-top:10px;",
-                    "Fichier .coi ou .clt requis pour la heatmap de correlation.")
-              }
-            )
+          }
+        ),
+        tabPanel("Eigenvalues",
+          div(class = "plot-card", style = "margin-top:12px;",
+            p(class = "section-title", "Correlation matrix eigenvalues"),
+            DTOutput(ns("eigen_table"))
           )
         ),
+        tabPanel("Correlation Heatmap",
+          div(class = "plot-card", style = "margin-top:12px;",
+            p(class = "section-title", "Correlation matrix (FIM)"),
+            uiOutput(ns("heatmap_run_selector")),
+            if (!is.null(fim)) {
+              tagList(
+                plotOutput(ns("heatmap"), height = "400px"),
+                plot_export_ui(ns, "heatmap_export", default_fname = "fim_heatmap")
+              )
+            } else {
+              div(class = "alert alert-warning", style = "margin-top:10px;",
+                  ".coi or .clt file required for the correlation heatmap.")
+            }
+          )
+        ),
+        id = "fim_tabs"
       )
     })
 
@@ -91,18 +89,23 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       cn       <- get_condition_number(ext, tbl_no())
 
       fluidRow(
-        column(3, metric_card("D-critere", signif(d_crit, 4),
-                              "exp(-OFV/p)", "blue")),
-        column(3, metric_card("Determinant", if (!is.na(det_fim)) formatC(det_fim, format = "e", digits = 3) else "N/A",
-                              "exp(-OFV)", "purple")),
-        column(3, metric_card("Cond. # (FE)",
-                              if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else "N/A",
-                              "effets fixes", "green")),
-        column(3, metric_card("Eigenvalues",
-                              if (!is.na(cn$min_eigenvalue))
-                                sprintf("%.3g - %.3g", cn$min_eigenvalue, cn$max_eigenvalue)
-                              else "N/A",
-                              "min - max", "orange"))
+        column(3, metric_card_v5("D-criterion", signif(d_crit, 4),
+                                 icon_name = "chart-bar", color = "#2563eb",
+                                 sub = "exp(-OFV/p)")),
+        column(3, metric_card_v5("Determinant",
+                                 if (!is.na(det_fim)) formatC(det_fim, format = "e", digits = 3) else "N/A",
+                                 icon_name = "calculator", color = "#7c3aed",
+                                 sub = "exp(-OFV)")),
+        column(3, metric_card_v5("Cond. # (FE)",
+                                 if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else "N/A",
+                                 icon_name = "balance-scale", color = "#16a34a",
+                                 sub = "Fixed effects")),
+        column(3, metric_card_v5("Eigenvalues",
+                                 if (!is.na(cn$min_eigenvalue))
+                                   sprintf("%.3g - %.3g", cn$min_eigenvalue, cn$max_eigenvalue)
+                                 else "N/A",
+                                 icon_name = "sort-amount-down", color = "#d97706",
+                                 sub = "min - max"))
       )
     })
 
@@ -122,10 +125,10 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
         tibble(
           Run = r$name,
           OFV = if (!is.na(ofv)) round(ofv, 4) else NA_real_,
-          `D-critere` = if (!is.na(d_crit)) signif(d_crit, 4) else NA_real_,
+          `D-criterion` = if (!is.na(d_crit)) signif(d_crit, 4) else NA_real_,
           `Params` = n_params,
           `Cond. #` = if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else NA,
-          `RSE moy. (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
+          `RSE mean (%)` = if (n_params > 0L) round(mean(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
           `RSE med. (%)` = if (n_params > 0L) round(median(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
           `RSE max (%)` = if (n_params > 0L) round(max(rse$rse_pct, na.rm = TRUE), 2) else NA_real_,
           CPU = format_cpu(cpu_secs)
@@ -157,13 +160,13 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       if (length(runs) <= 1L) return(NULL)
       run_choices <- setNames(names(runs),
                               vapply(runs, function(r) r$name %||% "?", character(1L)))
-      selectInput(ns("heatmap_run"), "Run affichee :",
+      selectInput(ns("heatmap_run"), "Displayed run:",
                   choices = run_choices, selected = names(runs)[1],
                   width = "100%")
     })
 
-    # FIM heatmap — adapte a la run selectionnee en multi-run
-    output$heatmap <- renderPlot({
+    # FIM heatmap reactive (shared between renderPlot and export)
+    heatmap_plot <- reactive({
       runs <- all_runs()
       first_rid <- names(runs)[1]
       rid  <- if (length(runs) > 1L) input$heatmap_run %||% first_rid else first_rid
@@ -175,8 +178,10 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       }
       if (is.null(fim)) return(NULL)
       plot_fim_heatmap(fim, labels = param_labels())
-    }, res = 110)
+    })
 
+    output$heatmap <- renderPlot({ heatmap_plot() }, res = 110)
+    plot_export_server(input, output, session, "heatmap_export", heatmap_plot)
 
   })
 }

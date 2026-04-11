@@ -4,14 +4,53 @@
 
 mod_params_ui <- function(id) {
   ns <- NS(id)
-  uiOutput(ns("table3_ui"))
+  tagList(
+    settings_bar(
+      selectInput(ns("table_no"), "TABLE NO.", choices = "1", selected = "1", width = "120px"),
+      numericInput(ns("groupsize"), "GROUPSIZE", value = 1L, min = 1L, step = 1L, width = "100px")
+    ),
+    uiOutput(ns("table3_ui"))
+  )
 }
 
-mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
+mod_params_server <- function(id, ext_data, shk_data, ext_lines,
                                param_labels,
+                               table_no_range = reactive(NULL),
+                               suggested_groupsize = reactive(1L),
+                               reset_trigger = reactive(0L),
                                all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # -- Internal table_no + groupsize reactives (owned by this module) ------
+    tbl_no <- reactive({ as.integer(input$table_no) })
+    groupsize_r <- reactive({ as.integer(input$groupsize %||% 1L) })
+
+    # Update TABLE NO choices when ext_data changes
+    observe({
+      ext <- ext_data(); req(ext)
+      tabs <- sort(unique(ext$table_no))
+      tnr  <- table_no_range()
+      if (!is.null(tnr) && length(tnr) == 2L) {
+        tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
+        if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
+      }
+      updateSelectInput(session, "table_no",
+        choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
+        selected = as.character(max(tabs)))
+    })
+
+    # Update groupsize when suggested by upload/examples
+    observeEvent(suggested_groupsize(), {
+      gs <- suggested_groupsize()
+      if (!is.na(gs) && gs >= 1L) updateNumericInput(session, "groupsize", value = gs)
+    }, ignoreInit = TRUE)
+
+    # Reset handler
+    observeEvent(reset_trigger(), {
+      updateSelectInput(session, "table_no", choices = "1", selected = "1")
+      updateNumericInput(session, "groupsize", value = 1L)
+    }, ignoreInit = TRUE)
 
     # -------------------------------------------------------------------------
     # Helpers — construire les sections de la TABLE 3 depuis all_runs
@@ -101,7 +140,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       runs <- all_runs()
       if (length(runs) == 0L || all(sapply(runs, function(r) is.null(r$ext_data)))) {
         return(div(class = "alert alert-info", style = "border-radius:10px;",
-                   "Chargez un fichier .ext pour commencer l'analyse."))
+                   "Load a .ext file to begin the analysis."))
       }
 
       has_shk   <- nrow(shk_long()) > 0L
@@ -110,25 +149,25 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       tagList(
         div(class = "param-table-wrap",
             p(class = "section-title",
-              HTML("Crit\u00e8re d'optimalit\u00e9 \u2014 <em>-log(det(FIM))</em>")),
+              HTML("Optimality criterion \u2014 <em>-log(det(FIM))</em>")),
             DTOutput(ns("dt_ofv"))
         ),
         br(),
         div(class = "param-table-wrap",
-            p(class = "section-title", "%RSE par param\u00e8tre"),
+            p(class = "section-title", "%RSE per parameter"),
             DTOutput(ns("dt_rse"))
         ),
         if (has_shk) tagList(
           br(),
           div(class = "param-table-wrap",
-              p(class = "section-title", "Shrinkage EBV (%) par ETA"),
+              p(class = "section-title", "EBV Shrinkage (%) per ETA"),
               DTOutput(ns("dt_shk"))
           )
         ),
         if (has_times) tagList(
           br(),
           div(class = "param-table-wrap",
-              p(class = "section-title", "Temps d'echantillonnage optimaux (h)"),
+              p(class = "section-title", "Optimal sampling times (h)"),
               DTOutput(ns("dt_times"))
           )
         )
@@ -157,7 +196,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
       # -- Ligne OFV -----------------------------------------------------------
       ofv_label <- paste0("\u2212log(det(FIM)) [", crit, "]")
       rows <- list(as.data.frame(
-        c(list(Metrique = ofv_label), as.list(ofv_vals)),
+        c(list(Metric = ofv_label), as.list(ofv_vals)),
         check.names = FALSE
       ))
 
@@ -206,7 +245,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
         }
 
         rows[[length(rows) + 1L]] <- as.data.frame(
-          c(list(Metrique = eff_label), as.list(eff_display)),
+          c(list(Metric = eff_label), as.list(eff_display)),
           check.names = FALSE
         )
       }
@@ -220,7 +259,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
           if (!is.null(rdc)) {
             d_str <- sprintf("%.4f [%.4f \u2013 %.4f]", rdc$d_robust, rdc$d_p10, rdc$d_p90)
             rdc_row <- as.data.frame(
-              c(list(Metrique = sprintf("D-critere robuste P10-P90 (n=%d)", rdc$n_subprob)),
+              c(list(Metric = sprintf("Robust D-criterion P10-P90 (n=%d)", rdc$n_subprob)),
                 setNames(
                   lapply(seq_along(runs), function(i) if (i == 1L) d_str else NA_character_),
                   names(ofv_vals)
@@ -249,8 +288,8 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
-        rename(Parametre = metric) |>
-        select(Parametre, any_of(rnms))
+        rename(Parameter = metric) |>
+        select(Parameter, any_of(rnms))
 
       dt <- datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
@@ -311,13 +350,19 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines, tbl_no,
 
       wide <- long |>
         pivot_wider(names_from = run, values_from = value) |>
-        rename(Temps = metric) |>
-        select(Temps, any_of(rnms))
+        rename(Time = metric) |>
+        select(Time, any_of(rnms))
 
       datatable(
         wide, rownames = FALSE, class = "stripe hover compact",
         options = list(dom = "t", ordering = FALSE)
       )
     })
+
+    # -- Return table_no + groupsize for use by other modules -----------------
+    list(
+      tbl_no    = tbl_no,
+      groupsize = groupsize_r
+    )
   })
 }
