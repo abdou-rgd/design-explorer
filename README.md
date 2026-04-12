@@ -1,6 +1,6 @@
 # NONMEM $DESIGN — Post-Processing & Optimal Design
 
-**V4.5.1** · Stage M2 Sciences des données de santé · Sanofi
+**V5.0.0** · Stage M2 Sciences des donn\u00e9es de sant\u00e9 · Sanofi
 Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Information Matrix (FIM).
 
 ---
@@ -25,7 +25,7 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 │   ├── fim_metrics.R            # Power/NSN Wald & TOST : compute_power_wald(), ...
 │   └── report_design.R          # Visualisations ggplot2 : plot_rse(), plot_convergence(), ...
 ├── app/
-│   ├── app.R                    # Application Shiny "$DESIGN Explorer" (V4)
+│   ├── app.R                    # Application Shiny "DE$IGN EXPLORER" (V5)
 │   ├── install_deps.R           # Installation des dépendances Shiny
 │   ├── examples/                # Exemples intégrés (Bauer 2021, examples 1-7)
 │   └── R/                       # 13 modules Shiny
@@ -55,7 +55,7 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 
 ---
 
-## Application Shiny — `$DESIGN Explorer`
+## Application Shiny — `DE$IGN EXPLORER`
 
 Interface web pour explorer interactivement les sorties NONMEM `$DESIGN`.
 

@@ -1,4 +1,4 @@
-# Versioning — $DESIGN Explorer
+# Versioning — DE$IGN EXPLORER
 
 Noms de versions inspirés des chapitres du *Petit Prince* — Antoine de Saint-Exupéry.
 Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
@@ -20,12 +20,18 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 | V4.2.0 | — | Phase 2 quick wins : RSE 4 niveaux, labels CMT, percentiles TSTRAT, efficiency ratio, D-critère robuste, guides ex1/ex3 |
 | V4.3.0 | — | Exemples Bauer 6 & 7, RSE colorés 4 tiers, export CSV temps optimaux, version sidebar, fix DT Run A |
 | V4.3.1 | — | Review fixes : ligne 100% multi-run, accents titres, reactive robust_summary, Bootstrap 3, na.rm |
+| V4.3.2 | — | Multi-run audit + refactor (PRs #28-#36) |
+| V4.4.0 | — | Power Wald / NSN |
+| V4.5.0 | — | TOST Equivalence + UX N total |
+| V4.5.1 | — | Elementary design display fix |
+| V4.5.2 | — | SSE Validation + Convergence + Upload fix |
+| V5 | *Le d\u00e9part du Petit Prince* | Refonte V5 : Home page, kill drawer, English labels, rename DE$IGN EXPLORER |
 
 ---
 
 ## Version actuelle
 
-**V4.3.1** — *La naissance de la rose*
+**V5.0.0** — *Le d\u00e9part du Petit Prince*
 
 ---
 
@@ -41,7 +47,7 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 | Les couchers de soleil | disponible |
 | La rose et la peur de la perdre | disponible |
 | La naissance de la rose | V4 ✓ |
-| Le départ du Petit Prince | disponible |
+| Le d\u00e9part du Petit Prince | V5 \u2713 |
 | Le roi | disponible |
 | Le vaniteux | disponible |
 | Le buveur | disponible |

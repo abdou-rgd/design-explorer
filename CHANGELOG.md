@@ -2,7 +2,7 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
-## V5.0.0 — 2026-04-11 (Refonte V5 — Home page, kill drawer, English labels)
+## V5.0.0 — 2026-04-12 — *Le d\u00e9part du Petit Prince* (Refonte V5 — Home page, kill drawer, English labels, rename DE$IGN EXPLORER)
 
 ### Architecture (`app/app.R`, `app/R/mod_home.R`, `app/www/styles.css`)
 - [feat] **Home landing page** : nouveau module `mod_home.R` affiche les infos du run charge (OFV, params, CPU time) ou message d'accueil

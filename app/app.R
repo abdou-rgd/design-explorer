@@ -1,7 +1,7 @@
 # =============================================================================
-# app.R — NONMEM $DESIGN Post-Processing Shiny App  (V4)
+# app.R — NONMEM $DESIGN Post-Processing Shiny App  (V5)
 #
-# Usage : shiny::runApp("app/", launch.browser = TRUE)  depuis la racine ClaudeProjets/
+# Usage : shiny::runApp("app/", launch.browser = TRUE)  depuis la racine design-explorer/
 #         launch.browser = TRUE force l'ouverture dans le navigateur externe
 #         (contourne les bugs d'upload du viewer RStudio integre sur certaines versions)
 # =============================================================================
@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V4.5.1"
-.APP_VERSION_NAME <- "Elementary, my dear Watson"
+.APP_VERSION      <- "V5.0.0"
+.APP_VERSION_NAME <- "Le d\u00e9part du Petit Prince"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -80,7 +80,7 @@ ui <- fluidPage(
     tags$nav(id = "app-sidebar",
 
       div(id = "sidebar-logo",
-        div(class = "app-title",   "$DESIGN Explorer"),
+        div(class = "app-title",   "DE$IGN EXPLORER"),
         div(class = "app-version",  paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME)),
         div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
       ),

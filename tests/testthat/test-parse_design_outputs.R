@@ -11,7 +11,7 @@ library(dplyr)
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 # Determine root: prefer env var set by run_tests.R, else climb file tree
-project_root <- Sys.getenv("CLAUDEPROJETS_ROOT", unset = NA_character_)
+project_root <- Sys.getenv("DESIGN_EXPLORER_ROOT", unset = NA_character_)
 if (is.na(project_root) || !nzchar(project_root)) {
   this_file <- tryCatch(
     normalizePath(sys.frame(0)$ofile),
