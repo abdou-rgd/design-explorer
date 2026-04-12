@@ -5,6 +5,11 @@
 mod_times_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    settings_bar(
+      radioButtons(ns("time_unit"), "Time unit",
+        choices = c("Hours" = "hours", "Days" = "days"),
+        selected = "hours", inline = TRUE)
+    ),
     uiOutput(ns("content"))
   )
 }
@@ -124,17 +129,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
                        class = "btn-sm btn-default")
       )
 
-      # Time unit toggle (shown for all non-robust views)
-      time_toggle <- if (!is_robust()) {
-        div(style = "text-align: right; margin-bottom: 6px;",
-          radioButtons(ns("time_unit"), NULL,
-            choices = c("Hours" = "hours", "Days" = "days"),
-            selected = "hours", inline = TRUE)
-        )
-      } else {
-        NULL
-      }
-
       if (is_robust()) {
         # Design robuste : pas de courbe predite, boxplot central + table resume
         tagList(
@@ -145,7 +139,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
               div(class = "plot-card",
                 p(class = "section-title",
                   "Optimal times distribution by stratum (robust design)"),
-                plotOutput(ns("gantt"), height = "420px")
+                plotOutput(ns("gantt"), height = "420px"),
+                plot_export_ui(ns, "gantt_export", default_fname = "robust_times_dist")
               )
             ),
             column(4,
@@ -159,12 +154,12 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       } else {
         tagList(
           export_btn,
-          time_toggle,
           fluidRow(
             column(12,
               div(class = "plot-card",
                 p(class = "section-title", "Predicted curve and sampling points"),
-                plotOutput(ns("prediction"), height = "400px")
+                plotOutput(ns("prediction"), height = "400px"),
+                plot_export_ui(ns, "pred_export", default_fname = "prediction_plot")
               )
             )
           ),
@@ -181,8 +176,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       }
     })
 
-    # -- Courbe predite --------------------------------------------------------
-    output$prediction <- renderPlot({
+    # -- Courbe predite (reactive for export) ------------------------------------
+    pred_plot <- reactive({
       runs <- all_runs()
       if (length(runs) <= 1L) {
         req(tab_single())
@@ -194,7 +189,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
       combined <- purrr::imap(runs, function(r, rid) {
         if (is.null(r$tab_data)) return(NULL)
         tab <- r$tab_data
-        # For multi-subproblem runs, use only table_no 1
         if ("table_no" %in% names(tab) && dplyr::n_distinct(tab$table_no) > 1L)
           tab <- dplyr::filter(tab, table_no == 1L)
         if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
@@ -231,10 +225,13 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
             " | Dashes = point connections (not a continuous PK curve)"
           )
         )
-    }, res = 110)
+    })
 
-    # -- Gantt / distribution --------------------------------------------------
-    output$gantt <- renderPlot({
+    output$prediction <- renderPlot({ pred_plot() }, res = 110)
+    plot_export_server(input, output, session, "pred_export", pred_plot)
+
+    # -- Gantt / distribution (reactive for export) ------------------------------
+    gantt_plot <- reactive({
       tab <- effective_tab_data()
       runs <- all_runs()
 
@@ -243,7 +240,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         req(tab)
         obs <- tab
         if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-        # Use obs position within each subproblem as strate when TSTRAT absent
         if (!"TSTRAT" %in% names(obs)) {
           obs <- obs |>
             dplyr::group_by(table_no) |>
@@ -268,7 +264,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
                     color = "#1e3a5f") +
           scale_fill_brewer(palette = "Set2", guide = "none")
 
-        # Multi-run overlay: comparison runs' optimal times as colored points
         if (length(runs) > 1L) {
           comp_pts <- purrr::imap(runs[-1], function(r, rid) {
             if (is.null(r$tab_data)) return(NULL)
@@ -328,7 +323,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         )
       }
 
-      # Cas multi-run : comparaison des temps par run (comportement existant)
+      # Cas multi-run
       if (length(runs) > 1L) {
         combined <- purrr::imap(runs, function(r, rid) {
           if (is.null(r$tab_data)) return(NULL)
@@ -367,10 +362,11 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         )
       }
 
-      # Cas mono-run : plot TSTRAT retire (redondant avec la courbe predite)
       NULL
+    })
 
-    }, res = 110)
+    output$gantt <- renderPlot({ gantt_plot() }, res = 110)
+    plot_export_server(input, output, session, "gantt_export", gantt_plot)
 
     # -- Table -----------------------------------------------------------------
     output$times_table <- renderDT({

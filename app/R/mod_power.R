@@ -75,52 +75,24 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       }
 
       tagList(
-        # Settings panel
-        div(class = "surface-card", style = "margin-bottom: 16px;",
-          p(class = "section-title", "Test parameters"),
-          fluidRow(
-            column(3,
-              numericInput(ns("h0"), "H0 (null hypothesis)", value = 0,
-                           step = 0.1, width = "100%")
-            ),
-            column(2,
-              numericInput(ns("alpha"), "Alpha", value = 0.05,
-                           min = 0.001, max = 0.20, step = 0.005, width = "100%")
-            ),
-            column(2,
-              numericInput(ns("power_target"), "Target power", value = 0.80,
-                           min = 0.50, max = 0.99, step = 0.05, width = "100%")
-            ),
-            column(2,
-              checkboxInput(ns("two_sided"), "Two-sided", value = TRUE)
-            ),
-            column(3,
-              numericInput(ns("n_total"), "N total (subjects)",
-                           value = groupsize() %||% 1L,
-                           min = 1L, step = 1L, width = "100%"),
-              tags$p(style = "font-size:.72rem; color:#64748b; margin-top:2px;",
-                HTML(paste0(
-                  "Auto-filled from GROUPSIZE in .ctl.<br>",
-                  "<b>Standard dataset</b> (1 ID = 1 subject): ",
-                  "N = number of IDs (GROUPSIZE=1).<br>",
-                  "<b>Elementary dataset</b> (few IDs, replicated design): ",
-                  "N = number of IDs &times; GROUPSIZE."
-                ))
-              )
-            )
-          ),
-          tags$p(style = "font-size:.85rem; color:#475569; margin:6px 0 0 0;",
-            HTML(paste0(
-              "<em>Test de Wald : W = (&theta;<sub>0</sub> &minus; ",
-              "<span style='text-decoration:overline'>&theta;</span>) / SE</em>",
-              " &nbsp;&bull;&nbsp; ",
-              "<em>FIM scaling : RSE(N) = RSE(N<sub>0</sub>) &times; &radic;(N<sub>0</sub>/N)</em>"
-            ))
-          )
+        # Settings bar
+        settings_bar(
+          numericInput(ns("h0"), "H0", value = 0,
+                       step = 0.1, width = "90px"),
+          numericInput(ns("alpha"), "Alpha", value = 0.05,
+                       min = 0.001, max = 0.20, step = 0.005, width = "80px"),
+          numericInput(ns("power_target"), "Target power", value = 0.80,
+                       min = 0.50, max = 0.99, step = 0.05, width = "90px"),
+          checkboxInput(ns("two_sided"), "Two-sided", value = TRUE),
+          numericInput(ns("n_total"), "N total",
+                       value = groupsize() %||% 1L,
+                       min = 1L, step = 1L, width = "90px"),
+          tags$span(style = "font-size:.72rem; color:#64748b; align-self:center;",
+            HTML("Wald: W = (&theta; &minus; H<sub>0</sub>) / SE"))
         ),
 
-        # Tabs
-        tabsetPanel(id = ns("power_tabs"), type = "tabs",
+        # Tabs (popkin-style underline)
+        popkin_tabs(ns,
           tabPanel("Power (Wald)",
             br(),
             div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;

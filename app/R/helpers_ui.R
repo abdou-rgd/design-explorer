@@ -14,21 +14,6 @@ google_fonts_link <- function() {
   )
 }
 
-# -- Metric card -------------------------------------------------------------
-metric_card <- function(label, value, sub = NULL, color = "blue") {
-  div(
-    class = paste("metric-card", color),
-    div(class = "metric-label", label),
-    div(class = "metric-value",  value),
-    if (!is.null(sub)) div(class = "metric-sub", sub)
-  )
-}
-
-# -- KPI bar (rendu dans app.R, pas dans les modules) -----------------------
-kpi_bar_ui <- function(id) {
-  div(id = "kpi-bar", uiOutput(id))
-}
-
 # -- RSE badge ---------------------------------------------------------------
 rse_badge <- function(x) {
   if (is.na(x)) return(span("\u2014", class = "ri-na"))
@@ -92,6 +77,30 @@ detect_criterion <- function(lines) {
   if (str_detect(hdr, "DS-OPT")) return("DS-OPTIMALITY")
   if (str_detect(hdr, "R-OPT"))  return("R-OPTIMALITY")
   "D-OPTIMALITY"
+}
+
+# -- Detect estimation method from .ext header lines -----------------------
+detect_method <- function(lines) {
+  hdr <- lines[str_detect(lines, "^TABLE NO\\.")][1]
+  if (is.na(hdr)) return(list(method = "Unknown", mode = "Evaluation"))
+
+  # Mode: Evaluation vs Optimization
+  mode <- if (str_detect(hdr, "\\(Evaluation\\)")) "Evaluation" else "Optimization"
+
+  # Method abbreviation
+  method <- if (str_detect(hdr, "Conditional.*Interaction")) {
+    "FOCEI"
+  } else if (str_detect(hdr, "Conditional")) {
+    "FOCE"
+  } else if (str_detect(hdr, "Laplace")) {
+    "LAPLACE"
+  } else if (str_detect(hdr, "First Order")) {
+    "FO"
+  } else {
+    "FO"
+  }
+
+  list(method = method, mode = mode)
 }
 
 # =============================================================================

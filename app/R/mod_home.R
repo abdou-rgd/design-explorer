@@ -44,19 +44,16 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
         "N/A"
       }
 
-      # Number of estimated params
-      n_params <- if (nrow(final) > 0) {
-        ncol(final) - 3L  # minus ITERATION, table_no, type
-      } else {
-        "N/A"
-      }
+      # Number of estimated (non-fixed) params — use get_rse which filters fixed
+      n_params <- tryCatch({
+        nrow(get_rse(ext, tno))
+      }, error = function(e) "N/A")
 
-      # Criterion type
-      criterion <- if (!is.null(ext_lines())) {
-        detect_criterion(ext_lines())
-      } else {
-        "D-OPTIMALITY"
-      }
+      # Criterion type + method from .ext header
+      lines <- ext_lines()
+      criterion <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
+      method_info <- if (!is.null(lines)) detect_method(lines) else list(method = "FO", mode = "Evaluation")
+      method_sub <- paste0(method_info$mode, " | Table ", tno, "/", n_tabs)
 
       # CPU time
       cpu <- merged_cpu()
@@ -75,19 +72,14 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
       # GROUPSIZE
       gs <- groupsize()
 
-      # D-criterion
-      d_crit <- tryCatch({
-        signif(get_d_criterion(ext, tno), 4)
-      }, error = function(e) "N/A")
-
       tagList(
-        section_header("Run Summary", primary_name()),
+        section_header("Run Summary"),
         tags$div(class = "home-cards-grid",
-          metric_card_v5("Criterion",    criterion,   "bullseye",       "#2563eb"),
-          metric_card_v5("OFV",          ofv_val,     "chart-line",     "#7c3aed", sub = paste0("Table ", tno, "/", n_tabs)),
-          metric_card_v5("D-criterion",  d_crit,      "chart-bar",      "#16a34a", sub = "exp(-OFV/p)"),
-          metric_card_v5("Parameters",   n_params,    "list-ol",        "#d97706"),
-          metric_card_v5("Sample Size",  gs,          "users",          "#dc2626", sub = "N total (IDs x GROUPSIZE)"),
+          metric_card_v5("Method",       method_info$method, "flask",    "#2563eb", sub = method_sub),
+          metric_card_v5("Criterion",    criterion,   "bullseye",       "#7c3aed"),
+          metric_card_v5("OFV",          ofv_val,     "chart-line",     "#16a34a", sub = "-log(det(FIM))"),
+          metric_card_v5("Parameters",   n_params,    "list-ol",        "#d97706", sub = "estimated"),
+          metric_card_v5("Sample Size",  gs,          "users",          "#dc2626", sub = "GROUPSIZE"),
           metric_card_v5("CPU Time",     cpu_txt,     "clock",          "#0891b2")
         )
       )

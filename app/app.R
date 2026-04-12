@@ -20,7 +20,7 @@ library(readr)
 # Version info — affichée dans le sidebar
 # =============================================================================
 .APP_VERSION      <- "V5.0.0"
-.APP_VERSION_NAME <- "Le d\u00e9part du Petit Prince"
+.APP_VERSION_NAME <- "Le depart du Petit Prince"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -66,118 +66,78 @@ for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
 # UI
 # =============================================================================
 
-ui <- fluidPage(
-  # -- Head ------------------------------------------------------------------
-  tags$head(
-    google_fonts_link(),
-    includeCSS("www/styles.css"),
+ui <- navbarPage(
+  title = span(
+    span("DE$IGN EXPLORER",
+         style = "font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:.04em;"),
+    span(paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME),
+         style = "font-size:.65rem; color:#93c5fd; font-style:italic; margin-left:10px; opacity:0.85;")
+  ),
+  id = "navbar",
+  inverse = TRUE,
+  collapsible = TRUE,
+
+  header = tagList(
+    tags$head(google_fonts_link(), includeCSS("www/styles.css")),
+    div(style = "display:none;",
+      textInput("primary_run_name", NULL, value = "Primary"),
+      textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
+      textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
+    )
   ),
 
-  # -- App shell -------------------------------------------------------------
-  div(id = "app-shell",
-
-    # -- Sidebar -------------------------------------------------------------
-    tags$nav(id = "app-sidebar",
-
-      div(id = "sidebar-logo",
-        div(class = "app-title",   "DE$IGN EXPLORER"),
-        div(class = "app-version",  paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME)),
-        div(class = "app-subtitle", "NONMEM 7.5+ \u00b7 Post-processing")
-      ),
-
-      tags$button(class = "nav-item active", id = "nav-home",
-        onclick = "navTo('home', this)", icon("home"), " Home"),
-
-      div(class = "nav-section-label", "Results"),
-      tags$button(class = "nav-item", id = "nav-params",
-        onclick = "navTo('params', this)", "Parameters"),
-      tags$button(class = "nav-item", id = "nav-rse",
-        onclick = "navTo('rse', this)", "RSE / SE"),
-      tags$button(class = "nav-item", id = "nav-ri",
-        onclick = "navTo('ri', this)", "RELATIVEINF"),
-
-      div(class = "nav-section-label", "Design"),
-      tags$button(class = "nav-item", id = "nav-fim",
-        onclick = "navTo('fim', this)", "FIM & Criteria"),
-      tags$button(class = "nav-item", id = "nav-times",
-        onclick = "navTo('times', this)", "Optimal Times"),
-      tags$button(class = "nav-item", id = "nav-prior",
-        onclick = "navTo('prior', this)", "Robust Design"),
-
-      div(class = "nav-section-label", "Decision"),
-      tags$button(class = "nav-item", id = "nav-power",
-        onclick = "navTo('power', this)", "Power / NSN"),
-
-      div(class = "nav-section-label", "Diagnostic"),
-      tags$button(class = "nav-item", id = "nav-conv",
-        onclick = "navTo('conv', this)", "Convergence"),
-      tags$button(class = "nav-item", id = "nav-raw",
-        onclick = "navTo('raw', this)", "Raw Data"),
-      tags$button(class = "nav-item", id = "nav-ctl",
-        onclick = "navTo('ctl', this)", "Control Stream"),
-
-      div(class = "nav-section-label", "Validation"),
-      tags$button(class = "nav-item", id = "nav-sse",
-        onclick = "navTo('sse', this)", "Validation SSE")
-    ),
-
-    # -- Main area -----------------------------------------------------------
-    div(id = "app-main",
-
-      # Tab content
-      div(id = "tab-content",
-        conditionalPanel("input.active_tab == 'home' || !input.active_tab",
-          tags$div(class = "home-upload-zone",
-            tags$h5(style = "margin-bottom:12px; font-weight:700;", "Load NONMEM $DESIGN Output"),
+  # -- Home ------------------------------------------------------------------
+  tabPanel("Home", value = "home",
+    fluidRow(
+      column(3,
+        tags$div(class = "home-sidebar",
+          tags$div(class = "home-upload-compact",
+            tags$h6(class = "home-section-label", "Load Run"),
             mod_upload_ui("upload"),
-            tags$hr(style = "margin:12px 0;"),
+            tags$hr(style = "margin:8px 0;"),
             mod_examples_ui("examples")
           ),
-          mod_home_ui("home")
-        ),
-        conditionalPanel("input.active_tab == 'params'",
-          mod_params_ui("params")),
-        conditionalPanel("input.active_tab == 'rse'",
-          mod_rse_ui("rse")),
-        conditionalPanel("input.active_tab == 'ri'",
-          mod_relativeinf_ui("ri")),
-        conditionalPanel("input.active_tab == 'fim'",
-          mod_fim_ui("fim")),
-        conditionalPanel("input.active_tab == 'times'",
-          mod_times_ui("times")),
-        conditionalPanel("input.active_tab == 'prior'",
-          mod_prior_ui("prior")),
-        conditionalPanel("input.active_tab == 'conv'",
-          mod_convergence_ui("conv")),
-        conditionalPanel("input.active_tab == 'raw'",
-          mod_raw_ui("raw")),
-        conditionalPanel("input.active_tab == 'ctl'",
-          mod_ctl_stream_ui("ctl")),
-        conditionalPanel("input.active_tab == 'power'",
-          mod_power_ui("power")),
-        conditionalPanel("input.active_tab == 'sse'",
-          mod_sse_validation_ui("sse"))
+          tags$div(class = "home-upload-compact", style = "margin-top:12px;",
+            mod_compare_ui("compare")
+          )
+        )
+      ),
+      column(9,
+        mod_home_ui("home")
       )
     )
   ),
 
-  # -- Settings inputs (labels + run name — global, accessed via modal later) --
-  div(style = "display:none;",
-    textInput("primary_run_name", NULL, value = "Primary"),
-    textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
-    textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
+  # -- Results (dropdown) ----------------------------------------------------
+  navbarMenu("Results",
+    tabPanel("Parameters",  value = "params", mod_params_ui("params")),
+    tabPanel("RSE / SE",    value = "rse",    mod_rse_ui("rse")),
+    tabPanel("RELATIVEINF", value = "ri",     mod_relativeinf_ui("ri"))
   ),
 
-  # -- JS: nav ----------------------------------------------------------------
-  tags$script(HTML("
-    function navTo(tab, el) {
-      Shiny.setInputValue('active_tab', tab, {priority: 'event'});
-      document.querySelectorAll('.nav-item').forEach(function(b) {
-        b.classList.remove('active');
-      });
-      el.classList.add('active');
-    }
-  ")),
+  # -- Design (dropdown) -----------------------------------------------------
+  navbarMenu("Design",
+    tabPanel("FIM & Criteria", value = "fim",   mod_fim_ui("fim")),
+    tabPanel("Optimal Times",  value = "times", mod_times_ui("times")),
+    tabPanel("Robust Design",  value = "prior", mod_prior_ui("prior"))
+  ),
+
+  # -- Decision (dropdown) ---------------------------------------------------
+  navbarMenu("Decision",
+    tabPanel("Power / NSN", value = "power", mod_power_ui("power"))
+  ),
+
+  # -- Diagnostic (dropdown) -------------------------------------------------
+  navbarMenu("Diagnostic",
+    tabPanel("Convergence",    value = "conv", mod_convergence_ui("conv")),
+    tabPanel("Control Stream", value = "ctl",  mod_ctl_stream_ui("ctl")),
+    tabPanel("Raw Data",       value = "raw",  mod_raw_ui("raw"))
+  ),
+
+  # -- Validation (dropdown) -------------------------------------------------
+  navbarMenu("Validation",
+    tabPanel("SSE Validation", value = "sse", mod_sse_validation_ui("sse"))
+  ),
 
 )
 
