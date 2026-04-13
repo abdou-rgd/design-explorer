@@ -2,6 +2,22 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V5.2 — 2026-04-13 — SSE Intrinsic Analysis
+
+### New module: SSE Analysis (`R/sse_diagnostics.R`, `app/R/mod_sse_analysis.R`)
+- [feat] **Run Health dashboard** : funnel pills Total → Minimization OK → No boundary → Covariance OK → No rounding errors, with nested denominators and per-metric color thresholds (covariance relaxed 60/40 for FOCEI)
+- [feat] **Parameter Estimate Distributions** : faceted density plots per parameter with true value (red dashed) and median estimate (blue solid) lines, toggle for including failed runs
+- [feat] **OFV Distribution** : histogram across SSE runs with median annotation, optional color by convergence status
+- [feat] **Empirical Correlation Heatmap** : Spearman correlation matrix of parameter estimates across converged runs, annotations for |r| > 0.3
+- [feat] **Per-Parameter Diagnostics table** : DT with SE=NA count, RSE>100% count, zero estimate count, color-coded cells, CSV export
+
+### Architecture
+- [feat] **Shared SSE reactives** : `mod_sse_validation` returns `sse_file_path` and `true_vals` reactives, consumed by `mod_sse_analysis` — single upload, two tabs
+- [feat] **`read_sse_raw_all()`** : new reader keeping ALL SSE rows with `$converged` boolean column (counterpart to existing `read_sse_raw()` which filters)
+- [feat] **Pure computation layer** : `compute_run_health()`, `compute_param_distributions()`, `compute_empirical_correlations()`, `compute_param_diagnostics()` — no Shiny dependency
+
+---
+
 ## V5.1 — 2026-04-12 — *Le Petit Prince s'envole* (navbarPage migration, Home redesign, UI polish)
 
 ### Architecture (`app/app.R`, `app/www/styles.css`)

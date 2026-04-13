@@ -56,6 +56,7 @@ source("../R/ctl_parsers.R",    local = TRUE)
 source("../R/report_design.R",        local = TRUE)
 source("../R/fim_metrics.R",          local = TRUE)
 source("../R/sse_metrics.R",          local = TRUE)
+source("../R/sse_diagnostics.R",      local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -136,7 +137,8 @@ ui <- navbarPage(
 
   # -- Validation (dropdown) -------------------------------------------------
   navbarMenu("Validation",
-    tabPanel("SSE Validation", value = "sse", mod_sse_validation_ui("sse"))
+    tabPanel("SSE Validation", value = "sse", mod_sse_validation_ui("sse")),
+    tabPanel("SSE Analysis",   value = "sse_analysis", mod_sse_analysis_ui("sse_analysis"))
   ),
 
 )
@@ -409,10 +411,15 @@ server <- function(input, output, session) {
     groupsize    = groupsize_r,
     all_runs     = all_runs)
 
-  mod_sse_validation_server("sse",
+  sse_shared <- mod_sse_validation_server("sse",
     ext_data     = merged_ext,
     param_labels = param_labels_r,
     shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
+
+  mod_sse_analysis_server("sse_analysis",
+    sse_file_path = sse_shared$sse_file_path,
+    true_vals     = sse_shared$true_vals,
+    param_labels  = param_labels_r)
 
   mod_home_server("home",
     merged_ext   = merged_ext,

@@ -650,5 +650,10 @@ mod_sse_validation_server <- function(id, ext_data,
         )
       }
     )
+    # --- Return shared reactives for mod_sse_analysis ---
+    list(
+      sse_file_path = reactive(input$sse_file$datapath),
+      true_vals     = true_vals
+    )
   })
 }
