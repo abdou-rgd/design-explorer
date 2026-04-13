@@ -15,8 +15,8 @@ mod_sse_comparison_ui <- function(id) {
       tags$strong("Two-SSE Comparison"),
       tags$p(style = "margin:6px 0 0; font-size:0.9em;",
         "Compare an original design SSE with an optimized design SSE. ",
-        "Upload two PsN raw_results CSVs (from the same model) and a .ctl ",
-        "for true parameter values."
+        "Upload two PsN raw_results CSVs (from the same model). ",
+        "True parameter values are extracted from the .ctl loaded in the Home tab."
       )
     ),
 
@@ -35,11 +35,7 @@ mod_sse_comparison_ui <- function(id) {
                   width = "100%")
       ),
       column(4,
-        fileInput(ns("ctl_file"),
-                  "Control stream for true values (.ctl/.mod/.con)",
-                  accept = c(".ctl", ".mod", ".con"), width = "100%"),
-        helpText(style = "margin-top:-10px; font-size:0.82em; color:#666;",
-          "Optional if a .ctl was already uploaded in the main panel.")
+        uiOutput(ns("ctl_status"))
       )
     ),
 
@@ -152,6 +148,7 @@ mod_sse_comparison_ui <- function(id) {
 
 
 mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
+                                      shared_true_vals = reactive(NULL),
                                       param_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
@@ -180,27 +177,47 @@ mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
       )
     })
 
-    # --- True values from .ctl ---
-    ctl_lines <- reactive({
-      if (!is.null(input$ctl_file)) {
-        tryCatch(
-          readLines(input$ctl_file$datapath, warn = FALSE),
-          error = function(e) NULL
+    # --- .ctl status indicator ---
+    output$ctl_status <- renderUI({
+      has_ctl <- !is.null(shared_true_vals()) && length(shared_true_vals()) > 0L
+      if (has_ctl) {
+        div(
+          style = paste0(
+            "padding:10px 14px; border-radius:8px; margin-top:25px;",
+            " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
+          ),
+          icon("check-circle"),
+          tags$strong(sprintf(" True values loaded (%d params)",
+                              length(shared_true_vals()))),
+          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+            "From control stream uploaded in the Home tab.")
         )
       } else {
-        shared_ctl_lines()
+        div(
+          style = paste0(
+            "padding:10px 14px; border-radius:8px; margin-top:25px;",
+            " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
+          ),
+          icon("exclamation-triangle"),
+          tags$strong(" No control stream loaded"),
+          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+            "Upload a .ctl/.mod/.con file in the ",
+            tags$strong("Home"), " tab to extract true parameter values.")
+        )
       }
     })
 
+    # --- True values from .ctl (Home tab) ---
     true_vals <- reactive({
-      cl <- ctl_lines()
+      # Pre-computed from main upload
+      sv <- shared_true_vals()
+      if (!is.null(sv) && length(sv) > 0L) return(sv)
+
+      # Fallback: parse shared_ctl_lines directly
+      cl <- shared_ctl_lines()
       if (is.null(cl)) return(NULL)
       vals <- read_true_values(cl)
-      if (length(vals) == 0L) {
-        showNotification("No true values extracted from .ctl",
-                         type = "warning", duration = 6)
-        return(NULL)
-      }
+      if (length(vals) == 0L) return(NULL)
       vals
     })
 

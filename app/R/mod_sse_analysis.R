@@ -142,12 +142,16 @@ mod_sse_analysis_ui <- function(id) {
 }
 
 
-mod_sse_analysis_server <- function(id, sse_file_path, true_vals,
+mod_sse_analysis_server <- function(id, sse_file_path,
+                                    sse_all_shared = reactive(NULL),
+                                    true_vals,
                                     param_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
-    # --- Read unfiltered SSE data ---
+    # --- Read unfiltered SSE data (prefer pre-parsed from mod_sse_validation) ---
     sse_all <- reactive({
+      pre <- sse_all_shared()
+      if (!is.null(pre)) return(pre)
       fp <- sse_file_path()
       req(fp)
       tryCatch(

@@ -2,6 +2,47 @@
 # helpers_ui.R — Composants UI réutilisables V4
 # =============================================================================
 
+# -- Extraction fichiers NONMEM (tar.gz ou fichiers multiples) ----------------
+# Shared by mod_upload and mod_compare to avoid duplicated logic.
+# Returns named list: list(ext=, shk=, coi=, clt=, tab=, ctl=, bfm=, cpu=)
+extract_design_files <- function(files, tmp_prefix = "design") {
+  exts <- c("ext", "shk", "coi", "clt", "tab", "bfm", "cpu")
+  paths <- stats::setNames(
+    vector("list", length(exts) + 1L),
+    c(exts, "ctl")
+  )
+
+  if (nrow(files) == 1L &&
+      grepl("\\.(tar\\.gz|tgz)$", files$name, ignore.case = TRUE)) {
+    tmp <- file.path(tempdir(),
+                     paste0(tmp_prefix, "_", format(Sys.time(), "%H%M%S")))
+    dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
+    untar(files$datapath, exdir = tmp)
+
+    all_f <- list.files(tmp, recursive = TRUE, full.names = TRUE)
+    all_n <- basename(all_f)
+
+    for (et in exts) {
+      idx <- which(grepl(paste0("\\.", et, "$"), all_n, ignore.case = TRUE))[1]
+      if (!is.na(idx)) paths[[et]] <- all_f[idx]
+    }
+    ctl_idx <- which(grepl("\\.(ctl|mod|con)$", all_n, ignore.case = TRUE))[1]
+    if (!is.na(ctl_idx)) paths$ctl <- all_f[ctl_idx]
+  } else {
+    for (i in seq_len(nrow(files))) {
+      nm <- files$name[i]
+      dp <- files$datapath[i]
+      for (et in exts) {
+        if (grepl(paste0("\\.", et, "$"), nm, ignore.case = TRUE))
+          paths[[et]] <- dp
+      }
+      if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE))
+        paths$ctl <- dp
+    }
+  }
+  paths
+}
+
 # -- Seuils qualite RSE / RELATIVEINF (utilises par rse_badge / ri_badge) ---
 RSE_THRESHOLDS    <- c(20, 50, 100) # <20% bon, 20-50% modere, 50-100% mauvais, >100% tres mauvais
 RELINF_THRESHOLDS <- c(20, 50)   # >=50% bon, 20-50% modere, <20% mauvais

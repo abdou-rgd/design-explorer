@@ -291,7 +291,13 @@ server <- function(input, output, session) {
     if (is.null(tab)) return(NULL)
     compute_robust_summary(tab)
   })
-  merged_summary <- reactive({ examples$summary_data() %||% upload_summary() })
+  merged_summary   <- reactive({ examples$summary_data() %||% upload_summary() })
+  merged_ctl_lines <- reactive({ example_ctl_lines() %||% upload$ctl_lines() })
+  merged_true_vals <- reactive({
+    cl <- merged_ctl_lines()
+    if (is.null(cl)) return(NULL)
+    tryCatch(read_true_values(cl), error = function(e) NULL)
+  })
 
   # -- all_runs ---------------------------------------------------------------
   primary_name <- reactive({ input$primary_run_name %||% "Primary" })
@@ -397,14 +403,14 @@ server <- function(input, output, session) {
 
   mod_convergence_server("conv",
     ext_data = merged_ext, all_runs = all_runs,
-    ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }),
+    ctl_lines = merged_ctl_lines,
     cpu_secs = merged_cpu)
 
   mod_raw_server("raw",
     ext_data = merged_ext, all_runs = all_runs)
 
   mod_ctl_stream_server("ctl",
-    ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
+    ctl_lines = merged_ctl_lines)
 
   mod_power_server("power",
     ext_data     = merged_ext,
@@ -414,17 +420,20 @@ server <- function(input, output, session) {
     all_runs     = all_runs)
 
   sse_shared <- mod_sse_validation_server("sse",
-    ext_data     = merged_ext,
-    param_labels = param_labels_r,
-    shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }))
+    ext_data         = merged_ext,
+    param_labels     = param_labels_r,
+    shared_ctl_lines = merged_ctl_lines,
+    shared_true_vals = merged_true_vals)
 
   mod_sse_analysis_server("sse_analysis",
-    sse_file_path = sse_shared$sse_file_path,
-    true_vals     = sse_shared$true_vals,
-    param_labels  = param_labels_r)
+    sse_file_path  = sse_shared$sse_file_path,
+    sse_all_shared = sse_shared$sse_all,
+    true_vals      = sse_shared$true_vals,
+    param_labels   = param_labels_r)
 
   mod_sse_comparison_server("sse_comparison",
-    shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }),
+    shared_ctl_lines = merged_ctl_lines,
+    shared_true_vals = merged_true_vals,
     param_labels     = param_labels_r)
 
   mod_home_server("home",

@@ -44,50 +44,7 @@ mod_upload_server <- function(id, reset_trigger = NULL) {
       files <- input$upload
       req(files)
 
-      paths <- list(ext = NULL, shk = NULL, coi = NULL, clt = NULL, tab = NULL, ctl = NULL, bfm = NULL, cpu = NULL)
-
-      if (nrow(files) == 1L && grepl("\\.(tar\\.gz|tgz)$", files$name, ignore.case = TRUE)) {
-        # tar.gz : extraire dans un dossier temporaire
-        tmp <- file.path(tempdir(), paste0("design_", format(Sys.time(), "%H%M%S")))
-        dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
-        untar(files$datapath, exdir = tmp)
-
-        all_files <- list.files(tmp, recursive = TRUE, full.names = TRUE)
-        all_names <- basename(all_files)
-
-        ext_i <- which(grepl("\\.ext$", all_names, ignore.case = TRUE))[1]
-        shk_i <- which(grepl("\\.shk$", all_names, ignore.case = TRUE))[1]
-        coi_i <- which(grepl("\\.coi$", all_names, ignore.case = TRUE))[1]
-        clt_i <- which(grepl("\\.clt$", all_names, ignore.case = TRUE))[1]
-        tab_i <- which(grepl("\\.tab$", all_names, ignore.case = TRUE))[1]
-        ctl_i <- which(grepl("\\.(ctl|mod|con)$", all_names, ignore.case = TRUE))[1]
-        bfm_i <- which(grepl("\\.bfm$", all_names, ignore.case = TRUE))[1]
-        cpu_i <- which(grepl("\\.cpu$", all_names, ignore.case = TRUE))[1]
-
-        if (!is.na(ext_i)) paths$ext <- all_files[ext_i]
-        if (!is.na(shk_i)) paths$shk <- all_files[shk_i]
-        if (!is.na(coi_i)) paths$coi <- all_files[coi_i]
-        if (!is.na(clt_i)) paths$clt <- all_files[clt_i]
-        if (!is.na(tab_i)) paths$tab <- all_files[tab_i]
-        if (!is.na(ctl_i)) paths$ctl <- all_files[ctl_i]
-        if (!is.na(bfm_i)) paths$bfm <- all_files[bfm_i]
-        if (!is.na(cpu_i)) paths$cpu <- all_files[cpu_i]
-
-      } else {
-        # Fichiers multiples : matcher par nom original
-        for (i in seq_len(nrow(files))) {
-          nm <- files$name[i]
-          dp <- files$datapath[i]
-          if (grepl("\\.ext$", nm, ignore.case = TRUE)) paths$ext <- dp
-          if (grepl("\\.shk$", nm, ignore.case = TRUE)) paths$shk <- dp
-          if (grepl("\\.coi$", nm, ignore.case = TRUE)) paths$coi <- dp
-          if (grepl("\\.clt$", nm, ignore.case = TRUE)) paths$clt <- dp
-          if (grepl("\\.tab$", nm, ignore.case = TRUE)) paths$tab <- dp
-          if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE)) paths$ctl <- dp
-          if (grepl("\\.bfm$", nm, ignore.case = TRUE)) paths$bfm <- dp
-          if (grepl("\\.cpu$", nm, ignore.case = TRUE)) paths$cpu <- dp
-        }
-      }
+      paths <- extract_design_files(files, "design")
 
       file_paths(paths)
 

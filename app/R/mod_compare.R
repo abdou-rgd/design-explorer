@@ -91,42 +91,7 @@ mod_compare_server <- function(id) {
           observeEvent(input[[paste0("upload_", local_rid)]], {
             files <- input[[paste0("upload_", local_rid)]]
             req(files)
-            paths <- list(ext = NULL, shk = NULL, coi = NULL,
-                          clt = NULL, tab = NULL, ctl = NULL,
-                          cpu = NULL)
-
-            if (nrow(files) == 1L &&
-                grepl("\\.(tar\\.gz|tgz)$", files$name,
-                      ignore.case = TRUE)) {
-              tmp <- file.path(tempdir(),
-                paste0("comp_", local_rid, "_",
-                       format(Sys.time(), "%H%M%S")))
-              dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
-              untar(files$datapath, exdir = tmp)
-              all_f <- list.files(tmp, recursive = TRUE,
-                                  full.names = TRUE)
-              all_n <- basename(all_f)
-              for (et in c("ext", "shk", "coi", "clt", "tab", "cpu")) {
-                idx <- which(grepl(paste0("\\.", et, "$"), all_n,
-                                   ignore.case = TRUE))[1]
-                if (!is.na(idx)) paths[[et]] <- all_f[idx]
-              }
-              ctl_idx <- which(grepl("\\.(ctl|mod|con)$", all_n,
-                                     ignore.case = TRUE))[1]
-              if (!is.na(ctl_idx)) paths$ctl <- all_f[ctl_idx]
-            } else {
-              for (i in seq_len(nrow(files))) {
-                nm <- files$name[i]
-                dp <- files$datapath[i]
-                for (et in c("ext", "shk", "coi", "clt", "tab", "cpu")) {
-                  if (grepl(paste0("\\.", et, "$"), nm,
-                            ignore.case = TRUE))
-                    paths[[et]] <- dp
-                }
-                if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE))
-                  paths$ctl <- dp
-              }
-            }
+            paths <- extract_design_files(files, paste0("comp_", local_rid))
 
             # Parse and store in run_data (does NOT trigger UI re-render)
             parsed <- list(
