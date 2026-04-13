@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.1"
-.APP_VERSION_NAME <- "Le Petit Prince s'envole"
+.APP_VERSION      <- "V5.3"
+.APP_VERSION_NAME <- "Le Petit Prince compare"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -57,6 +57,7 @@ source("../R/report_design.R",        local = TRUE)
 source("../R/fim_metrics.R",          local = TRUE)
 source("../R/sse_metrics.R",          local = TRUE)
 source("../R/sse_diagnostics.R",      local = TRUE)
+source("../R/sse_comparison.R",       local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -138,7 +139,8 @@ ui <- navbarPage(
   # -- Validation (dropdown) -------------------------------------------------
   navbarMenu("Validation",
     tabPanel("SSE Validation", value = "sse", mod_sse_validation_ui("sse")),
-    tabPanel("SSE Analysis",   value = "sse_analysis", mod_sse_analysis_ui("sse_analysis"))
+    tabPanel("SSE Analysis",   value = "sse_analysis", mod_sse_analysis_ui("sse_analysis")),
+    tabPanel("SSE Comparison", value = "sse_comparison", mod_sse_comparison_ui("sse_comparison"))
   ),
 
 )
@@ -420,6 +422,10 @@ server <- function(input, output, session) {
     sse_file_path = sse_shared$sse_file_path,
     true_vals     = sse_shared$true_vals,
     param_labels  = param_labels_r)
+
+  mod_sse_comparison_server("sse_comparison",
+    shared_ctl_lines = reactive({ example_ctl_lines() %||% upload$ctl_lines() }),
+    param_labels     = param_labels_r)
 
   mod_home_server("home",
     merged_ext   = merged_ext,
