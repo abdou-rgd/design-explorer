@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.0.0"
-.APP_VERSION_NAME <- "Le depart du Petit Prince"
+.APP_VERSION      <- "V5.1"
+.APP_VERSION_NAME <- "Le Petit Prince s'envole"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log

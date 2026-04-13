@@ -2,6 +2,24 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V5.1 — 2026-04-12 — *Le Petit Prince s'envole* (navbarPage migration, Home redesign, UI polish)
+
+### Architecture (`app/app.R`, `app/www/styles.css`)
+- [refactor] **navbarPage migration** : remplacement de `fluidPage` + 12 `conditionalPanel` (JS navTo) par `navbarPage(inverse=TRUE, collapsible=TRUE)` + `navbarMenu` dropdowns natifs
+- [refactor] **CSS cleanup** : suppression ~83 lignes CSS sidebar, ajout styling navbar-inverse
+- [refactor] **Home tab two-column layout** : upload sidebar compact (25%) + run summary (75%)
+- [refactor] **Compare integre dans Home** : plus d'onglet separe, upload unique dans Home
+
+### Modules
+- [feat] **mod_times** : settings_bar (unite temps), plot_export pour prediction/gantt
+- [feat] **mod_power** : conversion test params en settings_bar, upgrade popkin_tabs
+- [fix] **mod_home** : param count corrige (estimated only), ajout Method card, suppression D-criterion redondant
+- [feat] **helpers_ui** : ajout `detect_method()`, suppression dead code `metric_card`/`kpi_bar_ui`
+- [fix] **CSS** : suppression regles `.metric-card` mortes, harmonisation font scale (.72rem labels)
+- [chore] **Suppression `run_preview.R`** (fichier mort)
+
+---
+
 ## V5.0.0 — 2026-04-12 — *Le d\u00e9part du Petit Prince* (Refonte V5 — Home page, kill drawer, English labels, rename DE$IGN EXPLORER)
 
 ### Architecture (`app/app.R`, `app/R/mod_home.R`, `app/www/styles.css`)

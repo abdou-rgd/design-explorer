@@ -1,6 +1,6 @@
 # NONMEM $DESIGN — Post-Processing & Optimal Design
 
-**V5.0.0** · Stage M2 Sciences des donn\u00e9es de sant\u00e9 · Sanofi
+**V5.1** · Stage M2 Sciences des donn\u00e9es de sant\u00e9 · Sanofi
 Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Information Matrix (FIM).
 
 ---
@@ -25,26 +25,28 @@ Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Infor
 │   ├── fim_metrics.R            # Power/NSN Wald & TOST : compute_power_wald(), ...
 │   └── report_design.R          # Visualisations ggplot2 : plot_rse(), plot_convergence(), ...
 ├── app/
-│   ├── app.R                    # Application Shiny "DE$IGN EXPLORER" (V5)
+│   ├── app.R                    # Application Shiny "DE$IGN EXPLORER" (V5.1)
 │   ├── install_deps.R           # Installation des dépendances Shiny
 │   ├── examples/                # Exemples intégrés (Bauer 2021, examples 1-7)
 │   └── R/                       # 13 modules Shiny
+│       ├── mod_home.R           # Home : upload + run summary + compare
 │       ├── mod_upload.R         # Import de fichiers NONMEM (.ext, .shk, .coi, .tab, ...)
-│       ├── mod_params.R         # Paramètres finaux, RSE, shrinkage, temps optimaux
-│       ├── mod_rse.R            # RSE prédit (%) avec seuils 4 paliers
+│       ├── mod_params.R         # Parametres finaux, RSE, shrinkage
+│       ├── mod_rse.R            # RSE predit (%) avec seuils 4 paliers
 │       ├── mod_relativeinf.R    # Information relative par ETA
 │       ├── mod_convergence.R    # Convergence OFV par optimiseur
-│       ├── mod_fim.R            # FIM heatmap, D-critère, eigenvalues
-│       ├── mod_compare.R        # Comparaison multi-runs side-by-side
-│       ├── mod_times.R          # Temps optimisés (+ design robuste boxplots)
+│       ├── mod_fim.R            # FIM heatmap, D-critere, eigenvalues
+│       ├── mod_times.R          # Temps optimises (+ design robuste boxplots)
 │       ├── mod_prior.R          # Visualisation $PRIOR NWPRI
 │       ├── mod_power.R          # Power Wald, NSN, Equivalence TOST
+│       ├── mod_sse_validation.R # Validation SSE vs FIM (scatter, REE, RSE bar)
 │       ├── mod_raw.R            # Fichiers bruts
 │       ├── mod_ctl_stream.R     # Visualisation control stream
-│       └── mod_examples.R       # Exemples intégrés avec auto-compare
+│       ├── mod_examples.R       # Exemples integres avec auto-compare
+│       └── helpers_ui.R         # Helpers UI : badges, pills, detect_method()
 ├── tests/
 │   ├── run_tests.R              # Script lanceur de tests
-│   └── testthat/                # 52 tests unitaires
+│   └── testthat/                # 175 tests unitaires
 └── docs/
     ├── nonmem/
     │   └── manuel_nonmem.txt     # Manuel NONMEM 7.5.1 complet (13 057 lignes)
@@ -71,21 +73,15 @@ shiny::runApp("app/")
 
 ### Fonctionnalités
 
-| Onglet | Description |
-|--------|-------------|
-| **Upload** | Import de fichiers `.ext`, `.shk`, `.tab`, `.coi`, `.clt`, `.cov`, `.cor` |
-| **Paramètres** | Paramètres finaux, valeurs initiales, temps optimaux |
-| **RSE** | Relative Standard Errors prédits (%) par paramètre avec seuils 4 paliers |
-| **RelInf** | Information relative (%) par ETA — mesure l'informativité du design |
-| **Convergence** | Évolution de l'OFV au cours des itérations par optimiseur |
-| **FIM** | Fisher Information Matrix (heatmap), D-critère, eigenvalues |
-| **Comparer** | Comparaison multi-runs side-by-side |
-| **Temps optimaux** | Temps/doses optimisés + courbe prédite (gère elementary designs) |
-| **Prior** | Visualisation `$PRIOR NWPRI` |
-| **Power** | Power Wald, NSN, Equivalence TOST |
-| **Control stream** | Visualisation du fichier `.ctl` |
-| **Fichiers bruts** | Visualisation des fichiers NONMEM bruts |
-| **Exemples** | Exemples intégrés (Bauer 2021, 1–7) avec auto-compare |
+| Tab / Menu | Description |
+|------------|-------------|
+| **Home** | Upload fichiers + run summary (OFV, params, CPU, method) + compare multi-runs |
+| **Parameters** | Parametres finaux, RSE, shrinkage |
+| **Design** (menu) | RSE predit (4 paliers), Information relative (%), Optimal Times, Robust Design |
+| **Analysis** (menu) | FIM heatmap + eigenvalues, Convergence OFV, SSE Validation (scatter FIM vs SSE) |
+| **Decision** (menu) | Power Wald, NSN, Equivalence TOST |
+| **Raw Data** | Fichiers bruts, Control stream viewer |
+| **Examples** | Exemples integres (Bauer 2021, 1-7) avec auto-compare |
 
 ---
 
