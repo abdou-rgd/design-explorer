@@ -10,13 +10,26 @@ mod_times_ui <- function(id) {
         choices = c("Hours" = "hours", "Days" = "days"),
         selected = "hours", inline = TRUE)
     ),
+    mod_mrgsolve_ui(ns("mrgsolve")),
     uiOutput(ns("content"))
   )
 }
 
-mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labels = reactive(NULL)) {
+mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
+                             cmt_labels = reactive(NULL),
+                             ext_data = reactive(NULL),
+                             ctl_lines = reactive(NULL),
+                             theta_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # -- mrgsolve sub-module (nested) ------------------------------------------
+    mrg_sim <- mod_mrgsolve_server("mrgsolve",
+      ext_data     = ext_data,
+      tab_data     = tab_data,
+      ctl_lines    = ctl_lines,
+      theta_labels = theta_labels
+    )
 
     # -- Tab effectif : tab_data() ou premier run secondaire ayant un .tab ------
     # Permet d'afficher l'onglet Temps optimaux meme si le run principal n'a
@@ -179,13 +192,39 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
     # -- Courbe predite (reactive for export) ------------------------------------
     pred_plot <- reactive({
       runs <- all_runs()
+      tu <- input$time_unit %||% "hours"
+
+      # mrgsolve smooth plot: if simulation is available, use it
+      if (!is.null(mrg_sim) && isTRUE(mrg_sim$is_available())) {
+        req(tab_single())
+        # Get compare points from second run (CTP) if available
+        ctp_points <- NULL
+        if (length(runs) > 1L) {
+          run_keys <- names(runs)
+          for (rk in run_keys[-1]) {
+            if (!is.null(runs[[rk]]$tab_data)) {
+              ctp_points <- runs[[rk]]$tab_data
+              break
+            }
+          }
+        }
+        return(plot_pk_profile(
+          sim_data       = mrg_sim$sim_data(),
+          obs_points     = tab_single(),
+          dose_times     = mrg_sim$dose_times(),
+          time_unit      = tu,
+          cmt_labels     = cmt_labels(),
+          compare_points = ctp_points
+        ))
+      }
+
       if (length(runs) <= 1L) {
         req(tab_single())
-        tu <- input$time_unit %||% "hours"
         return(plot_model_prediction(tab_single(), time_unit = tu))
       }
 
       # Multi-run : overlay des courbes predites par run
+      pred_cols_used <- character(0)
       combined <- purrr::imap(runs, function(r, rid) {
         if (is.null(r$tab_data)) return(NULL)
         tab <- r$tab_data
@@ -195,10 +234,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
         if (nrow(tab) == 0L) return(NULL)
         pred_col <- intersect(c("IPRED", "PRED", "DV"), names(tab))[1]
         if (is.na(pred_col)) return(NULL)
+        pred_cols_used[[rid]] <<- pred_col
         tab |>
           dplyr::mutate(IPRED = .data[[pred_col]], run = rid) |>
           dplyr::select(any_of(c("TIME", "IPRED", "TSTRAT", "run")))
       }) |> dplyr::bind_rows()
+      # Warn if runs use different prediction columns
+      if (length(unique(pred_cols_used)) > 1L) {
+        message("[mod_times] Runs use different prediction columns: ",
+                paste(names(pred_cols_used), pred_cols_used,
+                      sep = "=", collapse = ", "))
+      }
 
       if (nrow(combined) == 0L) {
         req(tab_single())
@@ -329,7 +375,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()), cmt_labe
           if (is.null(r$tab_data)) return(NULL)
           obs <- r$tab_data
           if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
-          if (nrow(obs) > 1L) obs <- obs[-1L, , drop = FALSE]
           if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- 1
           obs |> mutate(run = rid) |>
             select(any_of(c("TSTRAT", "TIME", "run")))

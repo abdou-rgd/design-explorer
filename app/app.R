@@ -58,6 +58,7 @@ source("../R/fim_metrics.R",          local = TRUE)
 source("../R/sse_metrics.R",          local = TRUE)
 source("../R/sse_diagnostics.R",      local = TRUE)
 source("../R/sse_comparison.R",       local = TRUE)
+source("../R/mrgsolve_bridge.R",      local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -396,7 +397,9 @@ server <- function(input, output, session) {
     tbl_no = tbl_no, param_labels = param_labels_r, all_runs = all_runs)
 
   mod_times_server("times",
-    tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r)
+    tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r,
+    ext_data = merged_ext, ctl_lines = merged_ctl_lines,
+    theta_labels = param_labels_r)
 
   mod_prior_server("prior",
     summary_data = merged_summary, ctl_data = merged_ctl,

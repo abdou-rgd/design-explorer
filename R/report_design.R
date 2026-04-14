@@ -814,7 +814,9 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
       }
       # Hard cap: never show more than 4 facets
       if (length(rep_ids) > 4L) {
-        rep_ids <- sort(rep_ids)[1:2L]
+        rep_ids <- sort(rep_ids)[1:4L]
+        message("[plot_model_prediction] ", n_ids, " IDs detectes, ",
+                "affichage limite a ", length(rep_ids), " IDs representatifs")
       }
       obs <- obs |> dplyr::filter(ID %in% rep_ids)
     }
@@ -940,6 +942,200 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     p <- p + facet_wrap(~ id_label, ncol = 1, scales = "free_y")
   } else if (has_cmt) {
     p <- p + facet_wrap(~ response, scales = "free_y", ncol = 1)
+  }
+
+  p
+}
+
+
+# =============================================================================
+# plot_pk_profile — Profil PK lisse via mrgsolve + points d'echantillonnage
+# =============================================================================
+
+#' Profil PK simule (courbe lisse) avec points d'echantillonnage superposes
+#'
+#' @param sim_data        Tibble mrgsolve: time, IPRED, cmt, arm
+#' @param obs_points      Tibble .tab: TIME, IPRED/PRED/DV, TSTRAT, CMT, ID, EVID
+#' @param dose_times      Vecteur numerique des temps de dose (pour les lignes rouges)
+#' @param time_unit       "hours" ou "days"
+#' @param cmt_labels      Vecteur nomme: c("1"="Depot", "2"="Central")
+#' @param arm_labels      Vecteur nomme: c("1"="IV", "2"="SC")
+#' @param title           Titre du plot (NULL = auto)
+#' @param compare_points  Tibble optionnel: 2e jeu de points (ex: CTP avant optimisation)
+#' @return ggplot
+plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
+                            time_unit = "hours", cmt_labels = NULL,
+                            arm_labels = NULL, title = NULL,
+                            compare_points = NULL) {
+  if (is.null(sim_data) || nrow(sim_data) == 0L) {
+    return(ggplot() + labs(title = "Pas de donnees de simulation") +
+             .theme_design())
+  }
+
+  # -- Time unit conversion ---------------------------------------------------
+  time_div <- if (time_unit == "days") 24 else 1
+  time_label <- if (time_unit == "days") "Temps (jours)" else "Temps (heures)"
+
+  sim <- sim_data |>
+    dplyr::mutate(time_plot = time / time_div)
+
+  # -- Prepare obs points (optimized sampling) --------------------------------
+  obs <- NULL
+  if (!is.null(obs_points) && nrow(obs_points) > 0L) {
+    obs <- obs_points
+    if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
+    if ("table_no" %in% names(obs) && dplyr::n_distinct(obs$table_no) > 1L) {
+      obs <- dplyr::filter(obs, table_no == 1L)
+    }
+    y_col <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(obs))[1]
+    if (!is.na(y_col)) {
+      obs <- obs |> dplyr::mutate(
+        y_val = .data[[y_col]],
+        time_plot = TIME / time_div
+      )
+      obs$arm <- if ("ID" %in% names(obs)) obs$ID else 1
+      obs$cmt <- if ("CMT" %in% names(obs)) obs$CMT else 1L
+    } else {
+      obs <- NULL
+    }
+  }
+
+  # -- Prepare compare points (CTP) ------------------------------------------
+  ctp <- NULL
+  if (!is.null(compare_points) && nrow(compare_points) > 0L) {
+    ctp <- compare_points
+    if ("EVID" %in% names(ctp)) ctp <- dplyr::filter(ctp, EVID == 0)
+    if ("table_no" %in% names(ctp) && dplyr::n_distinct(ctp$table_no) > 1L) {
+      ctp <- dplyr::filter(ctp, table_no == 1L)
+    }
+    y_col_c <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(ctp))[1]
+    if (!is.na(y_col_c)) {
+      ctp <- ctp |> dplyr::mutate(
+        y_val = .data[[y_col_c]],
+        time_plot = TIME / time_div
+      )
+      ctp$arm <- if ("ID" %in% names(ctp)) ctp$ID else 1
+      ctp$cmt <- if ("CMT" %in% names(ctp)) ctp$CMT else 1L
+    } else {
+      ctp <- NULL
+    }
+  }
+
+  # -- Apply arm/cmt labels ---------------------------------------------------
+  .apply_arm_label <- function(df, labels) {
+    if (is.null(df)) return(NULL)
+    if (!is.null(labels)) {
+      df$arm_label <- ifelse(
+        as.character(df$arm) %in% names(labels),
+        labels[as.character(df$arm)],
+        paste("Arm", df$arm)
+      )
+    } else {
+      df$arm_label <- paste("Arm", df$arm)
+    }
+    df
+  }
+  sim <- .apply_arm_label(sim, arm_labels)
+  obs <- .apply_arm_label(obs, arm_labels)
+  ctp <- .apply_arm_label(ctp, arm_labels)
+
+  .apply_cmt_label <- function(df, labels) {
+    if (is.null(df)) return(NULL)
+    if (!is.null(labels)) {
+      df$cmt_label <- ifelse(
+        as.character(df$cmt) %in% names(labels),
+        labels[as.character(df$cmt)],
+        paste("CMT", df$cmt)
+      )
+    } else {
+      df$cmt_label <- paste("CMT", df$cmt)
+    }
+    df
+  }
+  sim <- .apply_cmt_label(sim, cmt_labels)
+  obs <- .apply_cmt_label(obs, cmt_labels)
+
+  # -- Detect multi-dimensions ------------------------------------------------
+  n_arms <- dplyr::n_distinct(sim$arm)
+  n_cmts <- dplyr::n_distinct(sim$cmt)
+  has_multi_arm <- n_arms > 1L
+  has_multi_cmt <- n_cmts > 1L
+
+  # -- Build plot -------------------------------------------------------------
+  p <- ggplot(sim, aes(x = time_plot, y = IPRED)) +
+    geom_line(
+      aes(group = interaction(arm, cmt)),
+      color = "grey30", size = 0.7, alpha = 0.9
+    )
+
+  # Overlay optimized sampling points
+  has_ctp <- !is.null(ctp)
+  if (!is.null(obs)) {
+    p <- p + geom_point(
+      data = obs, aes(x = time_plot, y = y_val),
+      color = "#7c3aed", shape = 16, size = 3, alpha = 0.9
+    )
+  }
+  if (has_ctp) {
+    p <- p + geom_point(
+      data = ctp, aes(x = time_plot, y = y_val),
+      color = "#e67e22", shape = 17, size = 3, alpha = 0.9
+    )
+  }
+
+  # -- Dose markers -----------------------------------------------------------
+  if (!is.null(dose_times) && length(dose_times) > 0L) {
+    dose_t <- unique(dose_times / time_div)
+    p <- p + geom_vline(
+      xintercept = dose_t, linetype = "dotted",
+      color = "#e74c3c", alpha = 0.5, size = 0.4
+    )
+  }
+
+  # -- Secondary x-axis with sampling time ticks ------------------------------
+  if (!is.null(obs)) {
+    samp_breaks <- sort(unique(round(obs$time_plot, 1)))
+    if (length(samp_breaks) > 15L) {
+      idx <- seq(1, length(samp_breaks), length.out = 15)
+      samp_breaks <- samp_breaks[round(idx)]
+    }
+    p <- p + scale_x_continuous(
+      sec.axis = dup_axis(breaks = samp_breaks,
+                          name = "Points de prelevement")
+    )
+  }
+
+  # -- Labels & theme ---------------------------------------------------------
+  ttl <- title %||% "Profil PK predit et points de prelevement"
+  sub <- if (has_ctp) {
+    "Simulation population (ETA=0) | Ronds = Optimise | Triangles = CTP"
+  } else {
+    "Simulation population (ETA=0) | Points = temps optimaux"
+  }
+
+  caption_text <- if (has_ctp) {
+    "Pointilles rouges = doses"
+  } else {
+    "Pointilles rouges = doses"
+  }
+
+  p <- p +
+    labs(title = ttl, subtitle = sub, x = time_label,
+         y = "Concentration predite", caption = caption_text) +
+    .theme_design() +
+    theme(
+      plot.caption = element_text(size = 8, color = "#6b7280"),
+      axis.text.x.top = element_text(size = 6, angle = 45, hjust = 0,
+                                      color = "#9ca3af")
+    )
+
+  # -- Facetting ---------------------------------------------------------------
+  if (has_multi_arm && has_multi_cmt) {
+    p <- p + facet_grid(arm_label ~ cmt_label, scales = "free_y")
+  } else if (has_multi_arm) {
+    p <- p + facet_wrap(~ arm_label, ncol = 1, scales = "free_y")
+  } else if (has_multi_cmt) {
+    p <- p + facet_wrap(~ cmt_label, ncol = 1, scales = "free_y")
   }
 
   p

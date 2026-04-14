@@ -8,8 +8,8 @@
 extract_design_files <- function(files, tmp_prefix = "design") {
   exts <- c("ext", "shk", "coi", "clt", "tab", "bfm", "cpu")
   paths <- stats::setNames(
-    vector("list", length(exts) + 1L),
-    c(exts, "ctl")
+    vector("list", length(exts) + 2L),
+    c(exts, "ctl", "mrg_cpp")
   )
 
   if (nrow(files) == 1L &&
@@ -28,6 +28,8 @@ extract_design_files <- function(files, tmp_prefix = "design") {
     }
     ctl_idx <- which(grepl("\\.(ctl|mod|con)$", all_n, ignore.case = TRUE))[1]
     if (!is.na(ctl_idx)) paths$ctl <- all_f[ctl_idx]
+    cpp_idx <- which(grepl("\\.cpp$", all_n, ignore.case = TRUE))[1]
+    if (!is.na(cpp_idx)) paths$mrg_cpp <- all_f[cpp_idx]
   } else {
     for (i in seq_len(nrow(files))) {
       nm <- files$name[i]
@@ -38,6 +40,8 @@ extract_design_files <- function(files, tmp_prefix = "design") {
       }
       if (grepl("\\.(ctl|mod|con)$", nm, ignore.case = TRUE))
         paths$ctl <- dp
+      if (grepl("\\.cpp$", nm, ignore.case = TRUE))
+        paths$mrg_cpp <- dp
     }
   }
   paths
