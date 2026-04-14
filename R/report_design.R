@@ -55,6 +55,52 @@ library(purrr)
     )
 }
 
+# Placeholder vide pour donnees manquantes
+.empty_plot <- function(msg) ggplot() + labs(title = msg) + .theme_design()
+
+# Prepare obs/CTP points from .tab data (shared by plot_pk_profile)
+.prep_points <- function(df, time_div) {
+  if (is.null(df) || nrow(df) == 0L) return(NULL)
+  if ("EVID" %in% names(df)) df <- dplyr::filter(df, EVID == 0)
+  if ("table_no" %in% names(df) && dplyr::n_distinct(df$table_no) > 1L)
+    df <- dplyr::filter(df, table_no == 1L)
+  y_col <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(df))[1]
+  if (is.na(y_col)) return(NULL)
+  df |> dplyr::mutate(
+    y_val     = .data[[y_col]],
+    time_plot = TIME / time_div,
+    arm       = if ("ID"  %in% names(df)) df$ID  else 1,
+    cmt       = if ("CMT" %in% names(df)) df$CMT else 1L
+  )
+}
+
+# Select representative IDs when dataset has >max_ids unique IDs
+.select_representative_ids <- function(obs, group_col, max_ids = 4L) {
+  n_ids <- dplyr::n_distinct(obs$ID)
+  if (n_ids <= max_ids) return(unique(obs$ID))
+
+  rep_ids <- NULL
+  if (group_col %in% names(obs)) {
+    arm_sig <- obs |>
+      dplyr::group_by(ID) |>
+      dplyr::summarise(sig = paste(sort(unique(.data[[group_col]])),
+                                   collapse = ","),
+                       .groups = "drop")
+    rep_ids <- arm_sig |>
+      dplyr::group_by(sig) |>
+      dplyr::slice_min(ID, n = 1L) |>
+      dplyr::ungroup() |>
+      dplyr::pull(ID)
+  }
+  if (is.null(rep_ids) || length(rep_ids) == 0L) {
+    rep_ids <- sort(unique(obs$ID))[1:2L]
+  }
+  if (length(rep_ids) > max_ids) {
+    rep_ids <- sort(rep_ids)[1:max_ids]
+  }
+  rep_ids
+}
+
 # Couleurs qualité
 .COLORS_RI  <- c(
   "> 50% (bon)"         = "#4CAF50",
@@ -103,7 +149,7 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
 
   if (nrow(ri) == 0L) {
     warning("Aucune donnée RELATIVEINF (TYPE 11) dans le fichier .shk fourni.")
-    return(ggplot() + labs(title = "Pas de données RELATIVEINF") + .theme_design())
+    return(.empty_plot("Pas de donnees RELATIVEINF"))
   }
 
   # Renommage optionnel des ETAs
@@ -181,7 +227,7 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
 
   if (nrow(rse) == 0L) {
     warning("Aucun paramètre estimable trouvé dans le fichier .ext fourni.")
-    return(ggplot() + labs(title = "Pas de données RSE") + .theme_design())
+    return(.empty_plot("Pas de donnees RSE"))
   }
 
   # Déterminer le type de paramètre AVANT renommage
@@ -281,7 +327,7 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
 
   if (nrow(dat) == 0L) {
     warning("Aucune ligne d'itération dans .ext (run d'évaluation MAXEVAL=0 ?).")
-    return(ggplot() + labs(title = "Pas de données de convergence (MAXEVAL=0)") + .theme_design())
+    return(.empty_plot("Pas de donnees de convergence (MAXEVAL=0)"))
   }
 
   n_blocs <- n_distinct(dat$table_no)
@@ -395,9 +441,7 @@ build_convergence_steps <- function(ext, cpu_secs = NA_real_,
 #' @export
 plot_convergence_steps <- function(steps_df, title = NULL) {
   if (is.null(steps_df) || nrow(steps_df) == 0L) {
-    return(ggplot() +
-      labs(title = "Pas de donnees de convergence par phase") +
-      .theme_design())
+    return(.empty_plot("Pas de donnees de convergence par phase"))
   }
 
   col_eval <- "#D4883A"
@@ -405,7 +449,6 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
   col_gain <- "#1B8C4E"
 
   n <- nrow(steps_df)
-  steps_df$x <- seq_len(n)
   point_colors <- ifelse(steps_df$is_eval, col_eval, col_opti)
 
   # Gain calculation
@@ -498,13 +541,13 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
 #' @export
 plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
   if (is.null(fim_matrix) || nrow(fim_matrix) == 0L) {
-    return(ggplot() + labs(title = "Pas de matrice FIM disponible") + .theme_design())
+    return(.empty_plot("Pas de matrice FIM disponible"))
   }
 
   # Utiliser get_cor_matrix() pour filtrage + inversion + correlation
   corr_mat <- get_cor_matrix(fim_matrix)
   if (is.null(corr_mat)) {
-    return(ggplot() + labs(title = "FIM singuliere -- correlations non calculables") + .theme_design())
+    return(.empty_plot("FIM singuliere -- correlations non calculables"))
   }
 
   # Renommer les paramètres si labels fournis
@@ -563,7 +606,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
                                cmt_col = NULL, title = NULL) {
 
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
-    return(ggplot() + labs(title = "Pas de données .tab disponibles") + .theme_design())
+    return(.empty_plot("Pas de donnees .tab disponibles"))
   }
 
   # Filtrer observations uniquement (EVID == 0)
@@ -573,7 +616,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
   }
 
   if (nrow(obs) == 0L) {
-    return(ggplot() + labs(title = "Aucune observation (EVID=0) dans le .tab") + .theme_design())
+    return(.empty_plot("Aucune observation (EVID=0) dans le .tab"))
   }
 
   # Vérifier que les colonnes existent
@@ -645,7 +688,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   rse <- get_rse(ext, table_no)
 
   if (nrow(rse) == 0L) {
-    return(ggplot() + labs(title = "Pas de données SE") + .theme_design())
+    return(.empty_plot("Pas de donnees SE"))
   }
 
   rse <- rse |>
@@ -699,7 +742,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
 plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   rse <- get_rse(ext, table_no)
   if (nrow(rse) == 0L) {
-    return(ggplot() + labs(title = "Pas de donnees RSE") + .theme_design())
+    return(.empty_plot("Pas de donnees RSE"))
   }
 
   if (!is.null(param_labels)) {
@@ -710,8 +753,7 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
     mutate(quality = factor(
       .rse_quality(rse_pct),
       levels = names(.COLORS_RSE)
-    )) |>
-    arrange(desc(rse_pct))
+    ))
 
   ttl <- title %||% "RSE prédit par la FIM (%) -- Waterfall"
 
@@ -753,7 +795,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
                                   time_unit = "hours", show_doses = TRUE,
                                   arm_labels = NULL, cmt_labels = NULL) {
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
-    return(ggplot() + labs(title = "Pas de donnees .tab") + .theme_design())
+    return(.empty_plot("Pas de donnees .tab"))
   }
 
   # Extract dose times BEFORE filtering (for dose markers)
@@ -773,13 +815,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   obs <- tab_data
   if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
   if (nrow(obs) == 0L) {
-    return(ggplot() + labs(title = "Aucune observation") + .theme_design())
+    return(.empty_plot("Aucune observation"))
   }
 
   # Determine Y variable
   y_col <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(obs))[1]
   if (is.na(y_col)) {
-    return(ggplot() + labs(title = "Colonne IPRED/PRED/DV absente") + .theme_design())
+    return(.empty_plot("Colonne IPRED/PRED/DV absente"))
   }
 
   if (!group_col %in% names(obs)) obs[[group_col]] <- 1
@@ -791,33 +833,9 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   # Detect multi-ID (e.g. IV vs SC elementary designs or dataset classique)
   has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
   if (has_multi_id) {
-    n_ids <- n_distinct(obs$ID)
-    if (n_ids > 4L) {
-      # Try to keep 1 representative ID per arm (unique TSTRAT pattern)
-      tstrat_col <- if (group_col %in% names(obs)) group_col else NULL
-      rep_ids <- NULL
-      if (!is.null(tstrat_col)) {
-        arm_sig <- obs |>
-          dplyr::group_by(ID) |>
-          dplyr::summarise(sig = paste(sort(unique(.data[[tstrat_col]])),
-                                       collapse = ","),
-                           .groups = "drop")
-        rep_ids <- arm_sig |>
-          dplyr::group_by(sig) |>
-          dplyr::slice_min(ID, n = 1L) |>
-          dplyr::ungroup() |>
-          dplyr::pull(ID)
-      }
-      if (is.null(rep_ids) || length(rep_ids) == 0L) {
-        rep_ids <- sort(unique(obs$ID))[1:2L]
-      }
-      # Hard cap: never show more than 4 facets
-      if (length(rep_ids) > 4L) {
-        rep_ids <- sort(rep_ids)[1:4L]
-      }
+    if (n_distinct(obs$ID) > 4L) {
+      rep_ids <- .select_representative_ids(obs, group_col, max_ids = 4L)
       obs <- obs |> dplyr::filter(ID %in% rep_ids)
-      message("[plot_model_prediction] ", n_ids, " IDs -> ",
-              length(rep_ids), " representatifs")
     }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
@@ -963,8 +981,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
                             arm_labels = NULL, title = NULL,
                             compare_points = NULL) {
   if (is.null(sim_data) || nrow(sim_data) == 0L) {
-    return(ggplot() + labs(title = "Pas de donnees de simulation") +
-             .theme_design())
+    return(.empty_plot("Pas de donnees de simulation"))
   }
 
   # -- Time unit conversion ---------------------------------------------------
@@ -974,47 +991,9 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
   sim <- sim_data |>
     dplyr::mutate(time_plot = time / time_div)
 
-  # -- Prepare obs points (optimized sampling) --------------------------------
-  obs <- NULL
-  if (!is.null(obs_points) && nrow(obs_points) > 0L) {
-    obs <- obs_points
-    if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
-    if ("table_no" %in% names(obs) && dplyr::n_distinct(obs$table_no) > 1L) {
-      obs <- dplyr::filter(obs, table_no == 1L)
-    }
-    y_col <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(obs))[1]
-    if (!is.na(y_col)) {
-      obs <- obs |> dplyr::mutate(
-        y_val = .data[[y_col]],
-        time_plot = TIME / time_div
-      )
-      obs$arm <- if ("ID" %in% names(obs)) obs$ID else 1
-      obs$cmt <- if ("CMT" %in% names(obs)) obs$CMT else 1L
-    } else {
-      obs <- NULL
-    }
-  }
-
-  # -- Prepare compare points (CTP) ------------------------------------------
-  ctp <- NULL
-  if (!is.null(compare_points) && nrow(compare_points) > 0L) {
-    ctp <- compare_points
-    if ("EVID" %in% names(ctp)) ctp <- dplyr::filter(ctp, EVID == 0)
-    if ("table_no" %in% names(ctp) && dplyr::n_distinct(ctp$table_no) > 1L) {
-      ctp <- dplyr::filter(ctp, table_no == 1L)
-    }
-    y_col_c <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(ctp))[1]
-    if (!is.na(y_col_c)) {
-      ctp <- ctp |> dplyr::mutate(
-        y_val = .data[[y_col_c]],
-        time_plot = TIME / time_div
-      )
-      ctp$arm <- if ("ID" %in% names(ctp)) ctp$ID else 1
-      ctp$cmt <- if ("CMT" %in% names(ctp)) ctp$CMT else 1L
-    } else {
-      ctp <- NULL
-    }
-  }
+  # -- Prepare obs + compare points (CTP) via shared helper -------------------
+  obs <- .prep_points(obs_points, time_div)
+  ctp <- .prep_points(compare_points, time_div)
 
   # -- Apply arm/cmt labels ---------------------------------------------------
   .apply_arm_label <- function(df, labels) {
@@ -1108,11 +1087,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
     "Simulation population (ETA=0) | Points = temps optimaux"
   }
 
-  caption_text <- if (has_ctp) {
-    "Pointilles rouges = doses"
-  } else {
-    "Pointilles rouges = doses"
-  }
+  caption_text <- "Pointilles rouges = doses"
 
   p <- p +
     labs(title = ttl, subtitle = sub, x = time_label,
