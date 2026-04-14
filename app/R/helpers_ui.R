@@ -228,3 +228,123 @@ popkin_tabs <- function(ns, ..., id = "sub_tabs") {
   )
 }
 
+# =============================================================================
+# Status banners — reusable across SSE modules
+# =============================================================================
+
+# -- .ctl status banner (green/yellow) ----------------------------------------
+ctl_status_banner <- function(true_vals) {
+  has_ctl <- !is.null(true_vals) && length(true_vals) > 0L
+  if (has_ctl) {
+    div(
+      style = paste0(
+        "padding:10px 14px; border-radius:8px; margin-top:6px;",
+        " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
+      ),
+      icon("check-circle"),
+      tags$strong(sprintf(" True values loaded (%d params)", length(true_vals))),
+      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+        "From control stream uploaded in the Home tab.")
+    )
+  } else {
+    div(
+      style = paste0(
+        "padding:10px 14px; border-radius:8px; margin-top:6px;",
+        " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
+      ),
+      icon("exclamation-triangle"),
+      tags$strong(" No control stream loaded"),
+      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+        "Upload a .ctl/.mod/.con file in the ",
+        tags$strong("Home"), " tab to extract true parameter values.")
+    )
+  }
+}
+
+# -- SSE data status banner (green/yellow) ------------------------------------
+sse_status_banner <- function(data, label = "SSE data") {
+  has_data <- !is.null(data)
+  if (has_data) {
+    n_total   <- attr(data, "n_total") %||% nrow(data)
+    n_success <- attr(data, "n_success") %||% sum(data$converged)
+    div(
+      style = paste0(
+        "padding:10px 14px; border-radius:8px; margin-top:6px;",
+        " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
+      ),
+      icon("check-circle"),
+      tags$strong(sprintf(" %s loaded (%d runs, %d converged)",
+                          label, n_total, n_success))
+    )
+  } else {
+    div(
+      style = paste0(
+        "padding:10px 14px; border-radius:8px; margin-top:6px;",
+        " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
+      ),
+      icon("exclamation-triangle"),
+      tags$strong(sprintf(" No %s loaded", label)),
+      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+        "Upload a PsN raw_results CSV in the ",
+        tags$strong("SSE Upload"), " tab.")
+    )
+  }
+}
+
+# =============================================================================
+# Run health pills — reusable across SSE modules
+# =============================================================================
+
+# Per-metric thresholds (pharmacometrics conventions)
+SSE_HEALTH_THRESHOLDS <- list(
+  "Total runs"            = c(green = 0,  amber = 0,  red = 0),
+  "Minimization OK"       = c(green = 80, amber = 60, red = 0),
+  "No boundary estimates" = c(green = 80, amber = 60, red = 0),
+  "Covariance OK"         = c(green = 60, amber = 40, red = 0),
+  "No rounding errors"    = c(green = 80, amber = 60, red = 0)
+)
+
+health_pill_color <- function(stage_name, pct) {
+  th <- SSE_HEALTH_THRESHOLDS[[stage_name]]
+  if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
+  if (pct >= th[["green"]]) "#15803d"
+  else if (pct >= th[["amber"]]) "#b45309"
+  else "#dc2626"
+}
+
+health_pill_bg <- function(stage_name, pct) {
+  th <- SSE_HEALTH_THRESHOLDS[[stage_name]]
+  if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
+  if (pct >= th[["green"]]) "#dcfce7"
+  else if (pct >= th[["amber"]]) "#fef3c7"
+  else "#fee2e2"
+}
+
+# Build a row of run-health pills from a compute_run_health() result.
+# @param health  Result of compute_run_health() (list with $stages data.frame)
+# @param label   Optional label displayed before the pills
+# @return tagList (or NULL if health is NULL)
+make_health_pills <- function(health, label = NULL) {
+  if (is.null(health)) return(NULL)
+  stages <- health$stages
+  pills <- lapply(seq_len(nrow(stages)), function(i) {
+    s <- stages[i, ]
+    tags$span(
+      style = sprintf(
+        paste0(
+          "display:inline-block; padding:3px 8px; border-radius:6px;",
+          " margin:2px 3px; font-size:0.82em; font-weight:600;",
+          " background:%s; color:%s;"
+        ),
+        health_pill_bg(s$stage, s$pct),
+        health_pill_color(s$stage, s$pct)
+      ),
+      sprintf("%s: %d/%d (%.0f%%)", s$stage, s$n, s$denom, s$pct)
+    )
+  })
+  div(style = "margin-bottom:4px;",
+    if (!is.null(label)) tags$strong(label, style = "font-size:0.9em; margin-right:8px;"),
+    div(style = "display:inline-flex; flex-wrap:wrap; gap:2px;", pills)
+  )
+}
+

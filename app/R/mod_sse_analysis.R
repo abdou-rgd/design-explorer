@@ -3,9 +3,9 @@
 #
 # Analyzes the SSE results themselves: run health, parameter distributions,
 # OFV distribution, empirical correlations, per-parameter diagnostics.
-# Consumes shared SSE data from mod_sse_validation (uploaded once, used by both).
+# Consumes shared SSE data from mod_sse_upload (centralized upload).
 #
-# Inputs: sse_file_path (reactive), true_vals (reactive), param_labels (reactive)
+# Inputs: sse_a_shared, sse_b_shared (reactives), name_a, name_b, true_vals, param_labels
 # =============================================================================
 
 mod_sse_analysis_ui <- function(id) {
@@ -17,9 +17,12 @@ mod_sse_analysis_ui <- function(id) {
       tags$p(style = "margin:6px 0 0; font-size:0.9em;",
         "Analyze the SSE results themselves: convergence quality, parameter ",
         "estimability, OFV distribution, and empirical correlations. ",
-        "Upload your PsN raw_results CSV in the SSE Validation tab first."
+        "Load SSE data in the SSE Upload tab first."
       )
     ),
+
+    # --- Design selector (A/B) ---
+    uiOutput(ns("design_selector")),
 
     # --- Run health banner (always visible) ---
     uiOutput(ns("run_health_banner")),
@@ -142,26 +145,44 @@ mod_sse_analysis_ui <- function(id) {
 }
 
 
-mod_sse_analysis_server <- function(id, sse_file_path,
-                                    sse_all_shared = reactive(NULL),
+mod_sse_analysis_server <- function(id,
+                                    sse_a_shared = reactive(NULL),
+                                    sse_b_shared = reactive(NULL),
+                                    name_a = reactive("Design A"),
+                                    name_b = reactive("Design B"),
                                     true_vals,
                                     param_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
-    # --- Read unfiltered SSE data (prefer pre-parsed from mod_sse_validation) ---
-    sse_all <- reactive({
-      pre <- sse_all_shared()
-      if (!is.null(pre)) return(pre)
-      fp <- sse_file_path()
-      req(fp)
-      tryCatch(
-        read_sse_raw_all(fp),
-        error = function(e) {
-          showNotification(paste("SSE read error:", conditionMessage(e)),
-                           type = "error", duration = 8)
-          NULL
-        }
+    # --- Design selector (show only when B is loaded) ---
+    output$design_selector <- renderUI({
+      b <- sse_b_shared()
+      if (is.null(b)) return(NULL)
+
+      choices <- c("a" = "a", "b" = "b")
+      names(choices) <- c(name_a(), name_b())
+
+      div(
+        style = paste0(
+          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
+          " margin-bottom:10px; background:#fafafa;"
+        ),
+        div(style = "display:flex; align-items:center; gap:12px;",
+          tags$strong("Analyze:", style = "white-space:nowrap;"),
+          div(style = "margin-bottom:-15px;",
+            radioButtons(session$ns("which_design"), label = NULL,
+                         choices = choices, selected = "a", inline = TRUE)
+          )
+        )
       )
+    })
+
+    # --- SSE data (switches between A and B) ---
+    sse_all <- reactive({
+      sel <- input$which_design %||% "a"
+      dat <- if (sel == "b") sse_b_shared() else sse_a_shared()
+      req(dat)
+      dat
     })
 
     # --- Run health ---
@@ -177,54 +198,9 @@ mod_sse_analysis_server <- function(id, sse_file_path,
         return(div(class = "alert alert-warning",
                    style = "border-radius:8px;",
           tags$strong("No SSE data loaded."),
-          " Upload a PsN raw_results CSV in the SSE Validation tab."
+          " Upload a PsN raw_results CSV in the SSE Upload tab."
         ))
       }
-
-      stages <- rh$stages
-
-      # Per-metric thresholds (pharmacometrics conventions)
-      # Minimization/rounding: higher is better
-      # Covariance: relaxed (FOCEI failures are endemic on complex models)
-      # No boundary: inverted (higher % without boundary = better)
-      thresholds <- list(
-        "Total runs"            = c(green = 0,  amber = 0,  red = 0),
-        "Minimization OK"       = c(green = 80, amber = 60, red = 0),
-        "No boundary estimates" = c(green = 80, amber = 60, red = 0),
-        "Covariance OK"         = c(green = 60, amber = 40, red = 0),
-        "No rounding errors"    = c(green = 80, amber = 60, red = 0)
-      )
-
-      pill_color <- function(stage_name, pct) {
-        th <- thresholds[[stage_name]]
-        if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
-        if (pct >= th[["green"]]) "#15803d"
-        else if (pct >= th[["amber"]]) "#b45309"
-        else "#dc2626"
-      }
-      pill_bg <- function(stage_name, pct) {
-        th <- thresholds[[stage_name]]
-        if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
-        if (pct >= th[["green"]]) "#dcfce7"
-        else if (pct >= th[["amber"]]) "#fef3c7"
-        else "#fee2e2"
-      }
-
-      # Build pills
-      pills <- lapply(seq_len(nrow(stages)), function(i) {
-        s <- stages[i, ]
-        tags$span(
-          style = sprintf(
-            paste0(
-              "display:inline-block; padding:4px 10px; border-radius:6px;",
-              " margin:2px 4px; font-size:0.88em; font-weight:600;",
-              " background:%s; color:%s;"
-            ),
-            pill_bg(s$stage, s$pct), pill_color(s$stage, s$pct)
-          ),
-          sprintf("%s: %d/%d (%.0f%%)", s$stage, s$n, s$denom, s$pct)
-        )
-      })
 
       div(class = "alert",
           style = paste0(
@@ -232,8 +208,8 @@ mod_sse_analysis_server <- function(id, sse_file_path,
             " background:#f8fafc; border:1px solid #e2e8f0;"
           ),
         tags$strong("Run Health", style = "font-size:1em;"),
-        div(style = "margin-top:6px; display:flex; flex-wrap:wrap; gap:2px;",
-          pills
+        div(style = "margin-top:6px;",
+          make_health_pills(rh)
         )
       )
     })
@@ -281,7 +257,7 @@ mod_sse_analysis_server <- function(id, sse_file_path,
       dd <- dist_data_filtered()
       if (is.null(dd) || nrow(dd) == 0L) {
         return(ggplot() +
-          labs(title = "Upload SSE data in SSE Validation tab") +
+          labs(title = "Load SSE data in SSE Upload tab") +
           .theme_design())
       }
       plot_param_distributions(dd, show_failed = isTRUE(input$show_failed))

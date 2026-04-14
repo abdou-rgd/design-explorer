@@ -14,6 +14,10 @@ mod_upload_ui <- function(id) {
                              ".ctl", ".mod", ".con", ".tar.gz", ".tgz", ".gz"),
                 buttonLabel = "Browse"),
       helpText("Upload a .tar.gz (nrm workflow) or multiple individual files."),
+      helpText(style = "font-size:0.82em; color:#854d0e;",
+        "Tip: load NONMEM outputs (.ext, .ctl, ...) here first,",
+        " then upload SSE results in the Validation tab."
+      ),
       uiOutput(ns("file_status"))
     )
   )

@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.3"
-.APP_VERSION_NAME <- "Le Petit Prince compare"
+.APP_VERSION      <- "V5.4"
+.APP_VERSION_NAME <- "SSE centralise"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -138,8 +138,9 @@ ui <- navbarPage(
 
   # -- Validation (dropdown) -------------------------------------------------
   navbarMenu("Validation",
-    tabPanel("SSE Validation", value = "sse", mod_sse_validation_ui("sse")),
-    tabPanel("SSE Analysis",   value = "sse_analysis", mod_sse_analysis_ui("sse_analysis")),
+    tabPanel("SSE Upload",     value = "sse_upload",    mod_sse_upload_ui("sse_upload")),
+    tabPanel("SSE Validation", value = "sse",           mod_sse_validation_ui("sse")),
+    tabPanel("SSE Analysis",   value = "sse_analysis",  mod_sse_analysis_ui("sse_analysis")),
     tabPanel("SSE Comparison", value = "sse_comparison", mod_sse_comparison_ui("sse_comparison"))
   ),
 
@@ -419,19 +420,32 @@ server <- function(input, output, session) {
     groupsize    = groupsize_r,
     all_runs     = all_runs)
 
-  sse_shared <- mod_sse_validation_server("sse",
+  # -- SSE centralized upload --
+  sse_upload <- mod_sse_upload_server("sse_upload", reset_trigger = reset_trigger)
+
+  mod_sse_validation_server("sse",
     ext_data         = merged_ext,
     param_labels     = param_labels_r,
     shared_ctl_lines = merged_ctl_lines,
-    shared_true_vals = merged_true_vals)
+    shared_true_vals = merged_true_vals,
+    sse_a_data       = sse_upload$sse_a_data,
+    sse_b_data       = sse_upload$sse_b_data,
+    name_a           = sse_upload$name_a,
+    name_b           = sse_upload$name_b)
 
   mod_sse_analysis_server("sse_analysis",
-    sse_file_path  = sse_shared$sse_file_path,
-    sse_all_shared = sse_shared$sse_all,
-    true_vals      = sse_shared$true_vals,
-    param_labels   = param_labels_r)
+    sse_a_shared = sse_upload$sse_a_data,
+    sse_b_shared = sse_upload$sse_b_data,
+    name_a       = sse_upload$name_a,
+    name_b       = sse_upload$name_b,
+    true_vals    = merged_true_vals,
+    param_labels = param_labels_r)
 
   mod_sse_comparison_server("sse_comparison",
+    sse_orig         = sse_upload$sse_a_data,
+    sse_opti         = sse_upload$sse_b_data,
+    name_orig        = sse_upload$name_a,
+    name_opti        = sse_upload$name_b,
     shared_ctl_lines = merged_ctl_lines,
     shared_true_vals = merged_true_vals,
     param_labels     = param_labels_r)

@@ -2,9 +2,9 @@
 # mod_sse_comparison.R — SSE Comparison Tab (original vs optimized design)
 #
 # Compares two SSE results side by side: run health, RSE, distributions,
-# empirical correlations. Self-contained uploads (no coupling to SSE Validation).
+# empirical correlations. Consumes shared SSE data from mod_sse_upload.
 #
-# Inputs: shared_ctl_lines (reactive fallback), param_labels (reactive)
+# Inputs: sse_orig, sse_opti (shared reactives), shared_ctl_lines, param_labels
 # =============================================================================
 
 mod_sse_comparison_ui <- function(id) {
@@ -15,28 +15,16 @@ mod_sse_comparison_ui <- function(id) {
       tags$strong("Two-SSE Comparison"),
       tags$p(style = "margin:6px 0 0; font-size:0.9em;",
         "Compare an original design SSE with an optimized design SSE. ",
-        "Upload two PsN raw_results CSVs (from the same model). ",
+        "Upload two PsN raw_results CSVs in the SSE Upload tab. ",
         "True parameter values are extracted from the .ctl loaded in the Home tab."
       )
     ),
 
-    # --- File uploads + design names ---
+    # --- SSE + .ctl status banners ---
     fluidRow(
-      column(4,
-        fileInput(ns("sse_orig"), "Original design SSE (raw_results_*.csv)",
-                  accept = ".csv", width = "100%"),
-        textInput(ns("name_orig"), "Design name", value = "Original",
-                  width = "100%")
-      ),
-      column(4,
-        fileInput(ns("sse_opti"), "Optimized design SSE (raw_results_*.csv)",
-                  accept = ".csv", width = "100%"),
-        textInput(ns("name_opti"), "Design name", value = "Optimized",
-                  width = "100%")
-      ),
-      column(4,
-        uiOutput(ns("ctl_status"))
-      )
+      column(4, uiOutput(ns("sse_a_status"))),
+      column(4, uiOutput(ns("sse_b_status"))),
+      column(4, uiOutput(ns("ctl_status")))
     ),
 
     # --- Status banner ---
@@ -147,83 +135,42 @@ mod_sse_comparison_ui <- function(id) {
 }
 
 
-mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
+mod_sse_comparison_server <- function(id,
+                                      sse_orig = reactive(NULL),
+                                      sse_opti = reactive(NULL),
+                                      name_orig = reactive("Original"),
+                                      name_opti = reactive("Optimized"),
+                                      shared_ctl_lines = reactive(NULL),
                                       shared_true_vals = reactive(NULL),
                                       param_labels = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
-    # --- Read SSE data (unfiltered) ---
-    sse_all_orig <- reactive({
-      req(input$sse_orig)
-      tryCatch(
-        read_sse_raw_all(input$sse_orig$datapath),
-        error = function(e) {
-          showNotification(paste("Original SSE read error:", conditionMessage(e)),
-                           type = "error", duration = 8)
-          NULL
-        }
-      )
-    })
+    # --- SSE data (from centralized upload) ---
+    sse_all_orig <- reactive({ sse_orig() })
+    sse_all_opti <- reactive({ sse_opti() })
 
-    sse_all_opti <- reactive({
-      req(input$sse_opti)
-      tryCatch(
-        read_sse_raw_all(input$sse_opti$datapath),
-        error = function(e) {
-          showNotification(paste("Optimized SSE read error:", conditionMessage(e)),
-                           type = "error", duration = 8)
-          NULL
-        }
-      )
+    # --- Status banners ---
+    output$sse_a_status <- renderUI({
+      sse_status_banner(sse_all_orig(), sprintf("Design A (%s)", name_orig()))
     })
-
-    # --- .ctl status indicator ---
+    output$sse_b_status <- renderUI({
+      sse_status_banner(sse_all_opti(), sprintf("Design B (%s)", name_opti()))
+    })
     output$ctl_status <- renderUI({
-      has_ctl <- !is.null(shared_true_vals()) && length(shared_true_vals()) > 0L
-      if (has_ctl) {
-        div(
-          style = paste0(
-            "padding:10px 14px; border-radius:8px; margin-top:25px;",
-            " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
-          ),
-          icon("check-circle"),
-          tags$strong(sprintf(" True values loaded (%d params)",
-                              length(shared_true_vals()))),
-          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
-            "From control stream uploaded in the Home tab.")
-        )
-      } else {
-        div(
-          style = paste0(
-            "padding:10px 14px; border-radius:8px; margin-top:25px;",
-            " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
-          ),
-          icon("exclamation-triangle"),
-          tags$strong(" No control stream loaded"),
-          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
-            "Upload a .ctl/.mod/.con file in the ",
-            tags$strong("Home"), " tab to extract true parameter values.")
-        )
-      }
+      ctl_status_banner(shared_true_vals())
     })
 
     # --- True values from .ctl (Home tab) ---
     true_vals <- reactive({
-      # Pre-computed from main upload
       sv <- shared_true_vals()
       if (!is.null(sv) && length(sv) > 0L) return(sv)
 
-      # Fallback: parse shared_ctl_lines directly
       cl <- shared_ctl_lines()
       if (is.null(cl)) return(NULL)
       vals <- read_true_values(cl)
       if (length(vals) == 0L) return(NULL)
       vals
     })
-
-    # --- Design names ---
-    name_orig <- reactive({ input$name_orig %||% "Original" })
-    name_opti <- reactive({ input$name_opti %||% "Optimized" })
 
     # --- Status banner ---
     output$status_banner <- renderUI({
@@ -234,7 +181,7 @@ mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
       if (is.null(orig) && is.null(opti)) {
         return(div(class = "alert alert-warning",
                    style = "border-radius:8px; margin-bottom:10px;",
-          tags$strong("Upload two SSE CSV files and a .ctl to begin.")
+          tags$strong("Upload two SSE CSV files in the SSE Upload tab to begin.")
         ))
       }
 
@@ -254,8 +201,8 @@ mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
       }
 
       missing <- c()
-      if (is.null(orig)) missing <- c(missing, "original SSE")
-      if (is.null(opti)) missing <- c(missing, "optimized SSE")
+      if (is.null(orig)) missing <- c(missing, "Design A SSE")
+      if (is.null(opti)) missing <- c(missing, "Design B SSE")
       if (is.null(tv))   missing <- c(missing, ".ctl for true values")
 
       cls <- if (length(missing) == 0L) "alert-success" else "alert-info"
@@ -287,54 +234,6 @@ mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
       hp <- tryCatch(health_opti(), error = function(e) NULL)
       if (is.null(ho) && is.null(hp)) return(NULL)
 
-      # Color thresholds (same as mod_sse_analysis)
-      thresholds <- list(
-        "Total runs"            = c(green = 0,  amber = 0,  red = 0),
-        "Minimization OK"       = c(green = 80, amber = 60, red = 0),
-        "No boundary estimates" = c(green = 80, amber = 60, red = 0),
-        "Covariance OK"         = c(green = 60, amber = 40, red = 0),
-        "No rounding errors"    = c(green = 80, amber = 60, red = 0)
-      )
-      pill_color <- function(stage_name, pct) {
-        th <- thresholds[[stage_name]]
-        if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
-        if (pct >= th[["green"]]) "#15803d"
-        else if (pct >= th[["amber"]]) "#b45309"
-        else "#dc2626"
-      }
-      pill_bg <- function(stage_name, pct) {
-        th <- thresholds[[stage_name]]
-        if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
-        if (pct >= th[["green"]]) "#dcfce7"
-        else if (pct >= th[["amber"]]) "#fef3c7"
-        else "#fee2e2"
-      }
-
-      make_pills <- function(health, label) {
-        if (is.null(health)) return(NULL)
-        stages <- health$stages
-        pills <- lapply(seq_len(nrow(stages)), function(i) {
-          s <- stages[i, ]
-          tags$span(
-            style = sprintf(
-              paste0(
-                "display:inline-block; padding:3px 8px; border-radius:6px;",
-                " margin:2px 3px; font-size:0.82em; font-weight:600;",
-                " background:%s; color:%s;"
-              ),
-              pill_bg(s$stage, s$pct), pill_color(s$stage, s$pct)
-            ),
-            sprintf("%s: %d/%d (%.0f%%)", s$stage, s$n, s$denom, s$pct)
-          )
-        })
-        div(style = "margin-bottom:4px;",
-          tags$strong(label, style = "font-size:0.9em; margin-right:8px;"),
-          div(style = "display:inline-flex; flex-wrap:wrap; gap:2px;",
-            pills
-          )
-        )
-      }
-
       div(class = "alert",
           style = paste0(
             "border-radius:10px; margin-bottom:12px; padding:10px 14px;",
@@ -342,8 +241,8 @@ mod_sse_comparison_server <- function(id, shared_ctl_lines = reactive(NULL),
           ),
         tags$strong("Run Health Comparison", style = "font-size:1em;"),
         div(style = "margin-top:6px;",
-          make_pills(ho, name_orig()),
-          make_pills(hp, name_opti())
+          make_health_pills(ho, name_orig()),
+          make_health_pills(hp, name_opti())
         )
       )
     })

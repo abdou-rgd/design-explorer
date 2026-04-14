@@ -3,7 +3,8 @@
 #
 # Compares FIM-predicted RSE with empirical RSE from SSE (Stochastic Simulation
 # and Estimation). Includes methodology panel with formulas and references.
-# Inputs: PsN raw CSV + .ctl (true values) + .ext already loaded (FIM RSE)
+# Inputs: sse_a_data, sse_b_data (shared reactives from mod_sse_upload)
+#         + .ctl (true values) + .ext already loaded (FIM RSE)
 # =============================================================================
 
 mod_sse_validation_ui <- function(id) {
@@ -19,11 +20,13 @@ mod_sse_validation_ui <- function(id) {
       )
     ),
 
-    # --- File upload + .ctl status ---
+    # --- Design selector (A/B) ---
+    uiOutput(ns("design_selector")),
+
+    # --- SSE + .ctl status banners ---
     fluidRow(
       column(6,
-        fileInput(ns("sse_file"), "SSE results (raw_results_*.csv)",
-                  accept = ".csv", width = "100%")
+        uiOutput(ns("sse_status"))
       ),
       column(6,
         uiOutput(ns("ctl_status"))
@@ -134,8 +137,8 @@ mod_sse_validation_ui <- function(id) {
           "(including the empirical D-criterion) and filter on successful runs."
         ),
         tags$p(style = "font-size:0.88em; color:#555;",
-          "The PsN summary file (sse_results.csv) is also accepted as a ",
-          "fallback, but the raw_results file is preferred."
+          "Upload files in the ", tags$strong("SSE Upload"),
+          " tab (Validation dropdown)."
         ),
 
         tags$h5("Running SSE with PsN", style = "margin-top:10px;"),
@@ -298,66 +301,64 @@ mod_sse_validation_ui <- function(id) {
 mod_sse_validation_server <- function(id, ext_data,
                                       param_labels = reactive(NULL),
                                       shared_ctl_lines = reactive(NULL),
-                                      shared_true_vals = reactive(NULL)) {
+                                      shared_true_vals = reactive(NULL),
+                                      sse_a_data = reactive(NULL),
+                                      sse_b_data = reactive(NULL),
+                                      name_a = reactive("Design A"),
+                                      name_b = reactive("Design B")) {
   moduleServer(id, function(input, output, session) {
 
-    # --- Parse SSE file (auto-detect format) ---
-    sse_parsed <- reactive({
-      req(input$sse_file)
-      tryCatch(
-        read_sse_auto(input$sse_file$datapath),
-        error = function(e) {
-          showNotification(paste("SSE read error:", conditionMessage(e)),
-                           type = "error", duration = 8)
-          NULL
-        }
+    # --- Design selector (show only when B is loaded) ---
+    output$design_selector <- renderUI({
+      b <- sse_b_data()
+      if (is.null(b)) return(NULL)
+
+      choices <- c("a" = "a", "b" = "b")
+      names(choices) <- c(name_a(), name_b())
+
+      div(
+        style = paste0(
+          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
+          " margin-bottom:10px; background:#fafafa;"
+        ),
+        div(style = "display:flex; align-items:center; gap:12px;",
+          tags$strong("Validate:", style = "white-space:nowrap;"),
+          div(style = "margin-bottom:-15px;",
+            radioButtons(session$ns("which_design"), label = NULL,
+                         choices = choices, selected = "a", inline = TRUE)
+          )
+        )
       )
+    })
+
+    # --- Active SSE data (switches between A and B) ---
+    sse_data <- reactive({
+      sel <- input$which_design %||% "a"
+      if (sel == "b") sse_b_data() else sse_a_data()
+    })
+
+    # --- Converged subset (for metrics that need filtered data) ---
+    sse_converged <- reactive({
+      dat <- sse_data()
+      req(dat)
+      dat[dat$converged, , drop = FALSE]
+    })
+
+    # --- SSE status banner ---
+    output$sse_status <- renderUI({
+      sse_status_banner(sse_data(), "SSE data")
     })
 
     # --- .ctl status indicator ---
     output$ctl_status <- renderUI({
-      has_ctl <- !is.null(shared_true_vals()) && length(shared_true_vals()) > 0L
-      if (has_ctl) {
-        div(
-          style = paste0(
-            "padding:10px 14px; border-radius:8px; margin-top:25px;",
-            " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
-          ),
-          icon("check-circle"),
-          tags$strong(sprintf(" True values loaded (%d params)",
-                              length(shared_true_vals()))),
-          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
-            "From control stream uploaded in the Home tab.")
-        )
-      } else {
-        div(
-          style = paste0(
-            "padding:10px 14px; border-radius:8px; margin-top:25px;",
-            " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
-          ),
-          icon("exclamation-triangle"),
-          tags$strong(" No control stream loaded"),
-          tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
-            "Upload a .ctl/.mod/.con file in the ",
-            tags$strong("Home"), " tab to extract true parameter values.")
-        )
-      }
+      ctl_status_banner(shared_true_vals())
     })
 
-    # --- Parse true values from .ctl ---
-    # For "summary" format: true values come from the file itself
-    # For "raw" format: need .ctl from Home tab via shared_true_vals
+    # --- True values from .ctl (Home tab) ---
     true_vals <- reactive({
-      parsed <- sse_parsed()
-      if (!is.null(parsed) && parsed$format == "summary") {
-        return(parsed$data$true_values)
-      }
-
-      # Pre-computed from main upload
       sv <- shared_true_vals()
       if (!is.null(sv) && length(sv) > 0L) return(sv)
 
-      # Fallback: parse shared_ctl_lines directly
       cl <- shared_ctl_lines()
       if (is.null(cl)) return(NULL)
       vals <- read_true_values(cl)
@@ -367,29 +368,16 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- Compute SSE metrics ---
     sse_metrics <- reactive({
-      parsed <- sse_parsed()
-      req(parsed)
-
-      if (parsed$format == "summary") {
-        return(parsed$data$metrics)
-      }
-
-      # Raw format: compute from individual estimates
-      req(true_vals())
-      compute_sse_metrics(parsed$data, true_vals(), param_labels())
+      dat <- sse_converged()
+      req(dat, true_vals())
+      compute_sse_metrics(dat, true_vals(), param_labels())
     })
 
     # --- Empirical D-criterion ---
     d_criterion <- reactive({
-      parsed <- sse_parsed()
-      req(parsed, true_vals())
-
-      if (parsed$format == "summary") {
-        # Cannot compute D-criterion from summary (no individual estimates)
-        return(NULL)
-      }
-
-      compute_empirical_d_criterion(parsed$data, true_vals())
+      dat <- sse_converged()
+      req(dat, true_vals())
+      compute_empirical_d_criterion(dat, true_vals())
     })
 
     # --- Get FIM RSE (from already-loaded .ext, last table) ---
@@ -460,42 +448,31 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- Status banner ---
     output$status_banner <- renderUI({
-      parsed <- sse_parsed()
-      if (is.null(parsed)) return(NULL)
+      dat <- sse_data()
+      if (is.null(dat)) return(NULL)
 
       tv <- true_vals()
       n_params <- if (!is.null(tv)) length(tv) else 0L
 
-      if (parsed$format == "summary") {
-        n_samples <- parsed$data$n_samples %||% "?"
-        sim_model <- parsed$data$sim_model %||% ""
-        filter_msg <- sprintf(
-          "PsN summary format detected: %s runs | Model: %s",
-          n_samples, sim_model
+      n_total <- attr(dat, "n_total") %||% nrow(dat)
+      n_success <- attr(dat, "n_success") %||% sum(dat$converged)
+      pre_filtered <- isTRUE(attr(dat, "pre_filtered"))
+
+      filter_msg <- if (pre_filtered) {
+        sprintf(
+          paste0("SSE: %s runs loaded (no minimization_successful column ",
+                 "-- assuming pre-filtered, e.g. via PsN -out_filter)"),
+          n_success
         )
-        ctl_source <- " (from sse_results.csv)"
       } else {
-        raw <- parsed$data
-        n_total <- attr(raw, "n_total") %||% "?"
-        n_success <- attr(raw, "n_success") %||% nrow(raw)
-        pre_filtered <- isTRUE(attr(raw, "pre_filtered"))
+        sprintf("SSE: %s/%s valid runs (minimization_successful = 1)",
+                n_success, n_total)
+      }
 
-        filter_msg <- if (pre_filtered) {
-          sprintf(
-            paste0("SSE: %s runs loaded (no minimization_successful column ",
-                   "-- assuming pre-filtered, e.g. via PsN -out_filter)"),
-            n_success
-          )
-        } else {
-          sprintf("SSE: %s/%s valid runs (minimization_successful = 1)",
-                  n_success, n_total)
-        }
-
-        ctl_source <- if (!is.null(shared_ctl_lines())) {
-          " (from Home upload)"
-        } else {
-          ""
-        }
+      ctl_source <- if (!is.null(shared_ctl_lines())) {
+        " (from Home upload)"
+      } else {
+        ""
       }
 
       div(class = "alert alert-success",
@@ -562,10 +539,9 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- REE distribution (reactive) ---
     ree_dist <- reactive({
-      parsed <- sse_parsed()
-      req(parsed, true_vals())
-      if (parsed$format == "summary") return(NULL)
-      compute_ree_distribution(parsed$data, true_vals(), param_labels())
+      dat <- sse_converged()
+      req(dat, true_vals())
+      compute_ree_distribution(dat, true_vals(), param_labels())
     })
 
     # --- REE distribution filtered by selected params ---
@@ -667,19 +643,6 @@ mod_sse_validation_server <- function(id, ext_data,
           error = function(e) warning("CSV export failed: ", conditionMessage(e))
         )
       }
-    )
-    # --- Pre-parsed unfiltered SSE data (avoids double read in mod_sse_analysis) ---
-    sse_all_raw <- reactive({
-      req(input$sse_file)
-      tryCatch(read_sse_raw_all(input$sse_file$datapath),
-               error = function(e) NULL)
-    })
-
-    # --- Return shared reactives for mod_sse_analysis ---
-    list(
-      sse_file_path = reactive(input$sse_file$datapath),
-      sse_all       = sse_all_raw,
-      true_vals     = true_vals
     )
   })
 }
