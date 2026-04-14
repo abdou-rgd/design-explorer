@@ -137,15 +137,9 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
         NULL
       }
 
-      export_btn <- div(style = "text-align: right; margin-bottom: 6px;",
-        downloadButton(ns("export_csv"), "Export CSV",
-                       class = "btn-sm btn-default")
-      )
-
       if (is_robust()) {
         # Design robuste : pas de courbe predite, boxplot central + table resume
         tagList(
-          export_btn,
           robust_banner,
           fluidRow(
             column(8,
@@ -166,7 +160,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
         )
       } else {
         tagList(
-          export_btn,
           fluidRow(
             column(12,
               div(class = "plot-card",
@@ -473,60 +466,5 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
                                scrollX = TRUE))
     })
 
-    # -- Export CSV ------------------------------------------------------------
-    output$export_csv <- downloadHandler(
-      filename = function() {
-        paste0("temps_optimaux_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
-      },
-      content = function(file) {
-        tab <- effective_tab_data()
-        req(tab)
-
-        if (is_robust()) {
-          export_df <- robust_summary()
-        } else {
-          obs <- tab_single()
-          if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
-          # Elementary datasets: keep one representative ID per arm
-          if ("ID" %in% names(obs) && dplyr::n_distinct(obs$ID) > 4L &&
-              "TSTRAT" %in% names(obs)) {
-            arm_sig <- obs |>
-              dplyr::group_by(ID) |>
-              dplyr::summarise(sig = paste(sort(unique(TSTRAT)), collapse = ","),
-                               .groups = "drop")
-            rep_ids <- arm_sig |>
-              dplyr::group_by(sig) |>
-              dplyr::slice_min(ID, n = 1L) |>
-              dplyr::ungroup() |>
-              dplyr::pull(ID)
-            obs <- obs |> dplyr::filter(ID %in% rep_ids)
-          }
-          cols_show <- intersect(
-            c("ID", "TSTRAT", "TMIN", "TIME", "TMAX", "IPRED", "CONC", "STRAT", "CMT"),
-            names(obs)
-          )
-          if (length(cols_show) == 0L) {
-            cols_show <- names(obs)[!names(obs) %in% c("table_no")]
-          }
-          lbls <- cmt_labels()
-          export_df <- obs |>
-            dplyr::select(dplyr::all_of(cols_show)) |>
-            dplyr::mutate(dplyr::across(where(is.double), ~ round(.x, 4)))
-          if (!is.null(lbls) && "CMT" %in% names(export_df)) {
-            export_df <- export_df |>
-              dplyr::mutate(CMT = ifelse(
-                as.character(CMT) %in% names(lbls),
-                paste0(lbls[as.character(CMT)], " (CMT=", CMT, ")"),
-                as.character(CMT)
-              ))
-          }
-        }
-
-        tryCatch(
-          readr::write_csv(export_df, file),
-          error = function(e) warning("CSV export failed: ", conditionMessage(e))
-        )
-      }
-    )
   })
 }

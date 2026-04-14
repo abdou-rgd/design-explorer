@@ -788,16 +788,14 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     mutate(y_val = .data[[y_col]],
            strate_label = as.character(.data[[group_col]]))
 
-  # Detect multi-ID (e.g. IV vs SC elementary designs)
+  # Detect multi-ID (e.g. IV vs SC elementary designs or dataset classique)
   has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
   if (has_multi_id) {
-    # Elementary datasets (GROUPSIZE > 1): many IDs share the same design times.
-    # Keep only one representative ID per unique TSTRAT pattern (= per arm).
     n_ids <- n_distinct(obs$ID)
     if (n_ids > 4L) {
-      # Elementary dataset (GROUPSIZE > 1): many IDs share the same design.
-      # Keep 1 representative ID per arm (unique TSTRAT pattern), max 4 total.
+      # Try to keep 1 representative ID per arm (unique TSTRAT pattern)
       tstrat_col <- if (group_col %in% names(obs)) group_col else NULL
+      rep_ids <- NULL
       if (!is.null(tstrat_col)) {
         arm_sig <- obs |>
           dplyr::group_by(ID) |>
@@ -809,16 +807,17 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
           dplyr::slice_min(ID, n = 1L) |>
           dplyr::ungroup() |>
           dplyr::pull(ID)
-      } else {
-        rep_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
+      }
+      if (is.null(rep_ids) || length(rep_ids) == 0L) {
+        rep_ids <- sort(unique(obs$ID))[1:2L]
       }
       # Hard cap: never show more than 4 facets
       if (length(rep_ids) > 4L) {
         rep_ids <- sort(rep_ids)[1:4L]
-        message("[plot_model_prediction] ", n_ids, " IDs detectes, ",
-                "affichage limite a ", length(rep_ids), " IDs representatifs")
       }
       obs <- obs |> dplyr::filter(ID %in% rep_ids)
+      message("[plot_model_prediction] ", n_ids, " IDs -> ",
+              length(rep_ids), " representatifs")
     }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
@@ -842,12 +841,17 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   ttl <- title %||% if (has_cmt) "Predictions PK/PD aux temps de sampling optimaux" else
                      paste0("Predictions (", y_col, ") aux temps de sampling optimaux")
 
-  # Build line group: within each ID (if multi-ID) or response (if multi-CMT)
-  line_group <- if (has_multi_id) "id_label" else if (has_cmt) "response" else NULL
+  # --- Time unit conversion (BEFORE ggplot captures the data) ---
+  use_days <- identical(time_unit, "days")
+  time_label <- if (use_days) "Temps (jours)" else "Temps (h)"
+  sec_label  <- if (use_days) "Temps de sampling (jours)" else "Temps de sampling (h)"
+  if (use_days) {
+    obs$TIME <- obs$TIME / 24
+    if (!is.null(dose_times)) dose_times$TIME <- dose_times$TIME / 24
+  }
 
   p <- ggplot(obs, aes(x = TIME, y = y_val))
 
-  # Draw curve(s) — connect points sorted by TIME within each group
   if (has_cmt) {
     p <- p +
       geom_line(aes(color = response, group = response),
@@ -875,15 +879,6 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   p <- p +
     geom_text(aes(label = strate_label), size = 2.8, color = "#374151",
               vjust = -1.3, hjust = 0.5)
-
-  # --- Time unit conversion ---
-  use_days <- identical(time_unit, "days")
-  time_label <- if (use_days) "Temps (jours)" else "Temps (h)"
-  sec_label  <- if (use_days) "Temps de sampling (jours)" else "Temps de sampling (h)"
-  if (use_days) {
-    obs$TIME <- obs$TIME / 24
-    if (!is.null(dose_times)) dose_times$TIME <- dose_times$TIME / 24
-  }
 
   # --- Dose markers ---
   if (!is.null(dose_times) && nrow(dose_times) > 0L) {
