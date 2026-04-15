@@ -15,6 +15,15 @@
 library(readr)
 library(stringr)
 
+# Extract a KEY=VALUE argument from a NONMEM block string
+.extract_block_arg <- function(block, key, to_upper = FALSE) {
+  m <- regmatches(block, regexpr(paste0("\\b", key, "\\s*=\\s*([A-Za-z0-9]+)"),
+                                  block, perl = TRUE))
+  if (length(m) == 0L || nchar(m) == 0L) return(NULL)
+  val <- sub(paste0(".*", key, "\\s*=\\s*"), "", m)
+  if (to_upper) toupper(val) else val
+}
+
 
 # =============================================================================
 # read_prior_nwpri() — Parser $PRIOR NWPRI depuis un .ctl
@@ -196,11 +205,7 @@ parse_design_summary <- function(lines) {
   }
   block <- paste(design_lines, collapse = " ")
 
-  get_arg <- function(key) {
-    m <- regmatches(block, regexpr(paste0("\\b", key, "\\s*=\\s*([A-Za-z0-9]+)"), block, perl = TRUE))
-    if (length(m) == 0L || nchar(m) == 0L) return(NULL)
-    sub(paste0(".*", key, "\\s*=\\s*"), "", m)
-  }
+  get_arg <- function(key) .extract_block_arg(block, key)
 
   parts <- character(0)
 
@@ -294,13 +299,7 @@ parse_design_methods <- function(lines) {
     block <- paste(lines_clean[ds:block_end], collapse = " ")
     block <- toupper(block)
 
-    # Extract key arguments
-    get_val <- function(key) {
-      m <- regmatches(block, regexpr(paste0("\\b", key, "\\s*=\\s*([A-Za-z0-9]+)"),
-                                     block, perl = TRUE))
-      if (length(m) == 0L || nchar(m) == 0L) return(NULL)
-      toupper(sub(paste0(".*", key, "\\s*=\\s*"), "", m))
-    }
+    get_val <- function(key) .extract_block_arg(block, key, to_upper = TRUE)
 
     maxeval <- get_val("MAXEVAL")
     is_eval <- !is.null(maxeval) && maxeval == "0"

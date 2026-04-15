@@ -492,11 +492,11 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       )
 
       p <- ggplot(df, aes(x = N, y = Power)) +
-        geom_line(color = "#7c3aed", size = 1) +
+        geom_line(color = "#7c3aed", linewidth = 1) +
         geom_hline(yintercept = pt, linetype = "dashed",
-                   color = "#dc2626", size = 0.6) +
+                   color = "#dc2626", linewidth = 0.6) +
         geom_vline(xintercept = gs, linetype = "dotted",
-                   color = "#6b7280", size = 0.6) +
+                   color = "#6b7280", linewidth = 0.6) +
         annotate("text", x = gs, y = 0.05,
                  label = paste0("N=", gs), hjust = -0.15,
                  size = 3.2, color = "#6b7280") +

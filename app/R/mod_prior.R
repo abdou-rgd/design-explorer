@@ -155,9 +155,9 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL),
         geom_ribbon(aes(ymin = ipred_lo, ymax = ipred_hi),
                     fill = "#3b82f6", alpha = 0.13) +
         geom_errorbarh(aes(xmin = time_lo, xmax = time_hi),
-                       height = 0, color = "#6b7280", size = 0.5) +
+                       height = 0, color = "#6b7280", linewidth = 0.5) +
         geom_point(size = 4, color = "#2563eb") +
-        geom_line(size = 0.6, color = "#2563eb", alpha = 0.45) +
+        geom_line(linewidth = 0.6, color = "#2563eb", alpha = 0.45) +
         geom_text(size = 3.2, color = "#374151", vjust = -1)
 
       # Multi-run overlay: comparison runs' mean predictions

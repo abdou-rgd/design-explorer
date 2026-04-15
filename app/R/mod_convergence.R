@@ -179,7 +179,7 @@ mod_convergence_server <- function(id, ext_data,
       if (nrow(combined) == 0) return(ggplot() + labs(title = "No convergence data") + .theme_design())
 
       p <- ggplot(combined, aes(x = ITERATION, y = OBJ, color = run)) +
-        geom_line(size = 0.75, alpha = 0.9) +
+        geom_line(linewidth = 0.75, alpha = 0.9) +
         scale_color_manual(values = run_colors, labels = run_labels,
                            name = NULL) +
         labs(title = "Convergence -- Multi-run comparison",

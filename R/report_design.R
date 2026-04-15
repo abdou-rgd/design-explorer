@@ -170,9 +170,9 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
   ttl   <- title %||% "Information relative (%) par ETA"
 
   ggplot(ri, aes(x = reorder(eta, relativeinf_pct), y = relativeinf_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", size = 0.3) +
+    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
     geom_hline(yintercept = c(20, 50), linetype = "dashed",
-               color = "grey40", size = 0.45) +
+               color = "grey40", linewidth = 0.45) +
     geom_text(
       aes(label = sprintf("%.2f%%", relativeinf_pct)),
       hjust = -0.12, size = 3.2, color = "grey25"
@@ -258,9 +258,9 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
   facet_scales <- if (free_y) "free" else "free_x"
 
   p <- ggplot(rse, aes(x = param, y = rse_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", size = 0.3) +
+    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
     geom_hline(yintercept = c(20, 50, 100), linetype = "dashed",
-               color = "grey40", size = 0.45) +
+               color = "grey40", linewidth = 0.45) +
     geom_text(
       aes(label = sprintf("%.2f%%", rse_pct)),
       vjust = -0.35, size = 2.9, color = "grey25"
@@ -342,7 +342,7 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
   ttl <- title %||% "Convergence — critère d'optimalité par itération"
 
   p <- ggplot(dat, aes(x = ITERATION, y = OBJ, color = bloc_label, group = bloc_label)) +
-    geom_line(size = 0.75, alpha = 0.9) +
+    geom_line(linewidth = 0.75, alpha = 0.9) +
     geom_point(size = 0.6, alpha = 0.4) +
     labs(
       title = ttl,
@@ -476,7 +476,7 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
              ymin = min(steps_df$obj), ymax = max(steps_df$obj),
              fill = col_gain, alpha = 0.08) +
     # Line connecting points
-    geom_line(aes(group = 1), color = col_opti, size = 1.2) +
+    geom_line(aes(group = 1), color = col_opti, linewidth = 1.2) +
     # Points with per-step colors
     geom_point(size = 5, color = point_colors) +
     # OBJ labels above
@@ -513,7 +513,7 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
       annotate("segment", x = x_arrow, xend = x_arrow,
                y = steps_df$obj[1L], yend = steps_df$obj[n],
                arrow = arrow(ends = "both", length = unit(0.15, "cm")),
-               color = col_gain, size = 0.8) +
+               color = col_gain, linewidth = 0.8) +
       annotate("text", x = x_arrow + 0.15, y = y_mid,
                label = sprintf("Gain\n%.2f", gain), color = col_gain,
                fontface = "bold", size = 4, hjust = 0) +
@@ -568,7 +568,7 @@ plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
   ttl <- title %||% "Matrice de corrélation (FIM)"
 
   ggplot(df, aes(x = col, y = row, fill = value)) +
-    geom_tile(color = "white", size = 0.5) +
+    geom_tile(color = "white", linewidth = 0.5) +
     geom_text(aes(label = sprintf("%.2f", value)),
               size = 2.8, color = "grey20") +
     scale_fill_gradient2(
@@ -708,7 +708,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   ttl <- title %||% "Erreurs standard (SE) prédites par la FIM"
 
   ggplot(rse, aes(x = param, y = se)) +
-    geom_col(width = 0.65, fill = "#1976d2", color = "white", size = 0.3) +
+    geom_col(width = 0.65, fill = "#1976d2", color = "white", linewidth = 0.3) +
     geom_text(
       aes(label = sprintf("%.4f", se)),
       vjust = -0.35, size = 2.9, color = "grey25"
@@ -758,8 +758,8 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
   ttl <- title %||% "RSE prédit par la FIM (%) -- Waterfall"
 
   ggplot(rse, aes(x = reorder(param, rse_pct), y = rse_pct, fill = quality)) +
-    geom_col(width = 0.65, color = "white", size = 0.3) +
-    geom_hline(yintercept = c(20, 50, 100), linetype = "dashed", color = "grey40", size = 0.45) +
+    geom_col(width = 0.65, color = "white", linewidth = 0.3) +
+    geom_hline(yintercept = c(20, 50, 100), linetype = "dashed", color = "grey40", linewidth = 0.45) +
     geom_text(aes(label = sprintf("%.2f%%", rse_pct)),
               hjust = -0.12, size = 3, color = "grey25") +
     scale_fill_manual(values = .COLORS_RSE, name = NULL, drop = FALSE) +
@@ -873,7 +873,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   if (has_cmt) {
     p <- p +
       geom_line(aes(color = response, group = response),
-                size = 0.7, alpha = 0.35, linetype = "dashed") +
+                linewidth = 0.7, alpha = 0.35, linetype = "dashed") +
       geom_point(aes(fill = response), shape = 21, size = 3.5,
                  color = "white", stroke = 0.8) +
       scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
@@ -883,12 +883,12 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   } else if (has_multi_id) {
     p <- p +
       geom_line(aes(group = id_label),
-                color = "#2563eb", size = 0.7, alpha = 0.35, linetype = "dashed") +
+                color = "#2563eb", linewidth = 0.7, alpha = 0.35, linetype = "dashed") +
       geom_point(fill = "#2563eb", shape = 21, size = 3.5,
                  color = "white", stroke = 0.8)
   } else {
     p <- p +
-      geom_line(color = "#2563eb", size = 0.7, alpha = 0.35, linetype = "dashed") +
+      geom_line(color = "#2563eb", linewidth = 0.7, alpha = 0.35, linetype = "dashed") +
       geom_point(fill = "#2563eb", shape = 21, size = 3.5,
                  color = "white", stroke = 0.8)
   }
@@ -915,7 +915,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     p <- p +
       geom_vline(data = dose_df, aes(xintercept = TIME),
                  linetype = "dotted", color = "firebrick3",
-                 size = 0.3, alpha = 0.6)
+                 linewidth = 0.3, alpha = 0.6)
   }
 
   # --- Arm labels (rename ID facets) ---
@@ -1039,7 +1039,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
   p <- ggplot(sim, aes(x = time_plot, y = IPRED)) +
     geom_line(
       aes(group = interaction(arm, cmt)),
-      color = "grey30", size = 0.7, alpha = 0.9
+      color = "grey30", linewidth = 0.7, alpha = 0.9
     )
 
   # Overlay optimized sampling points
@@ -1062,7 +1062,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
     dose_t <- unique(dose_times / time_div)
     p <- p + geom_vline(
       xintercept = dose_t, linetype = "dotted",
-      color = "#e74c3c", alpha = 0.5, size = 0.4
+      color = "#e74c3c", alpha = 0.5, linewidth = 0.4
     )
   }
 

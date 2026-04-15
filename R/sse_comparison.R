@@ -124,7 +124,7 @@ plot_rse_comparison <- function(rse_comp, name_orig = "Original",
     geom_col(position = position_dodge(width = 0.7), width = 0.6,
              color = "white") +
     geom_hline(yintercept = 30, linetype = "dashed", color = "#94a3b8",
-               size = 0.5) +
+               linewidth = 0.5) +
     annotate("text", x = 0.5, y = 31, label = "30% threshold",
              hjust = 0, vjust = 0, size = 3, color = "#94a3b8",
              fontface = "italic") +
@@ -198,7 +198,7 @@ plot_distribution_overlay <- function(dist_orig, dist_opti,
   p <- ggplot(combined, aes(x = estimate, fill = design)) +
     geom_density(alpha = 0.4, color = NA) +
     geom_vline(data = tv, aes(xintercept = true_value),
-               color = "#dc2626", linetype = "dashed", size = 0.7) +
+               color = "#dc2626", linetype = "dashed", linewidth = 0.7) +
     facet_wrap(~ param_label, scales = "free", ncol = 3) +
     scale_fill_manual(
       values = setNames(c("#3b82f6", "#16a34a"), c(name_orig, name_opti)),

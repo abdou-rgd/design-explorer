@@ -250,7 +250,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
                              names(runs))
 
       ggplot(combined, aes(x = TIME, y = IPRED, color = run, group = run)) +
-        geom_line(linetype = "dashed", alpha = 0.6, size = 0.8) +
+        geom_line(linetype = "dashed", alpha = 0.6, linewidth = 0.8) +
         geom_point(size = 2.5, alpha = 0.9) +
         scale_color_manual(values = run_colors, labels = run_labels,
                            name = NULL) +

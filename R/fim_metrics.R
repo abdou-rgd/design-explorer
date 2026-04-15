@@ -183,11 +183,11 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
                            if (is.na(nsn$n_needed)) "N/A" else as.character(nsn$n_needed))
 
   p <- ggplot(df, aes(x = N, y = Power)) +
-    geom_line(color = "#2563eb", size = 1) +
+    geom_line(color = "#2563eb", linewidth = 1) +
     geom_hline(yintercept = power_target, linetype = "dashed",
-               color = "#dc2626", size = 0.6) +
+               color = "#dc2626", linewidth = 0.6) +
     geom_vline(xintercept = n_current, linetype = "dotted",
-               color = "#6b7280", size = 0.6) +
+               color = "#6b7280", linewidth = 0.6) +
     annotate("text", x = n_current, y = 0.05,
              label = paste0("N=", n_current), hjust = -0.15,
              size = 3.2, color = "#6b7280") +
@@ -207,7 +207,7 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
     )
     p <- p +
       geom_vline(xintercept = nsn$n_needed, linetype = "dotted",
-                 color = "#16a34a", size = 0.6) +
+                 color = "#16a34a", linewidth = 0.6) +
       geom_point(data = data.frame(N = nsn$n_needed, Power = power_at_nsn),
                  aes(x = N, y = Power), color = "#16a34a", size = 3) +
       annotate("text", x = nsn$n_needed, y = 0.05,

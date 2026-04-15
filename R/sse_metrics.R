@@ -20,6 +20,13 @@ library(dplyr)
 library(stringr)
 library(tidyr)
 
+# Palette partagee FIM/SSE (Fixed effects, IIV, Residual)
+.COLORS_PARAM_TYPE <- c(
+  "Fixed effects" = "#6C2B91",
+  "IIV"           = "#2B6991",
+  "Residual"      = "#E07B39"
+)
+
 
 # =============================================================================
 # .normalize_psn_cols() — Normaliser noms colonnes PsN -> format NONMEM
@@ -733,9 +740,9 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     TRUE                            ~ df$param_type
   )
 
-  col_fixed <- "#6C2B91"
-  col_iiv   <- "#2B6991"
-  col_resid <- "#E07B39"
+  col_fixed <- .COLORS_PARAM_TYPE[["Fixed effects"]]
+  col_iiv   <- .COLORS_PARAM_TYPE[["IIV"]]
+  col_resid <- .COLORS_PARAM_TYPE[["Residual"]]
 
   lim_max <- max(c(df$rse_fim_capped, df$rse_sse_capped), na.rm = TRUE) * 1.1
   lim <- c(0, lim_max)
@@ -771,7 +778,7 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     geom_segment(aes(x = rse_sse_capped, xend = rmse_sse_capped,
                      y = rse_fim_capped, yend = rse_fim_capped,
                      color = type_group),
-                 alpha = 0.3, size = 0.5, linetype = "dotted") +
+                 alpha = 0.3, linewidth = 0.5, linetype = "dotted") +
     # RSE points (main)
     geom_point(aes(color = type_group), size = 3.5) +
     # Labels
@@ -908,9 +915,9 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
     TRUE ~ summ$param_type
   )
 
-  col_fixed <- "#6C2B91"
-  col_iiv   <- "#2B6991"
-  col_resid <- "#E07B39"
+  col_fixed <- .COLORS_PARAM_TYPE[["Fixed effects"]]
+  col_iiv   <- .COLORS_PARAM_TYPE[["IIV"]]
+  col_resid <- .COLORS_PARAM_TYPE[["Residual"]]
 
   # Order params: THETA, OMEGA, SIGMA
   summ$param_label <- factor(summ$param_label, levels = summ$param_label)
@@ -925,13 +932,13 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
       aes(ymin = p5, lower = q25, middle = median,
           upper = q75, ymax = p95, fill = type_group),
       stat = "identity", width = 0.6, alpha = 0.7,
-      color = "grey30", size = 0.4
+      color = "grey30", linewidth = 0.4
     ) +
     # Relative Bias as black diamond
     geom_point(aes(y = rb), shape = 18, size = 3, color = "black") +
     # 95% CI error bar for bias
     geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper),
-                  width = 0.2, size = 0.5, color = "black") +
+                  width = 0.2, linewidth = 0.5, color = "black") +
     scale_fill_manual(
       values = c("Fixed effects" = col_fixed,
                  "IIV" = col_iiv,
@@ -1002,9 +1009,9 @@ plot_rse_bar <- function(comparison_df, title = NULL) {
     geom_col(position = position_dodge(width = 0.7), width = 0.6, alpha = 0.85) +
     # Reference lines
     geom_hline(yintercept = 20, linetype = "dashed", color = "#16a34a",
-               size = 0.4, alpha = 0.7) +
+               linewidth = 0.4, alpha = 0.7) +
     geom_hline(yintercept = 50, linetype = "dashed", color = "#d97706",
-               size = 0.4, alpha = 0.7) +
+               linewidth = 0.4, alpha = 0.7) +
     scale_fill_manual(
       values = c("FIM predicted" = "#4682B4",
                  "SSE empirical" = "#CD5C5C"),

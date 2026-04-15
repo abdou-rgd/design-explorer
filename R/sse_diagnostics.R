@@ -7,6 +7,11 @@
 # Prereqs: ggplot2, dplyr, tidyr, stringr (already loaded by app.R)
 # =============================================================================
 
+# Safe percentage: 0 when denominator is 0
+.safe_pct <- function(n, total) {
+  if (total == 0L) 0 else round(100 * n / total, 1)
+}
+
 
 # =============================================================================
 # read_sse_raw_all() — Read PsN raw_results CSV WITHOUT filtering
@@ -92,19 +97,15 @@ compute_run_health <- function(sse_all) {
     sum(as.numeric(min_ok_rows$rounding_errors) == 0, na.rm = TRUE)
   } else n_min_ok
 
-  safe_pct <- function(n, total) {
-    if (total == 0L) 0 else round(100 * n / total, 1)
-  }
-
   stages <- data.frame(
     stage = c("Total runs", "Minimization OK", "No boundary estimates",
               "Covariance OK", "No rounding errors"),
     n     = c(n_total, n_min_ok, n_no_boundary, n_cov_ok, n_no_rounding),
     denom = c(n_total, n_total, n_min_ok, n_min_ok, n_min_ok),
-    pct   = c(100, safe_pct(n_min_ok, n_total),
-              safe_pct(n_no_boundary, n_min_ok),
-              safe_pct(n_cov_ok, n_min_ok),
-              safe_pct(n_no_rounding, n_min_ok)),
+    pct   = c(100, .safe_pct(n_min_ok, n_total),
+              .safe_pct(n_no_boundary, n_min_ok),
+              .safe_pct(n_cov_ok, n_min_ok),
+              .safe_pct(n_no_rounding, n_min_ok)),
     stringsAsFactors = FALSE
   )
 
@@ -229,8 +230,6 @@ compute_param_diagnostics <- function(sse_all, true_values,
   n_runs <- nrow(dat)
   if (n_runs == 0L) return(tibble::tibble())
 
-  safe_pct <- function(n) round(100 * n / n_runs, 1)
-
   rows <- lapply(available, function(pname) {
     estimates <- as.numeric(dat[[pname]])
     true_val  <- true_values[[pname]]
@@ -261,11 +260,11 @@ compute_param_diagnostics <- function(sse_all, true_values,
       param_type      = .param_type(pname),
       n_runs          = n_runs,
       n_se_na         = n_se_na,
-      pct_se_na       = safe_pct(n_se_na),
+      pct_se_na       = .safe_pct(n_se_na, n_runs),
       n_rse_over_100  = n_rse_over_100,
-      pct_rse_over_100 = safe_pct(n_rse_over_100),
+      pct_rse_over_100 = .safe_pct(n_rse_over_100, n_runs),
       n_zero_estimate = n_zero,
-      pct_zero_estimate = safe_pct(n_zero),
+      pct_zero_estimate = .safe_pct(n_zero, n_runs),
       stringsAsFactors = FALSE
     )
   })
@@ -320,10 +319,10 @@ plot_param_distributions <- function(dist_data, show_failed = FALSE) {
   p <- p +
     geom_vline(data = summaries,
                aes(xintercept = true_value),
-               color = "#dc2626", linetype = "dashed", size = 0.7) +
+               color = "#dc2626", linetype = "dashed", linewidth = 0.7) +
     geom_vline(data = summaries,
                aes(xintercept = median_est),
-               color = "#1e40af", linetype = "solid", size = 0.7) +
+               color = "#1e40af", linetype = "solid", linewidth = 0.7) +
     facet_wrap(~ param_label, scales = "free", ncol = 3) +
     labs(title = "Parameter Estimate Distributions (SSE)",
          subtitle = "Red dashed = true value | Blue solid = median estimate",
@@ -363,19 +362,19 @@ plot_ofv_distribution <- function(sse_all, color_by_status = FALSE) {
     df$status <- ifelse(df$converged, "Converged", "Failed")
     p <- ggplot(df, aes(x = ofv, fill = status)) +
       geom_histogram(bins = 30, alpha = 0.7, position = "identity",
-                     color = "white", size = 0.2) +
+                     color = "white", linewidth = 0.2) +
       scale_fill_manual(values = c("Converged" = "#3b82f6",
                                    "Failed" = "#ef4444"),
                         name = NULL)
   } else {
     p <- ggplot(df[df$converged, ], aes(x = ofv)) +
       geom_histogram(bins = 30, fill = "#3b82f6", alpha = 0.7,
-                     color = "white", size = 0.2)
+                     color = "white", linewidth = 0.2)
   }
 
   p <- p +
     geom_vline(xintercept = median_ofv, color = "#1e40af",
-               linetype = "dashed", size = 0.8) +
+               linetype = "dashed", linewidth = 0.8) +
     annotate("text", x = median_ofv, y = Inf, vjust = 2, hjust = -0.1,
              label = sprintf("Median: %.1f", median_ofv),
              color = "#1e40af", size = 3.5, fontface = "bold") +
@@ -413,7 +412,7 @@ plot_empirical_cor_heatmap <- function(cor_matrix) {
   df$Var2 <- factor(df$Var2, levels = rev(params))
 
   p <- ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
-    geom_tile(color = "white", size = 0.5) +
+    geom_tile(color = "white", linewidth = 0.5) +
     geom_text(aes(label = ifelse(abs(value) > 0.3,
                                  sprintf("%.2f", value), "")),
               size = 2.8, color = "black") +

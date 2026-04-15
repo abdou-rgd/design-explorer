@@ -467,7 +467,7 @@ mod_sse_comparison_server <- function(id,
       df$Var2 <- factor(df$Var2, levels = rev(common))
 
       ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
-        geom_tile(color = "white", size = 0.5) +
+        geom_tile(color = "white", linewidth = 0.5) +
         geom_text(aes(label = ifelse(abs(value) > 0.1,
                                      sprintf("%+.2f", value), "")),
                   size = 2.8, color = "black") +
