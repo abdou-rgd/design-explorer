@@ -88,14 +88,17 @@ library(tidyr)
 
 #' Prépare les observations d'un fichier .tab pour l'analyse des temps
 #'
-#' Filtre les doses (EVID != 0 si la colonne existe), exclut la première
-#' ligne (dose initiale TIME=0), et ajoute TSTRAT=1 si absent.
+#' Filtre les doses (EVID != 0 si la colonne existe), exclut la ligne
+#' baseline TIME=0 (artefact $DESIGN), et ajoute TSTRAT=1 si absent.
 #'
 #' @param tab data.frame lu par read_tab()
 #' @return data.frame nettoyé, sans ligne de dose
 prepare_tab_obs <- function(tab) {
   if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
-  if (nrow(tab) > 1L) tab <- tab[-1L, , drop = FALSE]
+  # Drop TIME=0 baseline row (NONMEM $DESIGN artefact, not a real sampling time)
+  if (nrow(tab) > 1L && "TIME" %in% names(tab) && tab$TIME[1] == 0) {
+    tab <- tab[-1L, , drop = FALSE]
+  }
   if (!"TSTRAT" %in% names(tab)) tab$TSTRAT <- 1L
   tab
 }

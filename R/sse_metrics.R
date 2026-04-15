@@ -332,6 +332,40 @@ read_true_values <- function(ctl_lines) {
     ranges
   }
 
+  # --- Helper: extract ALL THETA init values from a single line ---
+  # Handles multi-value lines: (0,0.15,1) (0,8.0,50) (0,1.0,5)
+  # Also handles: standalone 0.15, mixed (0,0.15,1) 8.0, and FIX/FIXED suffixes
+  .extract_theta_inits <- function(stripped) {
+    vals <- numeric(0L)
+    # 1) Extract all parenthesized groups: (lower,init,upper) or (init)
+    paren_locs <- gregexpr("\\([^)]+\\)", stripped)[[1]]
+    if (paren_locs[1] > 0) {
+      paren_strs <- regmatches(stripped, list(paren_locs))[[1]]
+      for (ps in paren_strs) {
+        inner <- sub("^\\((.*)\\)$", "\\1", ps)
+        nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
+        nums <- nums[!is.na(nums)]
+        if (length(nums) == 3L)      vals <- c(vals, nums[2])
+        else if (length(nums) == 2L) vals <- c(vals, nums[2])
+        else if (length(nums) == 1L) vals <- c(vals, nums[1])
+      }
+      remaining <- gsub("\\([^)]+\\)", "", stripped)
+    } else {
+      remaining <- stripped
+    }
+    # 2) Extract bare numbers from remaining text (e.g. "0.15 FIX 8.0")
+    remaining <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT)\\b", "", remaining)
+    bare_locs <- gregexpr("-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?", remaining)[[1]]
+    if (bare_locs[1] > 0) {
+      bare_strs <- regmatches(remaining, list(bare_locs))[[1]]
+      for (bs in bare_strs) {
+        val <- as.numeric(sub("[dD]", "e", bs))
+        if (!is.na(val)) vals <- c(vals, val)
+      }
+    }
+    vals
+  }
+
   # --- Parse $THETA ---
   theta_vals <- numeric(0L)
   theta_names <- character(0L)
@@ -342,30 +376,12 @@ read_true_values <- function(ctl_lines) {
       stripped <- sub("^\\s*\\$THETA\\s*", "", ln)
       stripped <- trimws(stripped)
       if (nchar(stripped) == 0L) next
-      # Extract init from (lower, init, upper) or standalone value
-      # Handle: (0, 0.005933, 1) or (0.005933) or 0.005933 or (0, 0.005933) FIX
-      if (grepl("\\(", stripped)) {
-        # Bounded format: extract numbers inside parens
-        inner <- sub("^\\(([^)]+)\\).*", "\\1", stripped)
-        nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
-        nums <- nums[!is.na(nums)]
-        if (length(nums) == 3L) {
-          val <- nums[2]  # (lower, init, upper)
-        } else if (length(nums) == 2L) {
-          val <- nums[2]  # (lower, init)
-        } else if (length(nums) == 1L) {
-          val <- nums[1]
-        } else {
-          next
-        }
-      } else {
-        # Standalone value (possibly followed by FIX)
-        val <- as.numeric(sub("^(-?[0-9.eEdD]+).*", "\\1", stripped))
-        if (is.na(val)) next
+      inits <- .extract_theta_inits(stripped)
+      for (val in inits) {
+        theta_idx <- theta_idx + 1L
+        theta_vals <- c(theta_vals, val)
+        theta_names <- c(theta_names, paste0("THETA", theta_idx))
       }
-      theta_idx <- theta_idx + 1L
-      theta_vals <- c(theta_vals, val)
-      theta_names <- c(theta_names, paste0("THETA", theta_idx))
     }
   }
 

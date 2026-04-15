@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.4"
-.APP_VERSION_NAME <- "SSE centralise"
+.APP_VERSION      <- "V5.5"
+.APP_VERSION_NAME <- "mrgsolve integration"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
