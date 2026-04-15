@@ -142,7 +142,7 @@ mod_sse_validation_ui <- function(id) {
         ),
 
         tags$h5("Running SSE with PsN", style = "margin-top:10px;"),
-        tags$p("Command line to run an SSE on a Sanofi-type cluster with wrapsn:"),
+        tags$p("Command line to run an SSE on a compute cluster with wrapsn:"),
         tags$pre(style = paste0(
           "font-size:0.85em; background:#f0f0f0; padding:8px;",
           " border-radius:4px; overflow-x:auto;"

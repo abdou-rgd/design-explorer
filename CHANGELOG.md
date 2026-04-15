@@ -102,7 +102,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ### Tests
 - [test] 17 nouveaux tests TOST : power centered/off-center, outside margin, negative branch, edge cases (theta=0, rse=NA, delta<=0), monotonicity, NSN consistency, equiv_table avec example1. **175 total, 0 failures.**
-- [verify] Formules cross-checkees : power a NSE = 0.800000 exactement. NSN scaling verifie pour cas frexa (2 IDs x GROUPSIZE=40 = 80 patients).
+- [verify] Formules cross-checkees : power a NSE = 0.800000 exactement. NSN scaling verifie pour un cas reel (2 IDs x GROUPSIZE=40 = 80 patients).
 - [verify] PFIM eq. (1)-(2) matchent exactement. Eq. (3) NNI : PFIM manual utilise ratio lineaire (conservatif), notre code utilise ratio carre (correct, valide par PopED).
 - [compat] R 4.2.0 clean (scan r42-compat-checker).
 
@@ -154,7 +154,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ### Upload & Parsers (PR #28)
 - [fix] **`.ctl/.mod/.con` acceptes** dans le `fileInput` des runs de comparaison
-- [fix] **`parse_theta_labels()` reecrit** : gere multiples blocs `$THETA`, format Sanofi, index corrects
+- [fix] **`parse_theta_labels()` reecrit** : gere multiples blocs `$THETA`, format custom (;--thN- LABEL), index corrects
 
 ### Navigation (PRs #34–#36)
 - [feat] **Architecture steps** : navigation multi-etapes ex2 (3 steps) et ex4 (4 steps), boutons Precedent/Suivant (PR #35)
@@ -261,7 +261,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 ## 2026-03-24 (session 2)
 - [maintenance] Correction paths stales dans CLAUDE.md (docs/inspiration/ → docs/other_softwares/, chemins PDF corrigés)
-- [maintenance] Simplification workflow section CLAUDE.md (passage 1 seul laptop perso Sanofi)
+- [maintenance] Simplification workflow section CLAUDE.md (passage 1 seul laptop perso)
 - [maintenance] Ajout 3 gotchas Shiny (observeEvent ignoreNULL, %||% priority, str_split_1)
 - [infra] 2 hooks PostToolUse configurés (lintr auto sur .R, testthat auto sur parse_design_outputs)
 - [infra] Agent r42-compat-checker créé (~/.claude/agents/)
@@ -274,7 +274,7 @@ Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de 
 
 - [fix] **Example 3 crash** (`app.R`) : `upload$summary_data()` n'existait pas dans le return de `mod_upload` → crash silencieux. Simplifié : `merged_summary` utilise `examples$summary_data()` uniquement.
 - [fix] **`RSE_THRESHOLDS` / `RELINF_THRESHOLDS` non définis** (`helpers_ui.R`) : constantes référencées dans `rse_badge()`/`ri_badge()` mais jamais déclarées → crash silencieux. Ajout des définitions.
-- [fix] **Support `.mod` / `.con`** (`mod_upload.R`, `app.R`) : convention Sanofi — accepte `.mod` et `.con` en plus de `.ctl` dans `fileInput`, détection tar.gz, et routing multi-fichiers.
+- [fix] **Support `.mod` / `.con`** (`mod_upload.R`, `app.R`) : convention industrielle — accepte `.mod` et `.con` en plus de `.ctl` dans `fileInput`, détection tar.gz, et routing multi-fichiers.
 - [fix] **str_split_1 incompatible R 4.2.0** : remplacé par `strsplit(x, sep)[[1]]` (stringr 1.4.0).
 - [fix] **Retirer la run + upload après exemple** (`app.R`) : les métriques de la session précédente persistaient après reset — clearing complet des `reactiveVal` exemples.
 - [feat] **Auto-fill param labels depuis `.ctl`** (`R/parse_design_outputs.R`, `app.R`) : `parse_theta_labels()` extrait les noms THETA depuis les commentaires `;[CL]` du bloc `$THETA`. `parse_design_summary()` génère un label court depuis les args `$DESIGN` (ex: `"FT=1/FO/VC=1 (optim)"`). Auto-remplissage du textarea labels + `primary_run_name` à l'upload.

@@ -145,7 +145,7 @@ parse_theta_labels <- function(lines) {
     if (!grepl(";", ln)) return(NULL)
     comment <- sub("^[^;]*;\\s*", "", ln)
     if (nchar(comment) == 0L) return(NULL)
-    # Strip Sanofi prefix: --thN- or --thN-- or similar
+    # Strip custom prefix: --thN- or --thN-- or similar
     comment <- sub("^[-]+\\s*(th\\d+)?[-]*\\s*", "", comment)
     # Strip brackets: [LABEL] -> LABEL
     comment <- sub("^\\[([^]]+)\\].*", "\\1", comment)

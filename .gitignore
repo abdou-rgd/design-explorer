@@ -71,9 +71,8 @@ docs/reading_list.md
 # Outputs d'optimisation (generes, pas du source code)
 docs/results/
 
-# Suivi de stage (tracke — livrable tutrice)
-!docs/suivi/*.csv
-!docs/suivi/*.xlsx
+# Suivi de stage (personnel, non redistribuable)
+docs/suivi/
 
 # Documents non redistribuables
 docs/nonmem/manuel_nonmem.txt
@@ -98,6 +97,9 @@ tmp_*.py
 
 # Presentations (binary, large)
 *.pptx
+
+# Python virtual environment
+.venv/
 
 # OS
 .DS_Store

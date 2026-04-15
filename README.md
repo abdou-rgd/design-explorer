@@ -1,93 +1,93 @@
-# NONMEM $DESIGN — Post-Processing & Optimal Design
+# NONMEM $DESIGN -- Post-Processing & Optimal Design
 
-**V5.1** · Stage M2 Sciences des donn\u00e9es de sant\u00e9 · Sanofi
-Optimisation de design d'essais cliniques en pharmacométrie via la Fisher Information Matrix (FIM).
-
----
-
-## Objectifs
-
-1. **Recherche scientifique** — étude des méthodes d'optimal design (D/A/R-optimality, design séquentiel, robust design) appliquées aux modèles NLME en pharmacocinétique/pharmacodynamie.
-2. **Outils R post-processing** — faciliter l'analyse et la visualisation des sorties NONMEM `$DESIGN` pour les pharmacométriciens.
+**V5.5** -- M2 Health Data Science Internship Project
+Optimization of clinical trial designs in pharmacometrics using the Fisher Information Matrix (FIM).
 
 ---
 
-## Structure du projet
+## Objectives
+
+1. **Scientific research** -- Study of optimal design methods (D/A/R-optimality, sequential design, robust design) applied to NLME models in pharmacokinetics/pharmacodynamics.
+2. **R post-processing tools** -- Facilitate the analysis and visualization of NONMEM `$DESIGN` outputs for pharmacometricians.
+
+---
+
+## Project Structure
 
 ```
 .
-├── R/
-│   ├── design_utils.R           # Utilitaires : %||%, constantes, helpers internes
-│   ├── design_io.R              # Lecteurs NONMEM : read_ext(), read_shk(), read_coi(), ...
-│   ├── design_metrics.R         # Extracteurs FIM : get_rse(), get_d_criterion(), ...
-│   ├── design_summary.R         # Affichage console : summary_design()
-│   ├── ctl_parsers.R            # Parseurs .ctl : parse_theta_labels(), parse_groupsize(), ...
-│   ├── fim_metrics.R            # Power/NSN Wald & TOST : compute_power_wald(), ...
-│   └── report_design.R          # Visualisations ggplot2 : plot_rse(), plot_convergence(), ...
-├── app/
-│   ├── app.R                    # Application Shiny "DE$IGN EXPLORER" (V5.1)
-│   ├── install_deps.R           # Installation des dépendances Shiny
-│   ├── examples/                # Exemples intégrés (Bauer 2021, examples 1-7)
-│   └── R/                       # 13 modules Shiny
-│       ├── mod_home.R           # Home : upload + run summary + compare
-│       ├── mod_upload.R         # Import de fichiers NONMEM (.ext, .shk, .coi, .tab, ...)
-│       ├── mod_params.R         # Parametres finaux, RSE, shrinkage
-│       ├── mod_rse.R            # RSE predit (%) avec seuils 4 paliers
-│       ├── mod_relativeinf.R    # Information relative par ETA
-│       ├── mod_convergence.R    # Convergence OFV par optimiseur
-│       ├── mod_fim.R            # FIM heatmap, D-critere, eigenvalues
-│       ├── mod_times.R          # Temps optimises (+ design robuste boxplots)
-│       ├── mod_prior.R          # Visualisation $PRIOR NWPRI
-│       ├── mod_power.R          # Power Wald, NSN, Equivalence TOST
-│       ├── mod_sse_validation.R # Validation SSE vs FIM (scatter, REE, RSE bar)
-│       ├── mod_raw.R            # Fichiers bruts
-│       ├── mod_ctl_stream.R     # Visualisation control stream
-│       ├── mod_examples.R       # Exemples integres avec auto-compare
-│       └── helpers_ui.R         # Helpers UI : badges, pills, detect_method()
-├── tests/
-│   ├── run_tests.R              # Script lanceur de tests
-│   └── testthat/                # 175 tests unitaires
-└── docs/
-    ├── nonmem/
-    │   └── manuel_nonmem.txt     # Manuel NONMEM 7.5.1 complet (13 057 lignes)
-    ├── papers/                   # Littérature de référence
-    ├── other_softwares/          # Code source PFIM 7.0, PopED (référence)
-    └── intern_work/              # Mémoire de stage en cours
+|-- R/
+|   |-- design_utils.R           # Utilities: %||%, constants, internal helpers
+|   |-- design_io.R              # NONMEM readers: read_ext(), read_shk(), read_coi(), ...
+|   |-- design_metrics.R         # FIM extractors: get_rse(), get_d_criterion(), ...
+|   |-- design_summary.R         # Console display: summary_design()
+|   |-- ctl_parsers.R            # .ctl parsers: parse_theta_labels(), parse_groupsize(), ...
+|   |-- fim_metrics.R            # Power/NSN Wald & TOST: compute_power_wald(), ...
+|   |-- report_design.R          # ggplot2 visualizations: plot_rse(), plot_convergence(), ...
+|   `-- sse_diagnostics.R        # SSE intrinsic analysis: compute_param_diagnostics(), ...
+|-- app/
+|   |-- app.R                    # Shiny application "DE$IGN EXPLORER" (V5.5)
+|   |-- install_deps.R           # Install Shiny dependencies
+|   |-- examples/                # Built-in examples (Bauer 2021, examples 1-7)
+|   `-- R/                       # 18 Shiny modules
+|       |-- mod_home.R           # Home: upload + run summary + compare
+|       |-- mod_upload.R         # NONMEM file import (.ext, .shk, .coi, .tab, ...)
+|       |-- mod_params.R         # Final parameters, RSE, shrinkage
+|       |-- mod_rse.R            # Predicted RSE (%) with 4-tier thresholds
+|       |-- mod_relativeinf.R    # Relative information per ETA
+|       |-- mod_convergence.R    # OFV convergence by optimizer
+|       |-- mod_fim.R            # FIM heatmap, D-criterion, eigenvalues
+|       |-- mod_times.R          # Optimized sampling times (+ robust design boxplots)
+|       |-- mod_prior.R          # $PRIOR NWPRI visualization
+|       |-- mod_power.R          # Wald power, NSN, TOST equivalence
+|       |-- mod_sse_upload.R     # SSE file upload
+|       |-- mod_sse_validation.R # SSE vs FIM validation (scatter, REE, RSE bars)
+|       |-- mod_sse_analysis.R   # SSE intrinsic analysis (distributions, correlations)
+|       |-- mod_sse_comparison.R # Two-SSE A/B comparison
+|       |-- mod_raw.R            # Raw files viewer
+|       |-- mod_ctl_stream.R     # Control stream viewer
+|       |-- mod_examples.R       # Built-in examples with auto-compare
+|       `-- helpers_ui.R         # UI helpers: badges, pills, detect_method()
+|-- tests/
+|   |-- run_tests.R              # Test runner script
+|   `-- testthat/                # 175 unit tests
+`-- docs/
+    `-- papers/                  # Reference literature
 ```
 
 ---
 
-## Application Shiny — `DE$IGN EXPLORER`
+## Shiny Application -- `DE$IGN EXPLORER`
 
-Interface web pour explorer interactivement les sorties NONMEM `$DESIGN`.
+Interactive web interface for exploring NONMEM `$DESIGN` outputs.
 
-### Lancement
+### Getting Started
 
 ```r
-# Installer les dépendances si nécessaire
+# Install dependencies if needed
 source("app/install_deps.R")
 
-# Lancer l'application
+# Launch the application
 shiny::runApp("app/")
 ```
 
-### Fonctionnalités
+### Features
 
 | Tab / Menu | Description |
 |------------|-------------|
-| **Home** | Upload fichiers + run summary (OFV, params, CPU, method) + compare multi-runs |
-| **Parameters** | Parametres finaux, RSE, shrinkage |
-| **Design** (menu) | RSE predit (4 paliers), Information relative (%), Optimal Times, Robust Design |
-| **Analysis** (menu) | FIM heatmap + eigenvalues, Convergence OFV, SSE Validation (scatter FIM vs SSE) |
-| **Decision** (menu) | Power Wald, NSN, Equivalence TOST |
-| **Raw Data** | Fichiers bruts, Control stream viewer |
-| **Examples** | Exemples integres (Bauer 2021, 1-7) avec auto-compare |
+| **Home** | File upload + run summary (OFV, params, CPU, method) + multi-run comparison |
+| **Parameters** | Final parameters, RSE, shrinkage |
+| **Design** (menu) | Predicted RSE (4 tiers), Relative Information (%), Optimal Times, Robust Design |
+| **Analysis** (menu) | FIM heatmap + eigenvalues, OFV convergence, SSE Validation (FIM vs SSE scatter) |
+| **Decision** (menu) | Wald power, NSN, TOST equivalence |
+| **Raw Data** | Raw files viewer, Control stream viewer |
+| **Examples** | Built-in examples (Bauer 2021, 1-7) with auto-compare |
 
 ---
 
-## Scripts R
+## R Scripts
 
-### Lecture et métriques
+### Reading and Metrics
 
 ```r
 source("R/design_utils.R")
@@ -95,113 +95,117 @@ source("R/design_io.R")
 source("R/design_metrics.R")
 source("R/design_summary.R")
 
-# Lire les fichiers
+# Read files
 ext <- read_ext("run001.ext")
 shk <- read_shk("run001.shk")
 coi <- read_coi("run001.coi")
 tab <- read_tab("run001.tab")
 
-# Extraire les métriques
-get_final_params(ext)    # Paramètres finaux (itération -1000000000)
-get_se(ext)              # Erreurs standard prédites par la FIM
-get_ofv(ext)             # Valeur du critère d'optimalité
-get_rse(ext)             # RSE (%) : tibble param / estimate / se / rse_pct
-get_relativeinf(shk)     # Information relative (%) par ETA (TYPE 11)
-get_d_criterion(ext)     # D-critère : -log(det(FIM))
+# Extract metrics
+get_final_params(ext)    # Final parameters (iteration -1000000000)
+get_se(ext)              # Standard errors predicted by FIM
+get_ofv(ext)             # Optimality criterion value
+get_rse(ext)             # RSE (%): tibble with param / estimate / se / rse_pct
+get_relativeinf(shk)     # Relative information (%) per ETA (TYPE 11)
+get_d_criterion(ext)     # D-criterion: -log(det(FIM))
 
-# Synthèse d'un run
+# Run summary
 summary_design(ext, shk)
 ```
 
-### Parseurs control stream
+### Control Stream Parsers
 
 ```r
 source("R/ctl_parsers.R")
 
-parse_theta_labels("run001.ctl")   # Labels THETA depuis les commentaires
-parse_groupsize("run001.ctl")      # GROUPSIZE par bras
-parse_design_summary("run001.ctl") # Résumé du bloc $DESIGN
-read_prior_nwpri("run001.ctl")     # Paramètres $PRIOR NWPRI
+parse_theta_labels("run001.ctl")   # THETA labels from comments
+parse_groupsize("run001.ctl")      # GROUPSIZE per arm
+parse_design_summary("run001.ctl") # $DESIGN block summary
+read_prior_nwpri("run001.ctl")     # $PRIOR NWPRI parameters
 ```
 
-### Power / NSN
+### Power / Sample Size
 
 ```r
 source("R/fim_metrics.R")
 
-compute_power_wald(rse, n)          # Puissance test de Wald
-compute_n_needed(rse, power = 0.8)  # NSN pour puissance cible
-compute_power_tost(rse, n, delta)   # Puissance équivalence TOST
+compute_power_wald(rse, n)          # Wald test power
+compute_n_needed(rse, power = 0.8)  # Sample size for target power
+compute_power_tost(rse, n, delta)   # TOST equivalence power
 ```
 
-### Visualisations ggplot2
+### ggplot2 Visualizations
 
 ```r
 source("R/report_design.R")
 
-plot_rse(ext)              # Barplot RSE(%) par paramètre, facetté par type
-plot_relativeinf(shk)      # Barplot RELATIVEINF(%) par ETA avec code couleur
-plot_convergence(ext)      # Courbe OFV vs itération par optimiseur
-plot_fim_heatmap(coi)      # Heatmap FIM avec annotations
-plot_optimal_times(tab)    # Temps optimisés sur timeline
-plot_model_prediction(tab) # Courbe IPRED vs TIME par bras
+plot_rse(ext)              # RSE (%) barplot by parameter, faceted by type
+plot_relativeinf(shk)      # RELATIVEINF (%) barplot per ETA with color coding
+plot_convergence(ext)      # OFV vs iteration curve by optimizer
+plot_fim_heatmap(coi)      # FIM heatmap with annotations
+plot_optimal_times(tab)    # Optimized times on timeline
+plot_model_prediction(tab) # IPRED vs TIME curve by arm
 ```
 
 ---
 
-## Fichiers NONMEM `$DESIGN` — référence rapide
+## NONMEM `$DESIGN` Output Files -- Quick Reference
 
-| Fichier | Contenu clé |
-|---------|------------|
-| `.ext` | Paramètres + OFV par itération ; lignes spéciales : `-1e9` (final), `-1e9-1` (SE) |
-| `.shk` | Shrinkage — TYPE 11 = `RELATIVEINF(%)` |
-| `.coi` | Fisher Information Matrix complète (format nommé) |
-| `.clt` | FIM en triangulaire inférieure (ordre TOSL) |
-| `.tab` | Temps/doses optimisés définis via `$TABLE` |
-| `.res` | Rapport complet : `#OBJV`, `RELATIVEINF`, temps de calcul |
-| `.bfm` | Bayes FIM individuelle (uniquement `OFVTYPE=8`) |
-
----
-
-## Critères d'optimalité (`OFVTYPE=`)
-
-| Valeur | Critère | Formule |
-|--------|---------|---------|
-| 0–1 | **D-optimality** (défaut) | `-log(det(FIM))` |
-| 2 | A-optimality | `-1/tr(FIM⁻¹)` |
-| 6 | DS-optimality | D-opt + pénalité paramètres non-intéressants |
-| 7 | R-optimality (RSE) | `-1/tr(√(FIM⁻¹)/θ)` |
-| 8 | Bayesian FIM individuelle | `-log(det(FIM_bayes))` |
+| File | Key Content |
+|------|-------------|
+| `.ext` | Parameters + OFV per iteration; special lines: `-1e9` (final), `-1e9-1` (SE) |
+| `.shk` | Shrinkage -- TYPE 11 = `RELATIVEINF(%)` |
+| `.coi` | Full Fisher Information Matrix (named format) |
+| `.clt` | FIM in lower-triangular form (TOSL order) |
+| `.tab` | Optimized times/doses defined via `$TABLE` |
+| `.res` | Full report: `#OBJV`, `RELATIVEINF`, computation time |
+| `.bfm` | Individual Bayesian FIM (only with `OFVTYPE=8`) |
 
 ---
 
-## Stack technique
+## Optimality Criteria (`OFVTYPE=`)
 
-- **R** 4.2+ avec tidyverse (`dplyr`, `tidyr`, `purrr`, `ggplot2`, `stringr`, `readr`)
+| Value | Criterion | Formula |
+|-------|-----------|---------|
+| 0-1 | **D-optimality** (default) | `-log(det(FIM))` |
+| 2 | A-optimality | `-1/tr(FIM^-1)` |
+| 6 | DS-optimality | D-opt + penalty for nuisance parameters |
+| 7 | R-optimality (RSE) | `-1/tr(sqrt(FIM^-1)/theta)` |
+| 8 | Individual Bayesian FIM | `-log(det(FIM_bayes))` |
+
+---
+
+## Tech Stack
+
+- **R** 4.2+ with tidyverse (`dplyr`, `tidyr`, `purrr`, `ggplot2`, `stringr`, `readr`)
 - **Shiny** 1.7+ / `bslib` 0.3+ (Bootstrap 3) / `DT`
-- **NONMEM** 7.5+ (sorties texte brut)
-- **Références** : PFIM 7.0, PopED, Bauer 2021
+- **NONMEM** 7.5+ (plain text outputs)
 
 ---
 
-## Exemples de référence (Bauer 2021)
+## Built-in Examples (Bauer 2021)
 
-| N° | Modèle | Illustre |
-|----|--------|---------|
-| 1 | Warfarine | Évaluation simple, FIM bloc-diagonale |
-| 2 | Warfarine | Optimisation des temps de prélèvement (NELDER) |
-| 3 | Warfarine | Robust design via `$SIM TRUE=PRIOR` |
-| 4 | PK-PD | Multi-réponses, lien PK/PD |
-| 5 | Warfarine | DS-optimality, paramètres non-intéressants |
+| # | Model | Illustrates |
+|---|-------|-------------|
+| 1 | Warfarin | Simple evaluation, block-diagonal FIM |
+| 2 | Warfarin | Sampling time optimization (NELDER) |
+| 3 | Warfarin | Robust design via `$SIM TRUE=PRIOR` |
+| 4 | PK-PD | Multi-response, PK/PD link |
+| 5 | Warfarin | DS-optimality, nuisance parameters |
 | 6 | TMDD | Stratification (`STRAT/STRATF`), ODE |
-| 7 | TMDD | Bayes FIM, optimisation dose + temps |
+| 7 | TMDD | Bayesian FIM, dose + time optimization |
 
-Fichiers disponibles dans `docs/papers/bauer2021/examples/`.
+Example files are available in `app/examples/`.
 
 ---
 
-## Ressources
+## References
 
-- `docs/nonmem/manuel_nonmem.txt` — Manuel NONMEM 7.5.1 complet
-- `docs/papers/bauer2021/bauer2021_text.txt` — Bauer 2021 (texte extrait)
-- `docs/intern_work/redaction.docx` — Mémoire de stage en cours
+- Bauer RJ (2021). NONMEM Tutorial Part III: Optimal Design. *CPT Pharmacometrics Syst Pharmacol*.
+- Fayette L, Brendel K, Mentre F (2026). Evaluation of the Fisher Information Matrix-Based Optimal Design in Comparison with Stochastic Simulation and Estimation for Nonlinear Mixed-Effect Models. *Pharm Res*.
+
+---
+
+## License
+
+This project is licensed under the MIT License -- see the [LICENSE](LICENSE) file for details.

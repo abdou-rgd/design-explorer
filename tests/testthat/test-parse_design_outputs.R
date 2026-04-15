@@ -501,9 +501,9 @@ test_that("parse_theta_labels() handles multiple $THETA blocks", {
   expect_equal(lbl, c(THETA1 = "CL", THETA2 = "V", THETA3 = "KA"))
 })
 
-test_that("parse_theta_labels() handles Sanofi format ;--thN- LABEL", {
+test_that("parse_theta_labels() handles custom format ;--thN- LABEL", {
   ctl <- c(
-    "$PROBLEM frexalimab",
+    "$PROBLEM example_drug",
     "$THETA (0, 3.9, 100)  ;--th1- CL",
     "$THETA (0, 0.5, 10)   ;--th2- V1",
     "$THETA (0, 1.2, 50)   ;--th3- Q",
