@@ -25,7 +25,18 @@
 read_sse_raw_all <- function(file) {
   if (!file.exists(file)) stop("SSE file not found: ", file)
 
-  raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
+  # Use readr::read_csv — quote-aware (handles OMEGA(1,1) commas) and robust
+  # type inference that doesn't mistype all-leading-NA columns as logical.
+  # Fall back to read.csv if readr is unavailable.
+  if (requireNamespace("readr", quietly = TRUE)) {
+    raw <- suppressWarnings(suppressMessages(
+      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
+                      guess_max = 10000)
+    ))
+    raw <- as.data.frame(raw, check.names = FALSE)
+  } else {
+    raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
+  }
   n_total <- nrow(raw)
   names(raw) <- .normalize_psn_cols(names(raw))
 
@@ -157,49 +168,123 @@ compute_param_distributions <- function(sse_all, true_values,
 
 
 # =============================================================================
-# compute_empirical_correlations() — Spearman correlation of estimates
+# compute_shrinkage_summary() — Per-ETA shrinkage statistics from SSE
 # =============================================================================
 
-#' Compute Spearman correlation matrix of parameter estimates across runs.
+#' Compute per-ETA shrinkage statistics across SSE replicates.
 #'
-#' @param sse_all    Tibble from read_sse_raw_all()
-#' @param true_values Named numeric vector (used for column selection)
+#' Reads the `shrinkage_eta*(%)` columns from PsN raw_results and summarises
+#' the distribution across the K converged replicates. Each ETA(N) is mapped
+#' to its corresponding OMEGA(N,N) diagonal parameter.
+#'
+#' Shrinkage interpretation (Savic & Karlsson 2009):
+#'   < 30 %  : posterior dominated by data (good)
+#'   30-50 % : acceptable
+#'   > 50 %  : posterior dominated by prior (design weakly informative)
+#'
+#' @param sse_all      Tibble from read_sse_raw_all()
+#' @param param_labels Named character vector mapping OMEGA(N,N) -> display name
 #' @param only_converged Logical, filter to converged runs (default TRUE)
-#' @param param_labels Named character vector for display names (optional)
-#' @return Named correlation matrix
+#' @return Tibble: eta, omega, param_label, n, mean_shrink, median_shrink,
+#'         sd_shrink, q25, q75, p5, p95
 #' @export
-compute_empirical_correlations <- function(sse_all, true_values,
-                                           only_converged = TRUE,
-                                           param_labels = NULL) {
-  available <- intersect(names(true_values), names(sse_all))
-  if (length(available) < 2L) return(NULL)
+compute_shrinkage_summary <- function(sse_all,
+                                      param_labels = NULL,
+                                      only_converged = TRUE) {
+  shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
+  if (length(shrink_cols) == 0L) return(tibble::tibble())
 
-  dat <- if (only_converged) {
-    sse_all[sse_all$converged, , drop = FALSE]
+  dat <- if (only_converged) sse_all[sse_all$converged, , drop = FALSE] else sse_all
+  if (nrow(dat) == 0L) return(tibble::tibble())
+
+  rows <- lapply(shrink_cols, function(col) {
+    idx <- as.integer(sub("shrinkage_eta(\\d+)\\(%\\)", "\\1", col))
+    vals <- as.numeric(dat[[col]])
+    vals <- vals[!is.na(vals)]
+    if (length(vals) == 0L) return(NULL)
+
+    omega <- sprintf("OMEGA(%d,%d)", idx, idx)
+    label <- if (!is.null(param_labels) && omega %in% names(param_labels)) {
+      param_labels[[omega]]
+    } else {
+      paste0("ETA(", idx, ")")
+    }
+
+    qs <- quantile(vals, probs = c(0.05, 0.25, 0.50, 0.75, 0.95), names = FALSE)
+
+    data.frame(
+      eta = paste0("ETA(", idx, ")"),
+      omega = omega,
+      param_label = label,
+      n = length(vals),
+      mean_shrink   = round(mean(vals), 2),
+      median_shrink = round(qs[3], 2),
+      sd_shrink     = round(sd(vals), 2),
+      p5  = round(qs[1], 2),
+      q25 = round(qs[2], 2),
+      q75 = round(qs[4], 2),
+      p95 = round(qs[5], 2),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  tibble::as_tibble(dplyr::bind_rows(rows))
+}
+
+
+# =============================================================================
+# compute_shrinkage_long() — Long-format shrinkage per replicate
+# =============================================================================
+
+#' Build long-format tibble of per-replicate shrinkage for boxplot.
+#'
+#' @param sse_all      Tibble from read_sse_raw_all()
+#' @param param_labels Named character vector mapping OMEGA(N,N) -> label
+#' @param only_converged Logical (default TRUE)
+#' @return Tibble: eta, omega, param_label, run_id, shrinkage
+#' @export
+compute_shrinkage_long <- function(sse_all,
+                                   param_labels = NULL,
+                                   only_converged = TRUE) {
+  shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
+  empty <- tibble::tibble()
+  if (length(shrink_cols) == 0L) {
+    attr(empty, "status") <- "no_columns"
+    return(empty)
+  }
+
+  dat <- if (only_converged) sse_all[sse_all$converged, , drop = FALSE] else sse_all
+  if (nrow(dat) == 0L) {
+    attr(empty, "status") <- "no_rows"
+    return(empty)
+  }
+
+  rows <- lapply(shrink_cols, function(col) {
+    idx <- as.integer(sub("shrinkage_eta(\\d+)\\(%\\)", "\\1", col))
+    omega <- sprintf("OMEGA(%d,%d)", idx, idx)
+    label <- if (!is.null(param_labels) && omega %in% names(param_labels)) {
+      param_labels[[omega]]
+    } else {
+      paste0("ETA(", idx, ")")
+    }
+    data.frame(
+      eta = paste0("ETA(", idx, ")"),
+      omega = omega,
+      param_label = label,
+      run_id = seq_len(nrow(dat)),
+      shrinkage = as.numeric(dat[[col]]),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  out <- tibble::as_tibble(dplyr::bind_rows(rows))
+  result <- out[!is.na(out$shrinkage), ]
+  if (nrow(result) == 0L) {
+    attr(result, "status") <- "all_na"
   } else {
-    sse_all
+    attr(result, "status") <- "ok"
   }
-
-  mat <- as.matrix(dat[, available, drop = FALSE])
-  mat <- apply(mat, 2, as.numeric)
-
-  # Remove rows with any NA
-  complete <- complete.cases(mat)
-  if (sum(complete) < 3L) return(NULL)
-  mat <- mat[complete, , drop = FALSE]
-
-  cor_mat <- cor(mat, method = "spearman")
-
-  # Apply display labels
-  if (!is.null(param_labels)) {
-    disp <- vapply(available, function(p) {
-      if (p %in% names(param_labels)) param_labels[[p]] else p
-    }, character(1))
-    rownames(cor_mat) <- disp
-    colnames(cor_mat) <- disp
-  }
-
-  cor_mat
+  result
 }
 
 
@@ -389,46 +474,177 @@ plot_ofv_distribution <- function(sse_all, color_by_status = FALSE) {
 
 
 # =============================================================================
-# plot_empirical_cor_heatmap() — Correlation heatmap of estimates
+# plot_shrinkage_boxplot() — Distribution of shrinkage per ETA
 # =============================================================================
 
-#' Plot Spearman correlation heatmap of parameter estimates across SSE runs.
+#' Boxplot of per-replicate shrinkage for each ETA.
 #'
-#' @param cor_matrix Named correlation matrix from compute_empirical_correlations()
+#' Visualises how stable the shrinkage is across SSE replicates. High median
+#' with narrow IQR = structurally weak identifiability; wide IQR = shrinkage
+#' varies sample to sample.
+#'
+#' @param shrink_long Tibble from compute_shrinkage_long()
+#' @param title       Plot title (NULL = auto)
 #' @return ggplot object
 #' @export
-plot_empirical_cor_heatmap <- function(cor_matrix) {
-  if (is.null(cor_matrix) || ncol(cor_matrix) < 2L) {
-    return(ggplot() + labs(title = "Not enough parameters for correlation") +
-           .theme_design())
+plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
+  if (is.null(shrink_long) || nrow(shrink_long) == 0L) {
+    status <- attr(shrink_long, "status") %||% "no_columns"
+    msg <- switch(status,
+      no_columns = "No shrinkage_eta*(%) columns in raw_results",
+      all_na     = "Shrinkage columns present but empty (PsN -no_shrinkage?)",
+      no_rows    = "No converged replicates available",
+      "No shrinkage data to display")
+    return(ggplot() + labs(title = msg) + .theme_design())
   }
 
-  # Long format for ggplot
-  params <- colnames(cor_matrix)
-  df <- expand.grid(Var1 = params, Var2 = params, stringsAsFactors = FALSE)
-  df$value <- as.vector(cor_matrix)
+  df <- shrink_long
+  df$param_label <- factor(df$param_label, levels = unique(df$param_label))
 
-  # Preserve parameter order
-  df$Var1 <- factor(df$Var1, levels = params)
-  df$Var2 <- factor(df$Var2, levels = rev(params))
+  ttl <- title %||% "Shrinkage Distribution per ETA"
+  n_rep <- length(unique(df$run_id))
 
-  p <- ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
-    geom_tile(color = "white", size = 0.5) +
-    geom_text(aes(label = ifelse(abs(value) > 0.3,
-                                 sprintf("%.2f", value), "")),
-              size = 2.8, color = "black") +
-    scale_fill_gradient2(low = "#2563eb", mid = "white", high = "#dc2626",
-                         midpoint = 0, limits = c(-1, 1),
-                         name = "Spearman r") +
-    labs(title = "Empirical Correlation of Parameter Estimates (SSE)",
-         subtitle = "Across successful runs — values shown for |r| > 0.3",
-         x = NULL, y = NULL) +
+  p <- ggplot(df, aes(x = param_label, y = shrinkage)) +
+    # Reference zones
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 30,
+             fill = "#16a34a", alpha = 0.06) +
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 30, ymax = 50,
+             fill = "#d97706", alpha = 0.06) +
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 50, ymax = Inf,
+             fill = "#dc2626", alpha = 0.06) +
+    geom_hline(yintercept = c(30, 50), linetype = "dashed",
+               color = "grey50", size = 0.3) +
+    geom_boxplot(fill = "#2B6991", alpha = 0.7, color = "grey30",
+                 width = 0.6, outlier.size = 0.8) +
+    labs(
+      title = ttl,
+      subtitle = sprintf(
+        "N=%d replicates | Green <30%% | Amber 30-50%% | Red >50%% (Savic & Karlsson 2009)",
+        n_rep
+      ),
+      x = NULL, y = "Shrinkage (%)"
+    ) +
     .theme_design() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-          axis.text.y = element_text(size = 9),
-          plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey50"),
-          legend.position = "right")
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 8)
+    )
+
+  p
+}
+
+
+# =============================================================================
+# plot_shrinkage_rse_scatter() — RSE vs shrinkage scatter, identifiability tiers
+# =============================================================================
+
+#' Scatter plot of empirical RSE vs mean shrinkage for each OMEGA parameter.
+#'
+#' Classifies each variance parameter into an identifiability tier:
+#'   Green  : RSE < 30 % AND shrinkage < 50 %  (estimable, informative)
+#'   Amber  : one side marginal
+#'   Red    : shrinkage > 80 %  (prior dominates, design not informative)
+#'
+#' The shrinkage axis uses Savic & Karlsson (2009) thresholds; the RSE axis
+#' uses the pharmacometrics convention (< 30 % = good precision).
+#'
+#' @param sse_all      Tibble from read_sse_raw_all()
+#' @param true_values  Named numeric vector from read_true_values()
+#' @param param_labels Named character vector (optional)
+#' @return ggplot object
+#' @export
+plot_shrinkage_rse_scatter <- function(sse_all, true_values,
+                                       param_labels = NULL) {
+  if (is.null(sse_all) || nrow(sse_all) == 0L || length(true_values) == 0L) {
+    return(ggplot() +
+      labs(title = "Load SSE data and .ctl to see identifiability scatter") +
+      .theme_design())
+  }
+
+  shrink_sum <- compute_shrinkage_summary(sse_all, param_labels)
+  if (nrow(shrink_sum) == 0L) {
+    shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
+    msg <- if (length(shrink_cols) == 0L)
+      "No shrinkage_eta*(%) columns in raw_results"
+    else
+      "Shrinkage columns present but empty (PsN -no_shrinkage?)"
+    return(ggplot() + labs(title = msg) + .theme_design())
+  }
+
+  converged <- sse_all[sse_all$converged, , drop = FALSE]
+  metrics <- compute_sse_metrics(converged, true_values, param_labels)
+  omega_metrics <- metrics[grepl("^OMEGA\\(", metrics$param), , drop = FALSE]
+
+  df <- dplyr::inner_join(
+    shrink_sum |>
+      dplyr::select(param = omega, param_label, shrinkage = mean_shrink),
+    omega_metrics |>
+      dplyr::select(param, rse = rse_empirical),
+    by = "param"
+  )
+
+  if (nrow(df) == 0L) {
+    return(ggplot() +
+      labs(title = "No OMEGA parameters shared between shrinkage and SSE metrics") +
+      .theme_design())
+  }
+
+  df$tier <- dplyr::case_when(
+    df$shrinkage > 80 ~ "Red (shrink >80%)",
+    df$rse < 30 & df$shrinkage < 50 ~ "Green (RSE<30% & shrink<50%)",
+    TRUE ~ "Amber (marginal)"
+  )
+  df$tier <- factor(df$tier, levels = c(
+    "Green (RSE<30% & shrink<50%)",
+    "Amber (marginal)",
+    "Red (shrink >80%)"
+  ))
+
+  x_max <- max(100, max(df$shrinkage, na.rm = TRUE) * 1.1)
+  y_max <- max(60, max(df$rse, na.rm = TRUE) * 1.1)
+
+  p <- ggplot(df, aes(x = shrinkage, y = rse)) +
+    # Tier rectangles (background)
+    annotate("rect", xmin = -Inf, xmax = 50, ymin = -Inf, ymax = 30,
+             fill = "#16a34a", alpha = 0.08) +
+    annotate("rect", xmin = 80, xmax = Inf, ymin = -Inf, ymax = Inf,
+             fill = "#dc2626", alpha = 0.08) +
+    # Threshold lines
+    geom_hline(yintercept = 30, linetype = "dashed",
+               color = "#16a34a", size = 0.4) +
+    geom_vline(xintercept = 50, linetype = "dashed",
+               color = "#d97706", size = 0.4) +
+    geom_vline(xintercept = 80, linetype = "dashed",
+               color = "#dc2626", size = 0.4) +
+    # Points
+    geom_point(aes(color = tier), size = 4, alpha = 0.85) +
+    geom_text(aes(label = param_label), nudge_y = y_max * 0.025,
+              size = 3, check_overlap = TRUE) +
+    scale_color_manual(
+      values = c(
+        "Green (RSE<30% & shrink<50%)" = "#16a34a",
+        "Amber (marginal)"              = "#d97706",
+        "Red (shrink >80%)"             = "#dc2626"
+      ),
+      drop = FALSE, name = NULL
+    ) +
+    coord_cartesian(xlim = c(0, x_max), ylim = c(0, y_max)) +
+    labs(
+      title = "Identifiability: Empirical RSE vs Mean Shrinkage",
+      subtitle = paste0(
+        "One point per OMEGA | RSE threshold 30% | Shrinkage thresholds 50/80% ",
+        "(Savic & Karlsson 2009)"
+      ),
+      x = "Mean shrinkage (%) across SSE replicates",
+      y = "Empirical RSE (%)"
+    ) +
+    .theme_design() +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 8)
+    )
 
   p
 }

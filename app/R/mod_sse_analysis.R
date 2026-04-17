@@ -55,9 +55,9 @@ mod_sse_analysis_ui <- function(id) {
               ns("visible_sections"), label = NULL,
               choices = c("Parameter Distributions" = "distributions",
                           "OFV Distribution" = "ofv",
-                          "Empirical Correlations" = "correlations",
+                          "Shrinkage & Identifiability" = "shrinkage",
                           "Parameter Diagnostics" = "diagnostics"),
-              selected = c("distributions", "ofv", "correlations", "diagnostics"),
+              selected = c("distributions", "ofv", "shrinkage", "diagnostics"),
               inline = TRUE
             )
           )
@@ -101,18 +101,47 @@ mod_sse_analysis_ui <- function(id) {
       br()
     ),
 
-    # --- Empirical correlation heatmap ---
+    # --- Shrinkage & Identifiability ---
     conditionalPanel(
       condition = sprintf(
-        "input['%s'].indexOf('correlations') > -1", ns("visible_sections")
+        "input['%s'].indexOf('shrinkage') > -1", ns("visible_sections")
       ),
       fluidRow(
         column(12,
           div(class = "plot-card",
-            p(class = "section-title", "Empirical Correlation Heatmap"),
-            plotOutput(ns("cor_plot"), height = "500px"),
-            plot_export_ui(ns, "cor_export",
-                           default_fname = "sse_empirical_correlations")
+            p(class = "section-title", "Shrinkage Distribution per ETA"),
+            plotOutput(ns("shrink_box"), height = "400px"),
+            plot_export_ui(ns, "shrink_box_export",
+                           default_fname = "sse_shrinkage_boxplot")
+          )
+        )
+      ),
+      br(),
+      fluidRow(
+        column(12,
+          div(class = "plot-card",
+            p(class = "section-title",
+              "Identifiability: Empirical RSE vs Mean Shrinkage"),
+            plotOutput(ns("shrink_scatter"), height = "500px"),
+            plot_export_ui(ns, "shrink_scatter_export",
+                           default_fname = "sse_shrinkage_rse_scatter")
+          )
+        )
+      ),
+      br(),
+      fluidRow(
+        column(12,
+          div(class = "param-table-wrap",
+            div(style = paste0(
+              "display:flex; justify-content:space-between;",
+              " align-items:center;"
+            ),
+              p(class = "section-title", style = "margin:0;",
+                "Shrinkage Summary Table"),
+              downloadButton(ns("export_shrink_csv"),
+                             "Export CSV", class = "btn-sm btn-default")
+            ),
+            DTOutput(ns("shrink_table"))
           )
         )
       ),
@@ -276,28 +305,91 @@ mod_sse_analysis_server <- function(id,
     output$ofv_plot <- renderPlot({ ofv_plot_fn() }, res = 110)
     plot_export_server(input, output, session, "ofv_export", ofv_plot_fn)
 
-    # --- Correlation heatmap ---
-    cor_matrix <- reactive({
+    # --- Shrinkage: long-format data per replicate ---
+    shrink_long <- reactive({
       dat <- sse_all()
-      tv  <- true_vals()
-      req(dat, tv)
-      compute_empirical_correlations(
-        dat, tv,
-        only_converged = !isTRUE(input$show_failed),
-        param_labels = param_labels()
+      req(dat)
+      compute_shrinkage_long(
+        dat, param_labels = param_labels(),
+        only_converged = !isTRUE(input$show_failed)
       )
     })
 
-    cor_plot_fn <- reactive({
-      cm <- cor_matrix()
-      if (is.null(cm)) {
-        return(ggplot() + labs(title = "Not enough data for correlations") +
-               .theme_design())
-      }
-      plot_empirical_cor_heatmap(cm)
+    # --- Shrinkage: summary per ETA ---
+    shrink_summary <- reactive({
+      dat <- sse_all()
+      req(dat)
+      compute_shrinkage_summary(
+        dat, param_labels = param_labels(),
+        only_converged = !isTRUE(input$show_failed)
+      )
     })
-    output$cor_plot <- renderPlot({ cor_plot_fn() }, res = 110)
-    plot_export_server(input, output, session, "cor_export", cor_plot_fn)
+
+    # --- Boxplot ---
+    shrink_box_fn <- reactive({
+      sl <- shrink_long()
+      plot_shrinkage_boxplot(sl)
+    })
+    output$shrink_box <- renderPlot({ shrink_box_fn() }, res = 110)
+    plot_export_server(input, output, session, "shrink_box_export",
+                       shrink_box_fn)
+
+    # --- Scatter RSE vs shrinkage ---
+    shrink_scatter_fn <- reactive({
+      dat <- sse_all()
+      tv  <- true_vals()
+      if (is.null(dat) || is.null(tv)) {
+        return(ggplot() +
+          labs(title = "Load SSE data and .ctl to see identifiability scatter") +
+          .theme_design())
+      }
+      plot_shrinkage_rse_scatter(dat, tv, param_labels())
+    })
+    output$shrink_scatter <- renderPlot({ shrink_scatter_fn() }, res = 110)
+    plot_export_server(input, output, session, "shrink_scatter_export",
+                       shrink_scatter_fn)
+
+    # --- Shrinkage summary table ---
+    output$shrink_table <- renderDT({
+      ss <- shrink_summary()
+      req(ss)
+      if (nrow(ss) == 0L) return(NULL)
+
+      display <- ss |>
+        dplyr::select(
+          Parameter   = param_label,
+          ETA         = eta,
+          `N runs`    = n,
+          `Mean (%)`  = mean_shrink,
+          `Median (%)` = median_shrink,
+          `SD (%)`    = sd_shrink,
+          `P5 (%)`    = p5,
+          `P95 (%)`   = p95
+        )
+
+      datatable(display, rownames = FALSE,
+                class = "stripe hover compact",
+                options = list(pageLength = 20, dom = "t",
+                               scrollX = TRUE)) |>
+        formatStyle("Mean (%)",
+          backgroundColor = styleInterval(
+            c(30, 50), c("#dcfce7", "#fef3c7", "#fee2e2")
+          ))
+    })
+
+    output$export_shrink_csv <- downloadHandler(
+      filename = function() {
+        paste0("sse_shrinkage_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        ss <- shrink_summary()
+        req(ss)
+        tryCatch(
+          write.csv(ss, file, row.names = FALSE),
+          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+        )
+      }
+    )
 
     # --- Per-parameter diagnostics table ---
     diag_data <- reactive({
