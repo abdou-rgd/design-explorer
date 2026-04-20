@@ -170,6 +170,13 @@ parse_theta_labels <- function(lines) {
   }
 
   if (length(labels) == 0L) return(NULL)
+
+  # Drop duplicate labels: ambiguous labels fall back to raw "THETAn" name downstream
+  keep        <- !(duplicated(labels) | duplicated(labels, fromLast = TRUE))
+  labels      <- labels[keep]
+  label_names <- label_names[keep]
+
+  if (length(labels) == 0L) return(NULL)
   setNames(labels, label_names)
 }
 
