@@ -343,7 +343,8 @@ mod_sse_analysis_server <- function(id,
           labs(title = "Load SSE data and .ctl to see identifiability scatter") +
           .theme_design())
       }
-      plot_shrinkage_rse_scatter(dat, tv, param_labels())
+      plot_shrinkage_rse_scatter(dat, tv, param_labels(),
+                                 shrink_sum = shrink_summary())
     })
     output$shrink_scatter <- renderPlot({ shrink_scatter_fn() }, res = 110)
     plot_export_server(input, output, session, "shrink_scatter_export",

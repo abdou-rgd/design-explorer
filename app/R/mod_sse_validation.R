@@ -179,6 +179,17 @@ mod_sse_validation_ui <- function(id) {
             " use the same method as your $DESIGN evaluation ",
             "(e.g. FOCE/FOCEI). Fayette et al. 2026 compared SAEM vs FOCE ",
             "and found consistent results across methods."
+          ),
+          tags$li(
+            tags$strong("Shrinkage output:"),
+            " to populate the Shrinkage views in the Analysis tab, the ",
+            "raw_results CSV must contain non-empty ",
+            tags$code("shrinkage_eta*(%)"), " columns. ",
+            "PsN writes these only when NONMEM computes post-hoc ETAs ",
+            "(",  tags$code("POSTHOC"), " and no ", tags$code("MAXEVAL=0"),
+            ") and PsN is not run with ", tags$code("-no_shrinkage"), ". ",
+            "If the columns are all NA, the Shrinkage boxplot, RSE scatter ",
+            "and summary table fall back to empty-state placeholders."
           )
         ),
 

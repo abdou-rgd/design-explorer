@@ -259,6 +259,12 @@ compute_shrinkage_long <- function(sse_all,
     return(empty)
   }
 
+  run_ids <- if ("sample" %in% names(dat)) {
+    as.integer(dat$sample)
+  } else {
+    seq_len(nrow(dat))
+  }
+
   rows <- lapply(shrink_cols, function(col) {
     idx <- as.integer(sub("shrinkage_eta(\\d+)\\(%\\)", "\\1", col))
     omega <- sprintf("OMEGA(%d,%d)", idx, idx)
@@ -271,7 +277,7 @@ compute_shrinkage_long <- function(sse_all,
       eta = paste0("ETA(", idx, ")"),
       omega = omega,
       param_label = label,
-      run_id = seq_len(nrow(dat)),
+      run_id = run_ids,
       shrinkage = as.numeric(dat[[col]]),
       stringsAsFactors = FALSE
     )
@@ -552,17 +558,24 @@ plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
 #' @param sse_all      Tibble from read_sse_raw_all()
 #' @param true_values  Named numeric vector from read_true_values()
 #' @param param_labels Named character vector (optional)
+#' @param shrink_sum   Optional pre-computed tibble from compute_shrinkage_summary().
+#'                     If provided, must be built from the converged subset so it
+#'                     aligns with the RSE metrics computed here. When NULL
+#'                     (default), shrinkage is recomputed internally.
 #' @return ggplot object
 #' @export
 plot_shrinkage_rse_scatter <- function(sse_all, true_values,
-                                       param_labels = NULL) {
+                                       param_labels = NULL,
+                                       shrink_sum = NULL) {
   if (is.null(sse_all) || nrow(sse_all) == 0L || length(true_values) == 0L) {
     return(ggplot() +
       labs(title = "Load SSE data and .ctl to see identifiability scatter") +
       .theme_design())
   }
 
-  shrink_sum <- compute_shrinkage_summary(sse_all, param_labels)
+  if (is.null(shrink_sum)) {
+    shrink_sum <- compute_shrinkage_summary(sse_all, param_labels)
+  }
   if (nrow(shrink_sum) == 0L) {
     shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
     msg <- if (length(shrink_cols) == 0L)
