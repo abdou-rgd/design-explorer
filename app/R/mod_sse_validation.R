@@ -205,6 +205,19 @@ mod_sse_validation_ui <- function(id) {
             " Pharm Res. 2026. doi:10.1007/s11095-026-04024-4"
           ),
           tags$li(
+            "Pantaleo et al. 2026 (threshold |RBias| < 20% and NRMSE < 20%)."
+          ),
+          tags$li(
+            "Djokoto et al. 2024. ",
+            tags$em(paste0(
+              "Application of stochastic simulation-estimation approach in ",
+              "dose optimization of antibacterials, anticancer and ",
+              "antipsychotics in pediatric population."
+            )),
+            " Research Square preprint. doi:10.21203/rs.3.rs-4356168/v1 ",
+            "(threshold |RBias| <= 30% and NRMSE <= 20%, K=200 replicates)."
+          ),
+          tags$li(
             "PsN SSE User Guide v5.7.0. ",
             tags$em(
               "\"SSE does not check whether minimization was successful or not. ",

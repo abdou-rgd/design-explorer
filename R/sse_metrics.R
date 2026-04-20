@@ -930,6 +930,11 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
   p <- ggplot(summ, aes(x = param_label)) +
     # Reference line at 0
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    # Bias thresholds: +/-20% (Pantaleo 2026), +/-30% (Djokoto 2024)
+    geom_hline(yintercept = c(-20, 20), linetype = "dotted",
+               color = "#16a34a", size = 0.35) +
+    geom_hline(yintercept = c(-30, 30), linetype = "dotted",
+               color = "#d97706", size = 0.35) +
     # Boxplot with pre-computed quantiles
     geom_boxplot(
       aes(ymin = p5, lower = q25, middle = median,
@@ -953,7 +958,8 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
       subtitle = paste0(
         "Boxes = 25th-75th pct | Whiskers = 5th-95th pct | ",
         "Diamond = Relative Bias | Error bar = 95% CI of bias\n",
-        "Pantaleo (2026) thresholds: |RBias| < 20% and NRMSE < 20%"
+        "Thresholds: |RBias| < 20% & NRMSE < 20% (Pantaleo 2026) | ",
+        "|RBias| <= 30% (Djokoto 2024)"
       ),
       x = NULL,
       y = "REE (%)"
