@@ -271,7 +271,17 @@ read_sse_summary <- function(file) {
 read_sse_raw <- function(file) {
   if (!file.exists(file)) stop("Fichier SSE introuvable : ", file)
 
-  raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
+  # Prefer readr::read_csv — quote-aware (handles OMEGA(1,1) commas) and
+  # robust type inference. Fall back to read.csv if readr unavailable.
+  if (requireNamespace("readr", quietly = TRUE)) {
+    raw <- suppressWarnings(suppressMessages(
+      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
+                      guess_max = 10000)
+    ))
+    raw <- as.data.frame(raw, check.names = FALSE)
+  } else {
+    raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
+  }
   n_total <- nrow(raw)
 
   # Normalize column names
@@ -942,7 +952,8 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
       title = ttl,
       subtitle = paste0(
         "Boxes = 25th-75th pct | Whiskers = 5th-95th pct | ",
-        "Diamond = Relative Bias | Error bar = 95% CI of bias"
+        "Diamond = Relative Bias | Error bar = 95% CI of bias\n",
+        "Pantaleo (2026) thresholds: |RBias| < 20% and NRMSE < 20%"
       ),
       x = NULL,
       y = "REE (%)"

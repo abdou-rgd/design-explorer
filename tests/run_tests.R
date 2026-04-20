@@ -22,3 +22,8 @@ test_file(file.path(PROJECT_ROOT, "tests", "testthat",
 test_file(file.path(PROJECT_ROOT, "tests", "testthat",
                     "test-fim_metrics.R"),
           reporter = "progress")
+
+# SSE pipeline smoke test — standalone stopifnot() style, not testthat.
+# Catches silent breakage if PsN column naming or the normalizer drifts.
+cat("\n\n--- SSE pipeline smoke test ---\n")
+source(file.path(PROJECT_ROOT, "tests", "test_sse_pipeline.R"))

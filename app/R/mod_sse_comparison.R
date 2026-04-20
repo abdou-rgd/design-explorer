@@ -49,9 +49,8 @@ mod_sse_comparison_ui <- function(id) {
             checkboxGroupInput(
               ns("visible_sections"), label = NULL,
               choices = c("RSE Comparison" = "rse",
-                          "Distributions" = "distributions",
-                          "Correlations" = "correlations"),
-              selected = c("rse", "distributions", "correlations"),
+                          "Distributions" = "distributions"),
+              selected = c("rse", "distributions"),
               inline = TRUE
             )
           )
@@ -115,22 +114,6 @@ mod_sse_comparison_ui <- function(id) {
       br()
     ),
 
-    # --- Correlation delta ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('correlations') > -1", ns("visible_sections")
-      ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Correlation Change (Optimized - Original)"),
-            plotOutput(ns("cor_delta_plot"), height = "500px"),
-            plot_export_ui(ns, "cor_export",
-                           default_fname = "sse_correlation_delta")
-          )
-        )
-      )
-    )
   )
 }
 
@@ -421,72 +404,5 @@ mod_sse_comparison_server <- function(id,
     output$dist_plot <- renderPlot({ dist_plot_fn() }, res = 110)
     plot_export_server(input, output, session, "dist_export", dist_plot_fn)
 
-    # --- Correlation delta ---
-    cor_orig <- reactive({
-      dat <- sse_all_orig()
-      tv  <- true_vals()
-      req(dat, tv)
-      compute_empirical_correlations(
-        dat, tv, only_converged = !isTRUE(input$show_failed),
-        param_labels = param_labels())
-    })
-    cor_opti <- reactive({
-      dat <- sse_all_opti()
-      tv  <- true_vals()
-      req(dat, tv)
-      compute_empirical_correlations(
-        dat, tv, only_converged = !isTRUE(input$show_failed),
-        param_labels = param_labels())
-    })
-
-    cor_delta_fn <- reactive({
-      c1 <- cor_orig()
-      c2 <- cor_opti()
-      if (is.null(c1) || is.null(c2)) {
-        return(ggplot() +
-          labs(title = "Not enough data for correlation comparison") +
-          .theme_design())
-      }
-
-      # Intersect parameters (same model, but guard against edge cases)
-      common <- intersect(colnames(c1), colnames(c2))
-      if (length(common) < 2L) {
-        return(ggplot() +
-          labs(title = "Not enough shared parameters") +
-          .theme_design())
-      }
-      m1 <- c1[common, common]
-      m2 <- c2[common, common]
-      delta <- m2 - m1
-
-      # Long format
-      df <- expand.grid(Var1 = common, Var2 = common,
-                        stringsAsFactors = FALSE)
-      df$value <- as.vector(delta)
-      df$Var1 <- factor(df$Var1, levels = common)
-      df$Var2 <- factor(df$Var2, levels = rev(common))
-
-      ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
-        geom_tile(color = "white", size = 0.5) +
-        geom_text(aes(label = ifelse(abs(value) > 0.1,
-                                     sprintf("%+.2f", value), "")),
-                  size = 2.8, color = "black") +
-        scale_fill_gradient2(low = "#2563eb", mid = "white", high = "#dc2626",
-                             midpoint = 0, limits = c(-1, 1),
-                             name = "Delta r") +
-        labs(title = "Correlation Change (Optimized - Original)",
-             subtitle = "Blue = decreased | Red = increased | Values for |delta| > 0.1",
-             x = NULL, y = NULL) +
-        .theme_design() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-          axis.text.y = element_text(size = 9),
-          plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey50"),
-          legend.position = "right"
-        )
-    })
-    output$cor_delta_plot <- renderPlot({ cor_delta_fn() }, res = 110)
-    plot_export_server(input, output, session, "cor_export", cor_delta_fn)
   })
 }
