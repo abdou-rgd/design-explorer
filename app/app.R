@@ -252,12 +252,6 @@ server <- function(input, output, session) {
     # Auto-remplissage depuis le .ctl uploade
     ctl_lines <- upload$ctl_lines()
     if (!is.null(ctl_lines)) {
-      # Labels THETA -> textArea param_labels
-      theta_lbl <- tryCatch(parse_theta_labels(ctl_lines), error = function(e) NULL)
-      if (!is.null(theta_lbl)) {
-        lbl_text <- paste(paste0(names(theta_lbl), "=", theta_lbl), collapse = "\n")
-        updateTextAreaInput(session, "param_labels", value = lbl_text)
-      }
       # Labels CMT -> textArea cmt_labels (depuis $MODEL COMP=(NOM))
       cmt_lbl <- tryCatch(parse_cmt_labels(ctl_lines), error = function(e) NULL)
       if (!is.null(cmt_lbl)) {
