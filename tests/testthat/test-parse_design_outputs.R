@@ -562,6 +562,20 @@ test_that("parse_theta_labels() works on real example1 .ctl", {
   }
 })
 
+test_that("parse_theta_labels() drops duplicate labels (commit e47fd94)", {
+  ctl <- c(
+    "$PROBLEM test",
+    "$THETA (0, 0.15, 1)  ; CL",
+    "$THETA (0, 8.0, 50)  ;--th",
+    "$THETA (0, 1.0, 10)  ;--th",
+    "$THETA (0, 2.0, 10)  ;--th",
+    "$THETA (0, 0.5, 5)   ; V",
+    "$OMEGA (0.07)"
+  )
+  lbl <- parse_theta_labels(ctl)
+  expect_equal(lbl, c(THETA1 = "CL", THETA5 = "V"))
+})
+
 
 # =============================================================================
 # M. compute_robust_summary()

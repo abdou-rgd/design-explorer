@@ -64,16 +64,16 @@ library(tidyr)
       }
     }
 
-    # THETA: "--th1- CL" -> "THETA1"
-    if (grepl("^--th(\\d+)-", nm)) {
-      idx <- sub("^--th(\\d+)-.*", "\\1", nm)
+    # THETA: "--th1- CL" -> "THETA1" ; also "--th10" (no trailing dash) -> "THETA10"
+    if (grepl("^--th(\\d+)($|[ \\t-])", nm)) {
+      idx <- sub("^--th(\\d+).*", "\\1", nm)
       out[i] <- paste0(se_prefix, "THETA", idx)
       next
     }
 
     # SIGMA: "--eps1- Proportional" -> "SIGMA(1,1)"
-    if (grepl("^--eps(\\d+)-", nm)) {
-      idx <- sub("^--eps(\\d+)-.*", "\\1", nm)
+    if (grepl("^--eps(\\d+)($|[ \\t-])", nm)) {
+      idx <- sub("^--eps(\\d+).*", "\\1", nm)
       out[i] <- paste0(se_prefix, "SIGMA(", idx, ",", idx, ")")
       next
     }
@@ -989,17 +989,17 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
 #' @export
 plot_rse_bar <- function(comparison_df, title = NULL) {
   df <- comparison_df |>
-    dplyr::filter(status == "matched",
-                  !is.na(rse_fim), !is.na(rse_sse))
+    dplyr::filter(!is.na(rse_fim) | !is.na(rse_sse))
 
   if (nrow(df) == 0L) {
     return(ggplot() +
-      labs(title = "No matched parameters for RSE comparison") +
+      labs(title = "No parameters with RSE data") +
       .theme_design())
   }
 
-  # Prepare long format for grouped bars
-  df$param_label <- factor(df$param_label, levels = df$param_label)
+  df$label <- ifelse(is.na(df$param_label) | df$param_label == df$param,
+                     df$param, df$param_label)
+  df$label <- factor(df$label, levels = df$label)
 
   df_long <- tidyr::pivot_longer(
     df,
@@ -1015,8 +1015,9 @@ plot_rse_bar <- function(comparison_df, title = NULL) {
 
   ttl <- title %||% "FIM vs SSE: RSE Comparison"
 
-  p <- ggplot(df_long, aes(x = param_label, y = rse, fill = source)) +
-    geom_col(position = position_dodge(width = 0.7), width = 0.6, alpha = 0.85) +
+  p <- ggplot(df_long, aes(x = label, y = rse, fill = source)) +
+    geom_col(position = position_dodge(width = 0.7), width = 0.6, alpha = 0.85,
+             na.rm = TRUE) +
     # Reference lines
     geom_hline(yintercept = 20, linetype = "dashed", color = "#16a34a",
                size = 0.4, alpha = 0.7) +
@@ -1029,7 +1030,7 @@ plot_rse_bar <- function(comparison_df, title = NULL) {
     ) +
     labs(
       title = ttl,
-      subtitle = "Dashed lines at 20% (good) and 50% (acceptable)",
+      subtitle = "Dashed lines at 20% / 50% ; missing bar = param absent from FIM or SSE",
       x = NULL,
       y = "RSE (%)"
     ) +

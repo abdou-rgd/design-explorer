@@ -423,15 +423,13 @@ mod_sse_validation_server <- function(id, ext_data,
       comp <- comparison()
       if (is.null(comp) || nrow(comp) == 0L) return(NULL)
 
-      matched <- comp |> dplyr::filter(status == "matched")
-      if (nrow(matched) == 0L) return(NULL)
+      display <- ifelse(is.na(comp$param_label) | comp$param_label == "",
+                        comp$param, comp$param_label)
+      choices <- setNames(comp$param, display)
 
-      all_params <- matched$param_label %||% matched$param
-      # Pre-select: exclude params with RSE > 100% (outliers that distort scale)
-      rse_max <- pmax(matched$rse_fim, matched$rse_sse, na.rm = TRUE)
-      default_selected <- all_params[is.na(rse_max) | rse_max <= 100]
-      # If that removes everything, keep all
-      if (length(default_selected) == 0L) default_selected <- all_params
+      rse_max <- pmax(comp$rse_fim, comp$rse_sse, na.rm = TRUE)
+      default_selected <- comp$param[is.na(rse_max) | rse_max <= 100]
+      if (length(default_selected) == 0L) default_selected <- comp$param
 
       has_outliers <- any(!is.na(rse_max) & rse_max > 100)
 
@@ -444,7 +442,7 @@ mod_sse_validation_server <- function(id, ext_data,
             tags$strong("Parameters to display:", style = "white-space:nowrap;"),
             checkboxGroupInput(
               session$ns("selected_params"), label = NULL,
-              choices = all_params, selected = default_selected,
+              choices = choices, selected = default_selected,
               inline = TRUE
             )
           ),
@@ -464,10 +462,7 @@ mod_sse_validation_server <- function(id, ext_data,
       req(comp)
       sel <- input$selected_params
       if (is.null(sel) || length(sel) == 0L) return(comp)
-      # Filter on param_label (display name)
-      comp |> dplyr::filter(
-        status != "matched" | param_label %in% sel | param %in% sel
-      )
+      comp |> dplyr::filter(param %in% sel)
     })
 
     # --- Status banner ---
@@ -556,7 +551,15 @@ mod_sse_validation_server <- function(id, ext_data,
           labs(title = "Upload an SSE CSV and a .ctl to see the scatter plot") +
           .theme_design())
       }
-      plot_fim_vs_sse(comp)
+      p <- plot_fim_vs_sse(comp)
+      n_hidden <- sum(comp$status != "matched", na.rm = TRUE)
+      if (n_hidden > 0L) {
+        p <- p + ggplot2::labs(caption = sprintf(
+          "%d param%s hidden (FIM-only or SSE-only)",
+          n_hidden, if (n_hidden > 1L) "s" else ""
+        ))
+      }
+      p
     })
     output$scatter <- renderPlot({ scatter_plot() }, res = 110)
     plot_export_server(input, output, session, "scatter_export", scatter_plot)
@@ -575,10 +578,8 @@ mod_sse_validation_server <- function(id, ext_data,
       sel <- input$selected_params
       if (is.null(sel) || length(sel) == 0L) return(rd)
       list(
-        individual = rd$individual |>
-          dplyr::filter(param_label %in% sel | param %in% sel),
-        summary = rd$summary |>
-          dplyr::filter(param_label %in% sel | param %in% sel)
+        individual = rd$individual |> dplyr::filter(param %in% sel),
+        summary    = rd$summary    |> dplyr::filter(param %in% sel)
       )
     })
 
