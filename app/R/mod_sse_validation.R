@@ -346,7 +346,9 @@ mod_sse_validation_server <- function(id, ext_data,
                                       sse_a_data = reactive(NULL),
                                       sse_b_data = reactive(NULL),
                                       name_a = reactive("Design A"),
-                                      name_b = reactive("Design B")) {
+                                      name_b = reactive("Design B"),
+                                      coi_data = reactive(NULL),
+                                      clt_data = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
     # --- Design selector (show only when B is loaded) ---
@@ -601,6 +603,10 @@ mod_sse_validation_server <- function(id, ext_data,
     })
 
     # --- Eigenvalue spectrum (FIM vs SSE correlation-matrix eigenvalues) ---
+    # FIM eigenvalues, preferred sources in order:
+    #   1. ext row -1000000002 (only emitted by NONMEM when $COV PRINT=E)
+    #   2. eigen(cov2cor(inv(FIM))) computed on-the-fly from .coi or .clt
+    # Most $DESIGN runs do NOT set PRINT=E, so (2) is the usual path.
     output$eigenvalue_spectrum <- renderPlot({
       dc <- d_criterion()
       sse_eig <- if (!is.null(dc)) dc$eigenvalues_corr else NULL
@@ -610,6 +616,20 @@ mod_sse_validation_server <- function(id, ext_data,
       if (!is.null(ext) && nrow(ext) > 0L) {
         ev <- tryCatch(get_eigenvalues(ext), error = function(e) NULL)
         if (!is.null(ev) && nrow(ev) > 0L) fim_eig <- ev$eigenvalue
+      }
+      if (is.null(fim_eig)) {
+        fim <- tryCatch(coi_data(), error = function(e) NULL)
+        if (is.null(fim)) fim <- tryCatch(clt_data(), error = function(e) NULL)
+        if (!is.null(fim) && nrow(fim) > 0L) {
+          corr_fim <- tryCatch(get_cor_matrix(fim), error = function(e) NULL)
+          if (!is.null(corr_fim)) {
+            eig <- tryCatch(
+              eigen(corr_fim, symmetric = TRUE, only.values = TRUE)$values,
+              error = function(e) NULL
+            )
+            if (!is.null(eig)) fim_eig <- sort(eig, decreasing = TRUE)
+          }
+        }
       }
 
       plot_eigenvalue_spectrum(fim_eig, sse_eig)
