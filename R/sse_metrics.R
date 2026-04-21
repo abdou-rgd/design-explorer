@@ -618,21 +618,31 @@ compute_sse_metrics <- function(sse_raw, true_values,
 #' Compute the empirical D-criterion from SSE parameter estimates.
 #'
 #' The empirical D-criterion is defined as det(VarCov)^(1/p) where VarCov is
-#' the full empirical variance-covariance matrix of the estimated parameters
-#' across K successful SSE runs, and p is the number of parameters.
-#' (Fayette et al. 2026, Pharm Res)
+#' the empirical variance-covariance matrix across K SSE runs, and p is the
+#' number of parameters (Fayette et al. 2026, Pharm Res).
 #'
-#' When the empirical variance-covariance matrix is ill-conditioned
-#' (rcond < threshold), the D-criterion cannot be reliably estimated.
-#' This was observed by Fayette et al. 2026 in the crossover example
-#' with NONMEM-SAEM and NONMEM-FOCE.
+#' This raw form is scale-dependent: with parameters spanning several orders of
+#' magnitude (e.g. CL = 6e-3 vs VC = 3.2), the determinant inherits the scale
+#' disparity and rcond can collapse to ~0 without any real collinearity. To
+#' decouple scale from structural identifiability, this function also returns
+#' the correlation-based counterpart det(Corr)^(1/p), which lives in [0,1]
+#' and is scale-invariant. The two should be read jointly:
+#'   * raw ill-conditioned + correlation well-conditioned -> scale artifact
+#'   * both ill-conditioned -> genuine near-collinear parameters
+#'
+#' Parameters whose empirical variance across SSE runs is effectively zero
+#' (e.g. fixed at 0 in the .ctl) are dropped before the decomposition; they
+#' would otherwise produce NaN rows in cov2cor() and crash eigen().
 #'
 #' @param sse_raw    Tibble from read_sse_raw() (normalized column names)
 #' @param true_values Named numeric vector from read_true_values()
 #' @param rcond_threshold Minimum reciprocal condition number (default 1e-15)
 #' @return List with components:
-#'   d_criterion (numeric or NA), p (integer), rcond (numeric),
-#'   ill_conditioned (logical), vcov (matrix)
+#'   d_criterion, rcond, ill_conditioned, vcov             (raw vcov)
+#'   d_criterion_corr, rcond_corr, ill_conditioned_corr, corr  (correlation)
+#'   cond_number_raw, cond_number_corr                     (= max_eig / min_eig)
+#'   eigenvalues_raw, eigenvalues_corr                     (sorted desc)
+#'   p, param_names
 #' @export
 compute_empirical_d_criterion <- function(sse_raw, true_values,
                                           rcond_threshold = 1e-15) {
@@ -640,39 +650,81 @@ compute_empirical_d_criterion <- function(sse_raw, true_values,
   p <- length(available)
 
   result <- list(
-    d_criterion = NA_real_,
-    p = p,
-    rcond = NA_real_,
-    ill_conditioned = FALSE,
-    vcov = NULL
+    d_criterion = NA_real_, p = p, rcond = NA_real_,
+    ill_conditioned = FALSE, vcov = NULL,
+    d_criterion_corr = NA_real_, rcond_corr = NA_real_,
+    ill_conditioned_corr = FALSE, corr = NULL,
+    cond_number_raw = NA_real_, cond_number_corr = NA_real_,
+    eigenvalues_raw = numeric(0L), eigenvalues_corr = numeric(0L),
+    param_names = available
   )
 
   if (p < 2L) return(result)
 
-  # Build matrix of estimates (K rows x p columns)
   est_matrix <- as.matrix(sse_raw[, available, drop = FALSE])
   est_matrix <- est_matrix[complete.cases(est_matrix), , drop = FALSE]
-
   if (nrow(est_matrix) < p + 1L) return(result)
 
+  # Drop parameters with zero (or near-zero) empirical variance -- typically
+  # parameters fixed at 0 in the .ctl, whose SSE column is constant. Without
+  # this, cov2cor() produces NaN on the zero-variance diagonal and eigen()
+  # fails downstream.
+  variances <- apply(est_matrix, 2L, var)
+  keep <- !is.na(variances) & variances > 1e-20
+  if (sum(keep) < 2L) return(result)
+  est_matrix <- est_matrix[, keep, drop = FALSE]
+  available <- available[keep]
+  p <- length(available)
+  result$p <- p
+  result$param_names <- available
+
   vcov <- cov(est_matrix)
+  corr <- tryCatch(cov2cor(vcov), error = function(e) NULL)
+  if (is.null(corr) || anyNA(corr)) return(result)
+
+  eig_v <- sort(eigen(vcov, symmetric = TRUE, only.values = TRUE)$values,
+                decreasing = TRUE)
+  eig_c <- sort(eigen(corr, symmetric = TRUE, only.values = TRUE)$values,
+                decreasing = TRUE)
+
   result$vcov <- vcov
+  result$corr <- corr
+  result$eigenvalues_raw  <- eig_v
+  result$eigenvalues_corr <- eig_c
+  result$rcond     <- rcond(vcov)
+  result$rcond_corr <- rcond(corr)
 
-  rc <- rcond(vcov)
-  result$rcond <- rc
+  safe_cond <- function(ev) {
+    if (length(ev) < 2L || any(!is.finite(ev)) || min(ev) <= 0) NA_real_
+    else max(ev) / min(ev)
+  }
+  result$cond_number_raw  <- safe_cond(eig_v)
+  result$cond_number_corr <- safe_cond(eig_c)
 
-  if (is.na(rc) || rc < rcond_threshold) {
+  # Raw D-criterion
+  if (!is.na(result$rcond) && result$rcond >= rcond_threshold) {
+    det_v <- det(vcov)
+    if (!is.na(det_v) && det_v > 0) {
+      result$d_criterion <- det_v^(1 / p)
+    } else {
+      result$ill_conditioned <- TRUE
+    }
+  } else {
     result$ill_conditioned <- TRUE
-    return(result)
   }
 
-  det_val <- det(vcov)
-  if (is.na(det_val) || det_val <= 0) {
-    result$ill_conditioned <- TRUE
-    return(result)
+  # Correlation-based D-criterion
+  if (!is.na(result$rcond_corr) && result$rcond_corr >= rcond_threshold) {
+    det_c <- det(corr)
+    if (!is.na(det_c) && det_c > 0) {
+      result$d_criterion_corr <- det_c^(1 / p)
+    } else {
+      result$ill_conditioned_corr <- TRUE
+    }
+  } else {
+    result$ill_conditioned_corr <- TRUE
   }
 
-  result$d_criterion <- det_val^(1 / p)
   result
 }
 

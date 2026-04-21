@@ -305,6 +305,23 @@ mod_sse_validation_ui <- function(id) {
     # --- D-criterion card ---
     uiOutput(ns("d_criterion_card")),
 
+    # --- Matrix conditioning diagnostics (collapsible) ---
+    tags$details(
+      style = paste0(
+        "border:1px solid #e5e7eb; border-radius:8px; padding:8px 14px;",
+        " margin-bottom:14px; background:#fafafa;"
+      ),
+      tags$summary(style = "cursor:pointer; font-weight:600; font-size:0.93em;",
+                   "Matrix conditioning diagnostics (eigenvalue spectrum + empirical correlation heatmap)"),
+      div(style = "margin-top:12px;",
+        plotOutput(ns("eigenvalue_spectrum"), height = "320px"),
+        tags$p(style = "margin:12px 0 6px; font-size:0.85em; color:#555;",
+          "Empirical SSE correlation matrix across converged runs. ",
+          "Off-diagonal patterns reveal structural couplings between parameters."),
+        plotOutput(ns("sse_cor_heatmap"), height = "500px")
+      )
+    ),
+
     # --- Comparison table ---
     fluidRow(
       column(12,
@@ -504,43 +521,108 @@ mod_sse_validation_server <- function(id, ext_data,
       )
     })
 
-    # --- D-criterion card ---
+    # --- D-criterion / matrix diagnostics card ---
+    # Shows BOTH raw and correlation-based D-criterion.
+    # Raw form (det(cov)^(1/p)) is scale-dependent: with parameters spanning
+    # several orders of magnitude it can collapse to rcond~0 without any real
+    # collinearity. The correlation-based form (det(corr)^(1/p)) is
+    # scale-invariant and reveals whether the matrix is *structurally*
+    # singular. See compute_empirical_d_criterion() doc for the policy.
     output$d_criterion_card <- renderUI({
       dc <- d_criterion()
-      if (is.null(dc)) return(NULL)
+      if (is.null(dc) || dc$p < 2L) return(NULL)
 
-      if (dc$ill_conditioned) {
-        div(class = "alert alert-warning",
-            style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
-          tags$strong("Empirical D-criterion: not estimable"),
-          tags$p(style = "margin:4px 0 0; font-size:0.9em;",
-            sprintf(
-              paste0(
-                "The empirical variance-covariance matrix is ill-conditioned ",
-                "(rcond = %.2e, p = %d parameters). The determinant is ",
-                "unreliable and the D-criterion cannot be computed. ",
-                "This may indicate near-collinear or non-identifiable parameters ",
-                "(Fayette et al. 2026)."
-              ),
-              dc$rcond, dc$p
+      fmt_sci  <- function(x) if (is.na(x)) "n/a" else sprintf("%.2e", x)
+      fmt_sig  <- function(x) if (is.na(x)) "n/a" else sprintf("%.4g", x)
+
+      # Headline: what is the verdict?
+      raw_ok  <- !dc$ill_conditioned      && !is.na(dc$d_criterion)
+      corr_ok <- !dc$ill_conditioned_corr && !is.na(dc$d_criterion_corr)
+
+      if (raw_ok && corr_ok) {
+        verdict_class <- "alert alert-success"
+        verdict <- "Both raw and correlation-based D-criteria computed cleanly"
+      } else if (!raw_ok && corr_ok) {
+        verdict_class <- "alert alert-info"
+        verdict <- "Raw D-criterion numerically unstable (scale artifact); correlation D-criterion is clean"
+      } else if (!raw_ok && !corr_ok) {
+        verdict_class <- "alert alert-warning"
+        verdict <- "Both matrices ill-conditioned: likely near-collinear parameters (Fayette et al. 2026)"
+      } else {
+        verdict_class <- "alert alert-warning"
+        verdict <- "Correlation-based criterion failed (rare; inspect the data)"
+      }
+
+      div(class = verdict_class,
+          style = "border-radius:8px; margin-bottom:10px; padding:10px 14px;",
+
+        tags$strong(sprintf("Matrix diagnostics  (p = %d parameters)", dc$p)),
+        tags$p(style = "margin:4px 0 8px; font-size:0.9em;", verdict),
+
+        tags$table(
+          style = "width:100%; font-size:0.87em; font-family:monospace;",
+          tags$thead(
+            tags$tr(style = "border-bottom:1px solid #ccc;",
+              tags$th(style = "text-align:left; padding:3px 8px;", "Metric"),
+              tags$th(style = "text-align:left; padding:3px 8px;", "Raw VarCov"),
+              tags$th(style = "text-align:left; padding:3px 8px;", "Correlation")
+            )
+          ),
+          tags$tbody(
+            tags$tr(
+              tags$td(style = "padding:3px 8px;",
+                      HTML("&phi;<sub>D</sub> = det(M)<sup>1/p</sup>")),
+              tags$td(style = "padding:3px 8px;", fmt_sig(dc$d_criterion)),
+              tags$td(style = "padding:3px 8px;", fmt_sig(dc$d_criterion_corr))
+            ),
+            tags$tr(
+              tags$td(style = "padding:3px 8px;",
+                      HTML("&kappa; = &lambda;<sub>max</sub> / &lambda;<sub>min</sub>")),
+              tags$td(style = "padding:3px 8px;", fmt_sci(dc$cond_number_raw)),
+              tags$td(style = "padding:3px 8px;", fmt_sci(dc$cond_number_corr))
+            ),
+            tags$tr(
+              tags$td(style = "padding:3px 8px;", "rcond"),
+              tags$td(style = "padding:3px 8px;", fmt_sci(dc$rcond)),
+              tags$td(style = "padding:3px 8px;", fmt_sci(dc$rcond_corr))
             )
           )
+        ),
+
+        tags$p(style = "margin:8px 0 0; font-size:0.8em; color:#555;",
+          HTML(paste0(
+            "Raw form inherits scale disparities between parameters and can fail ",
+            "numerically without real collinearity. The correlation form is ",
+            "scale-invariant: it isolates the structural conditioning of the ",
+            "empirical covariance."
+          ))
         )
-      } else if (!is.na(dc$d_criterion)) {
-        div(class = "alert alert-success",
-            style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
-          tags$strong(sprintf(
-            "Empirical D-criterion: %.4g  (p = %d parameters, rcond = %.2e)",
-            dc$d_criterion, dc$p, dc$rcond
-          )),
-          tags$p(style = "margin:4px 0 0; font-size:0.85em; color:#555;",
-            HTML(paste0(
-              "&phi;<sub>D</sub> = det(VarCov)<sup>1/p</sup> ",
-              "&mdash; lower values indicate better estimation precision"
-            ))
-          )
-        )
+      )
+    })
+
+    # --- Eigenvalue spectrum (FIM vs SSE correlation-matrix eigenvalues) ---
+    output$eigenvalue_spectrum <- renderPlot({
+      dc <- d_criterion()
+      sse_eig <- if (!is.null(dc)) dc$eigenvalues_corr else NULL
+
+      fim_eig <- NULL
+      ext <- tryCatch(ext_data(), error = function(e) NULL)
+      if (!is.null(ext) && nrow(ext) > 0L) {
+        ev <- tryCatch(get_eigenvalues(ext), error = function(e) NULL)
+        if (!is.null(ev) && nrow(ev) > 0L) fim_eig <- ev$eigenvalue
       }
+
+      plot_eigenvalue_spectrum(fim_eig, sse_eig)
+    })
+
+    # --- SSE empirical correlation heatmap ---
+    output$sse_cor_heatmap <- renderPlot({
+      dc <- d_criterion()
+      if (is.null(dc) || is.null(dc$corr)) {
+        return(plot_empirical_cor_heatmap(NULL))
+      }
+      plot_empirical_cor_heatmap(dc$corr, labels = param_labels(),
+                                 title = "SSE empirical correlation matrix")
     })
 
     # --- Scatter plot ---
