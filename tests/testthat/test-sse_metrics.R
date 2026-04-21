@@ -50,6 +50,35 @@ test_that(".normalize_psn_cols() preserves SE prefix", {
   expect_equal(out, c("se_THETA1", "se_OMEGA(1,1)", "se_OMEGA(2,2)"))
 })
 
+test_that(".normalize_psn_cols() maps unnumbered --th- positionally", {
+  # PsN writes --th<N>- when the .ctl ;label has a digit; otherwise --th-.
+  # With a FIXED THETA7, --th8- anchors the counter to 8 so the next
+  # unnumbered --th- becomes THETA10 (not THETA9).
+  hdr <- c(
+    "--th1- CL", "--th2- V", "--th6- F1",
+    "--th8- Allo_CL", "--th9- Allo_V",
+    "--th- COV1", "--th- COV2", "--th- COV3",
+    "OMEGA(2,1)",
+    "--th-", "--th-_", "--th-__",
+    "--eps1- Prop", "--eps2- Add",
+    "se--th1- CL", "se--th8- Allo_CL",
+    "se--th- COV1", "se--th-",
+    "se--eps1- Prop"
+  )
+  out <- .normalize_psn_cols(hdr)
+  expect_equal(out, c(
+    "THETA1", "THETA2", "THETA6",
+    "THETA8", "THETA9",
+    "THETA10", "THETA11", "THETA12",
+    "OMEGA(2,1)",
+    "THETA13", "THETA14", "THETA15",
+    "SIGMA(1,1)", "SIGMA(2,2)",
+    "se_THETA1", "se_THETA8",
+    "se_THETA9", "se_THETA10",
+    "se_SIGMA(1,1)"
+  ))
+})
+
 
 # =============================================================================
 # B. compare_fim_sse()

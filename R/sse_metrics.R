@@ -41,6 +41,10 @@ library(tidyr)
 .normalize_psn_cols <- function(nms) {
   nms <- trimws(nms)
   out <- nms
+  th_counter <- 0L
+  se_th_counter <- 0L
+  eps_counter <- 0L
+  se_eps_counter <- 0L
 
   for (i in seq_along(out)) {
     nm <- out[i]
@@ -64,16 +68,40 @@ library(tidyr)
       }
     }
 
-    # THETA: "--th1- CL" -> "THETA1" ; also "--th10" (no trailing dash) -> "THETA10"
+    # THETA numbered: "--th1- CL" -> "THETA1" ; "--th10" -> "THETA10"
     if (grepl("^--th(\\d+)($|[ \\t-])", nm)) {
-      idx <- sub("^--th(\\d+).*", "\\1", nm)
+      idx <- as.integer(sub("^--th(\\d+).*", "\\1", nm))
+      if (nchar(se_prefix)) se_th_counter <- idx else th_counter <- idx
       out[i] <- paste0(se_prefix, "THETA", idx)
       next
     }
 
-    # SIGMA: "--eps1- Proportional" -> "SIGMA(1,1)"
+    # THETA unnumbered: "--th- COV1" / "--th-_" -> positional from last seen digit
+    if (grepl("^--th($|[^0-9])", nm)) {
+      idx <- if (nchar(se_prefix)) {
+        se_th_counter <- se_th_counter + 1L; se_th_counter
+      } else {
+        th_counter <- th_counter + 1L; th_counter
+      }
+      out[i] <- paste0(se_prefix, "THETA", idx)
+      next
+    }
+
+    # SIGMA numbered: "--eps1- Proportional" -> "SIGMA(1,1)"
     if (grepl("^--eps(\\d+)($|[ \\t-])", nm)) {
-      idx <- sub("^--eps(\\d+).*", "\\1", nm)
+      idx <- as.integer(sub("^--eps(\\d+).*", "\\1", nm))
+      if (nchar(se_prefix)) se_eps_counter <- idx else eps_counter <- idx
+      out[i] <- paste0(se_prefix, "SIGMA(", idx, ",", idx, ")")
+      next
+    }
+
+    # SIGMA unnumbered: "--eps- Prop" -> positional
+    if (grepl("^--eps($|[^0-9])", nm)) {
+      idx <- if (nchar(se_prefix)) {
+        se_eps_counter <- se_eps_counter + 1L; se_eps_counter
+      } else {
+        eps_counter <- eps_counter + 1L; eps_counter
+      }
       out[i] <- paste0(se_prefix, "SIGMA(", idx, ",", idx, ")")
       next
     }
