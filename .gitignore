@@ -74,6 +74,13 @@ docs/results/
 # Suivi de stage (personnel, non redistribuable)
 docs/suivi/
 
+# Revues de litterature (personnel, non redistribuable)
+docs/review_*/
+docs/papers/*.md
+
+# Scripts de diagnostic one-off (personnel, pas du code source de l'app)
+scripts/
+
 # Documents non redistribuables
 docs/nonmem/manuel_nonmem.txt
 docs/nonmem/manuel_nonmem.pdf

@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.5"
-.APP_VERSION_NAME <- "mrgsolve integration"
+.APP_VERSION      <- "V5.7"
+.APP_VERSION_NAME <- "Terre des hommes"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log
@@ -428,7 +428,9 @@ server <- function(input, output, session) {
     sse_a_data       = sse_upload$sse_a_data,
     sse_b_data       = sse_upload$sse_b_data,
     name_a           = sse_upload$name_a,
-    name_b           = sse_upload$name_b)
+    name_b           = sse_upload$name_b,
+    coi_data         = merged_coi,
+    clt_data         = merged_clt)
 
   mod_sse_analysis_server("sse_analysis",
     sse_a_shared = sse_upload$sse_a_data,

@@ -587,6 +587,121 @@ plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
 
 
 # =============================================================================
+# plot_empirical_cor_heatmap() — Empirical correlation heatmap (SSE)
+# =============================================================================
+
+#' Heatmap of the empirical correlation matrix from SSE.
+#'
+#' Companion to `plot_fim_heatmap()` on the SSE side: takes a pre-computed
+#' correlation matrix (typically the $corr field from
+#' `compute_empirical_d_criterion()`) and renders it with the same divergent
+#' palette for direct visual comparison with the FIM-predicted heatmap.
+#'
+#' @param corr_matrix Named square correlation matrix (p x p)
+#' @param labels Named character vector for parameter renaming (optional)
+#' @param title  Plot title (NULL = auto)
+#' @return ggplot object
+#' @export
+plot_empirical_cor_heatmap <- function(corr_matrix, labels = NULL, title = NULL) {
+  if (is.null(corr_matrix) || nrow(corr_matrix) == 0L) {
+    return(.empty_plot("No empirical correlation matrix available"))
+  }
+
+  pnames <- rownames(corr_matrix)
+  if (!is.null(labels)) {
+    pnames <- ifelse(pnames %in% names(labels), labels[pnames], pnames)
+    rownames(corr_matrix) <- pnames
+    colnames(corr_matrix) <- pnames
+  }
+
+  df <- expand.grid(row = pnames, col = pnames, stringsAsFactors = FALSE)
+  df$value <- as.vector(corr_matrix)
+  df$row <- factor(df$row, levels = rev(pnames))
+  df$col <- factor(df$col, levels = pnames)
+
+  ttl <- title %||% "Empirical correlation matrix (SSE)"
+
+  ggplot(df, aes(x = col, y = row, fill = value)) +
+    geom_tile(color = "white", size = 0.5) +
+    geom_text(aes(label = sprintf("%.2f", value)),
+              size = 2.8, color = "grey20") +
+    scale_fill_gradient2(
+      low = "#2166ac", mid = "white", high = "#b2182b",
+      midpoint = 0, limits = c(-1, 1),
+      name = "Corrélation"
+    ) +
+    labs(title = ttl, x = NULL, y = NULL) +
+    .theme_design() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+      axis.text.y = element_text(size = 9),
+      panel.grid   = element_blank()
+    )
+}
+
+
+# =============================================================================
+# plot_eigenvalue_spectrum() — Eigenvalue spectrum FIM vs SSE
+# =============================================================================
+
+#' Bar plot of the correlation-matrix eigenvalue spectrum.
+#'
+#' For a p x p correlation matrix, eigenvalues live in [0, p]. A perfect
+#' identity would produce p unit eigenvalues; any near-collinearity pushes
+#' some eigenvalues toward 0 (and others toward p, since their sum is fixed
+#' at p). The spectrum makes any near-singular direction immediately visible.
+#'
+#' Optionally displays FIM-predicted and SSE-empirical side-by-side for
+#' direct comparison of conditioning.
+#'
+#' @param fim_eigenvalues Numeric vector of FIM correlation eigenvalues, or NULL
+#' @param sse_eigenvalues Numeric vector of SSE correlation eigenvalues, or NULL
+#' @param title Plot title (NULL = auto)
+#' @return ggplot object
+#' @export
+plot_eigenvalue_spectrum <- function(fim_eigenvalues = NULL,
+                                     sse_eigenvalues = NULL,
+                                     title = NULL) {
+  rows <- list()
+  if (!is.null(fim_eigenvalues) && length(fim_eigenvalues) > 0L) {
+    ev <- sort(fim_eigenvalues, decreasing = TRUE)
+    rows[[length(rows) + 1L]] <- data.frame(
+      source = "FIM predicted", index = seq_along(ev), eigenvalue = ev,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (!is.null(sse_eigenvalues) && length(sse_eigenvalues) > 0L) {
+    ev <- sort(sse_eigenvalues, decreasing = TRUE)
+    rows[[length(rows) + 1L]] <- data.frame(
+      source = "SSE empirical", index = seq_along(ev), eigenvalue = ev,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (length(rows) == 0L) {
+    return(.empty_plot("No eigenvalues available"))
+  }
+  df <- do.call(rbind, rows)
+
+  ttl <- title %||% "Correlation matrix eigenvalue spectrum"
+
+  ggplot(df, aes(x = index, y = eigenvalue, fill = source)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "grey50") +
+    scale_fill_manual(values = c("FIM predicted" = "#3b82f6",
+                                 "SSE empirical" = "#dc2626"),
+                      name = NULL) +
+    labs(title = ttl,
+         subtitle = "Dashed line at lambda = 1 (identity). Values near 0 indicate near-singular directions.",
+         x = "Eigenvalue index (largest first)",
+         y = "Eigenvalue") +
+    .theme_design() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey50"),
+          legend.position = "top")
+}
+
+
+# =============================================================================
 # plot_optimal_times() — Gantt des temps d'échantillonnage optimaux
 # =============================================================================
 
