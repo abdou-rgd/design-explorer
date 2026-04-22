@@ -116,36 +116,36 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
           tags$summary(style = "cursor:pointer; font-weight:600; color:#2563eb;",
                        "About these metrics"),
           div(style = "padding:10px 2px 2px; font-size:0.88em; color:#475569; line-height:1.55;",
-            tags$p(tags$strong("OFV"),
-              HTML(" = &minus;log(det(FIM)) for D-optimality designs, or the optimality ",
-                   "criterion value returned by NONMEM for other types (A, DS, R, Bayes). ",
-                   tags$strong("Smaller = more informative design"), " (in the D case)."))
-            ,
-            tags$p(tags$strong("ΔOFV vs ref"),
-              HTML(" = OFV<sub>ref</sub> &minus; OFV<sub>run</sub>, on the raw optimality ",
-                   "scale. Positive = the run is more informative than the reference; ",
-                   "negative = less. Useful to see the absolute gap (",
-                   tags$em("D-efficiency"),
-                   " only gives the relative ratio).")
-            ),
-            tags$p(tags$strong("D-efficiency vs ref"),
-              HTML(" = (det(FIM<sub>run</sub>) / det(FIM<sub>ref</sub>))<sup>1/p</sup> &minus; 1, ",
-                   "expressed in %. <b>p</b> is the number of estimable parameters ",
-                   "from the reference run (THETA + OMEGA + SIGMA elements with a finite ",
-                   "RSE). The 1/p exponent normalises the ratio per parameter so designs ",
-                   "with different dimensionalities stay comparable. ",
-                   "Usage: comparing different sampling schedules, or comparing FIM ",
-                   "approximations of the same design (FIMTYPE, APPROX, VARCROSS) as a ",
-                   "numerical sanity check. ",
-                   tags$em("Atkinson & Donev (1992); Mentré et al. (1997)."))
-            ),
-            tags$p(tags$strong("Robust D-criterion [P10-P90]"),
-              HTML(" = geometric mean of det(FIM)<sup>1/p</sup> over n Monte-Carlo ",
-                   "realisations of the parameter priors (n = number of $SIM TRUE=PRIOR ",
-                   "subproblems). The bracket shows the 10th-90th percentile spread: ",
-                   "narrow = design is stable across the prior; wide = design quality ",
-                   "is sensitive to the true parameter values.")
-            )
+            tags$p(HTML(paste0(
+              "<strong>OFV</strong> = &minus;log(det(FIM)) for D-optimality designs, ",
+              "or the optimality criterion value returned by NONMEM for other types ",
+              "(A, DS, R, Bayes). <strong>Smaller = more informative design</strong> ",
+              "(in the D case)."
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>ΔOFV vs ref</strong> = OFV<sub>ref</sub> &minus; OFV<sub>run</sub>, ",
+              "on the raw optimality scale. Positive = the run is more informative than ",
+              "the reference; negative = less. Useful to see the absolute gap ",
+              "(<em>D-efficiency</em> only gives the relative ratio)."
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>D-efficiency vs ref</strong> = ",
+              "(det(FIM<sub>run</sub>) / det(FIM<sub>ref</sub>))<sup>1/p</sup> &minus; 1, ",
+              "expressed in %. <strong>p</strong> is the number of estimable parameters ",
+              "from the reference run (THETA + OMEGA + SIGMA elements with a finite RSE). ",
+              "The 1/p exponent normalises the ratio per parameter so designs with ",
+              "different dimensionalities stay comparable. Usage: comparing different ",
+              "sampling schedules, or comparing FIM approximations of the same design ",
+              "(FIMTYPE, APPROX, VARCROSS) as a numerical sanity check. ",
+              "<em>Atkinson &amp; Donev (1992); Mentr&eacute; et al. (1997).</em>"
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>Robust D-criterion [P10-P90]</strong> = geometric mean of ",
+              "det(FIM)<sup>1/p</sup> over n Monte-Carlo realisations of the parameter ",
+              "priors (n = number of $SIM TRUE=PRIOR subproblems). The bracket shows ",
+              "the 10th-90th percentile spread: narrow = design is stable across the ",
+              "prior; wide = design quality is sensitive to the true parameter values."
+            )))
           )
         ),
         div(class = "param-table-wrap",
