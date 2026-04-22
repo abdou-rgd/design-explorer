@@ -107,9 +107,47 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
                    "Load a .ext file to begin the analysis."))
       }
 
-      div(class = "param-table-wrap",
-          p(class = "section-title", "Parameters - run comparison"),
-          DTOutput(ns("dt_all"))
+      tagList(
+        tags$details(style = "margin-bottom:10px;",
+          tags$summary(style = "cursor:pointer; font-weight:600; color:#2563eb;",
+                       "About these metrics"),
+          div(style = "padding:10px 14px; font-size:0.88em; color:#475569; line-height:1.55;",
+            tags$p(tags$strong("OFV"),
+              HTML(" = &minus;log(det(FIM)) for D-optimality designs, or the optimality ",
+                   "criterion value returned by NONMEM for other types (A, DS, R, Bayes). ",
+                   tags$strong("Smaller = more informative design"), " (in the D case)."))
+            ,
+            tags$p(tags$strong("ΔOFV vs ref"),
+              HTML(" = OFV<sub>ref</sub> &minus; OFV<sub>run</sub>, on the raw optimality ",
+                   "scale. Positive = the run is more informative than the reference; ",
+                   "negative = less. Useful to see the absolute gap (",
+                   tags$em("D-efficiency"),
+                   " only gives the relative ratio).")
+            ),
+            tags$p(tags$strong("D-efficiency vs ref"),
+              HTML(" = (det(FIM<sub>run</sub>) / det(FIM<sub>ref</sub>))<sup>1/p</sup> &minus; 1, ",
+                   "expressed in %. <b>p</b> is the number of estimable parameters ",
+                   "from the reference run (THETA + OMEGA + SIGMA elements with a finite ",
+                   "RSE). The 1/p exponent normalises the ratio per parameter so designs ",
+                   "with different dimensionalities stay comparable. ",
+                   "Usage: comparing different sampling schedules, or comparing FIM ",
+                   "approximations of the same design (FIMTYPE, APPROX, VARCROSS) as a ",
+                   "numerical sanity check. ",
+                   tags$em("Atkinson & Donev (1992); Mentré et al. (1997)."))
+            ),
+            tags$p(tags$strong("Robust D-criterion [P10-P90]"),
+              HTML(" = geometric mean of det(FIM)<sup>1/p</sup> over n Monte-Carlo ",
+                   "realisations of the parameter priors (n = number of $SIM TRUE=PRIOR ",
+                   "subproblems). The bracket shows the 10th-90th percentile spread: ",
+                   "narrow = design is stable across the prior; wide = design quality ",
+                   "is sensitive to the true parameter values.")
+            )
+          )
+        ),
+        div(class = "param-table-wrap",
+            p(class = "section-title", "Parameters - run comparison"),
+            DTOutput(ns("dt_all"))
+        )
       )
     })
 
@@ -145,7 +183,11 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
       ext_ln <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
       crit   <- if (!is.null(ext_ln)) detect_criterion(ext_ln) else "D-OPTIMALITY"
 
-      ofv_label <- paste0("−log(det(FIM)) [", crit, "]")
+      ofv_label <- if (crit == "D-OPTIMALITY") {
+        "OFV  [−log(det FIM)]"
+      } else {
+        paste0("OFV  [", crit, "]")
+      }
       ofv_row_vals <- setNames(lapply(ofv_vals, function(v) fmt(v, 4)), rnms)
       ofv_rows <- list(c(list(Group = "Optimality criterion",
                               Parameter = ofv_label), ofv_row_vals))
@@ -153,6 +195,20 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
       primary_ofv <- ofv_vals[[1]]
       has_cmp <- length(ofv_vals) >= 2L && !is.na(primary_ofv) && any(!is.na(ofv_vals[-1]))
       if (has_cmp) {
+        # ΔOFV row: raw scale difference (OFV_ref - OFV_run).
+        # For D-optimality: positive = run is more informative than ref.
+        delta_disp <- vapply(seq_along(ofv_vals), function(i) {
+          if (i == 1L) return("ref")
+          if (is.na(ofv_vals[i])) return(NA_character_)
+          sprintf("%+.4f", round(primary_ofv - ofv_vals[i], 4))
+        }, character(1))
+        names(delta_disp) <- rnms
+        ofv_rows[[length(ofv_rows) + 1L]] <- c(
+          list(Group = "Optimality criterion",
+               Parameter = "ΔOFV vs ref"),
+          as.list(delta_disp))
+
+        # D-efficiency (D-optimality) or relative %ΔOFV (other criteria).
         n_params <- tryCatch(nrow(get_rse(runs[[1]]$ext_data, tbl)),
                              error = function(e) NA_integer_)
         if (crit == "D-OPTIMALITY") {
@@ -161,14 +217,14 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
             if (is.na(ofv_vals[i]) || is.na(n_params) || n_params == 0L) return(NA_character_)
             sprintf("%+.2f%%", round((exp((primary_ofv - ofv_vals[i]) / n_params) - 1) * 100, 2))
           }, character(1))
-          eff_label <- paste0("D-efficiency vs ref (p=", n_params, ")")
+          eff_label <- "D-efficiency vs ref"
         } else {
           eff_disp <- vapply(seq_along(ofv_vals), function(i) {
             if (i == 1L) return("ref")
             if (is.na(ofv_vals[i]) || primary_ofv == 0) return(NA_character_)
             sprintf("%+.2f%%", round((primary_ofv - ofv_vals[i]) / abs(primary_ofv) * 100, 2))
           }, character(1))
-          eff_label <- paste0("ΔOFV% vs ref [", crit, "]")
+          eff_label <- "Relative ΔOFV vs ref"
         }
         names(eff_disp) <- rnms
         ofv_rows[[length(ofv_rows) + 1L]] <- c(list(Group = "Optimality criterion",
@@ -191,7 +247,7 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
             )
             ofv_rows[[length(ofv_rows) + 1L]] <- c(
               list(Group = "Optimality criterion",
-                   Parameter = sprintf("Robust D-criterion P10-P90 (n=%d)", rdc$n_subprob)),
+                   Parameter = "Robust D-criterion  [P10-P90]"),
               rdc_vals
             )
           }
