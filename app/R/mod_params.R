@@ -108,10 +108,14 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
       }
 
       tagList(
-        tags$details(style = "margin-bottom:10px;",
+        tags$details(style = paste0(
+            "margin-bottom:14px; background:#f8fafc; ",
+            "border:1px solid #e2e8f0; border-left:4px solid #2563eb; ",
+            "border-radius:8px; padding:10px 14px;"
+          ),
           tags$summary(style = "cursor:pointer; font-weight:600; color:#2563eb;",
                        "About these metrics"),
-          div(style = "padding:10px 14px; font-size:0.88em; color:#475569; line-height:1.55;",
+          div(style = "padding:10px 2px 2px; font-size:0.88em; color:#475569; line-height:1.55;",
             tags$p(tags$strong("OFV"),
               HTML(" = &minus;log(det(FIM)) for D-optimality designs, or the optimality ",
                    "criterion value returned by NONMEM for other types (A, DS, R, Bayes). ",
