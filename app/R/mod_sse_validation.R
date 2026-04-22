@@ -596,7 +596,9 @@ mod_sse_validation_server <- function(id, ext_data,
             "Raw form inherits scale disparities between parameters and can fail ",
             "numerically without real collinearity. The correlation form is ",
             "scale-invariant: it isolates the structural conditioning of the ",
-            "empirical covariance."
+            "empirical covariance. Diagnostic only; for an estimation-time remedy ",
+            "see Aoki, Nordgren, Hooker (2016), <em>AAPS J</em> 18(2):505-515 ",
+            "(preconditioning of the variance-covariance matrix, PsN <code>precond</code>)."
           ))
         )
       )

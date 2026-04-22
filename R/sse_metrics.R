@@ -630,6 +630,12 @@ compute_sse_metrics <- function(sse_raw, true_values,
 #'   * raw ill-conditioned + correlation well-conditioned -> scale artifact
 #'   * both ill-conditioned -> genuine near-collinear parameters
 #'
+#' The diagonal-vs-rotational decomposition V = D Corr D underlying this
+#' diagnostic is the same one Aoki, Nordgren, Hooker (2016, AAPS J 18(2):
+#' 505-515, doi:10.1208/s12248-016-9866-5) exploit in their preconditioning
+#' transform for NLME estimation. We use it here post hoc (diagnostic on
+#' converged SSE results); they use it in-loop (remedy for NONMEM $COV).
+#'
 #' Parameters whose empirical variance across SSE runs is effectively zero
 #' (e.g. fixed at 0 in the .ctl) are dropped before the decomposition; they
 #' would otherwise produce NaN rows in cov2cor() and crash eigen().
