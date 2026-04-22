@@ -5,52 +5,16 @@
 mod_params_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    settings_bar(
-      selectInput(ns("table_no"), "TABLE NO.", choices = "1", selected = "1", width = "120px"),
-      numericInput(ns("groupsize"), "GROUPSIZE", value = 1L, min = 1L, step = 1L, width = "100px")
-    ),
     uiOutput(ns("table3_ui"))
   )
 }
 
 mod_params_server <- function(id, ext_data, shk_data, ext_lines,
                                param_labels,
-                               table_no_range = reactive(NULL),
-                               suggested_groupsize = reactive(1L),
-                               reset_trigger = reactive(0L),
+                               tbl_no,
                                all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    # -- Internal table_no + groupsize reactives (owned by this module) ------
-    tbl_no <- reactive({ as.integer(input$table_no) })
-    groupsize_r <- reactive({ as.integer(input$groupsize %||% 1L) })
-
-    # Update TABLE NO choices when ext_data changes
-    observe({
-      ext <- ext_data(); req(ext)
-      tabs <- sort(unique(ext$table_no))
-      tnr  <- table_no_range()
-      if (!is.null(tnr) && length(tnr) == 2L) {
-        tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
-        if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
-      }
-      updateSelectInput(session, "table_no",
-        choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
-        selected = as.character(max(tabs)))
-    })
-
-    # Update groupsize when suggested by upload/examples
-    observeEvent(suggested_groupsize(), {
-      gs <- suggested_groupsize()
-      if (!is.na(gs) && gs >= 1L) updateNumericInput(session, "groupsize", value = gs)
-    }, ignoreInit = TRUE)
-
-    # Reset handler
-    observeEvent(reset_trigger(), {
-      updateSelectInput(session, "table_no", choices = "1", selected = "1")
-      updateNumericInput(session, "groupsize", value = 1L)
-    }, ignoreInit = TRUE)
 
     # -------------------------------------------------------------------------
     # Helpers — construire les sections de la TABLE 3 depuis all_runs
@@ -143,226 +107,278 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
                    "Load a .ext file to begin the analysis."))
       }
 
-      has_shk   <- nrow(shk_long()) > 0L
-      has_times <- nrow(times_long()) > 0L
-
       tagList(
-        div(class = "param-table-wrap",
-            p(class = "section-title",
-              HTML("Optimality criterion \u2014 <em>-log(det(FIM))</em>")),
-            DTOutput(ns("dt_ofv"))
-        ),
-        br(),
-        div(class = "param-table-wrap",
-            p(class = "section-title", "%RSE per parameter"),
-            DTOutput(ns("dt_rse"))
-        ),
-        if (has_shk) tagList(
-          br(),
-          div(class = "param-table-wrap",
-              p(class = "section-title", "EBV Shrinkage (%) per ETA"),
-              DTOutput(ns("dt_shk"))
+        tags$details(style = paste0(
+            "margin-bottom:14px; background:#f8fafc; ",
+            "border:1px solid #e2e8f0; border-left:4px solid #2563eb; ",
+            "border-radius:8px; padding:10px 14px;"
+          ),
+          tags$summary(style = "cursor:pointer; font-weight:600; color:#2563eb;",
+                       "About these metrics"),
+          div(style = "padding:10px 2px 2px; font-size:0.88em; color:#475569; line-height:1.55;",
+            tags$p(HTML(paste0(
+              "<strong>OFV</strong> = &minus;log(det(FIM)) for D-optimality designs, ",
+              "or the optimality criterion value returned by NONMEM for other types ",
+              "(A, DS, R, Bayes). <strong>Smaller = more informative design</strong> ",
+              "(in the D case)."
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>ΔOFV vs ref</strong> = OFV<sub>ref</sub> &minus; OFV<sub>run</sub>, ",
+              "on the raw optimality scale. Positive = the run is more informative than ",
+              "the reference; negative = less. Useful to see the absolute gap ",
+              "(<em>D-efficiency</em> only gives the relative ratio)."
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>D-efficiency vs ref</strong> = ",
+              "(det(FIM<sub>run</sub>) / det(FIM<sub>ref</sub>))<sup>1/p</sup> &minus; 1, ",
+              "expressed in %. <strong>p</strong> is the number of estimable parameters ",
+              "from the reference run (THETA + OMEGA + SIGMA elements with a finite RSE). ",
+              "The 1/p exponent normalises the ratio per parameter so designs with ",
+              "different dimensionalities stay comparable. Usage: comparing different ",
+              "sampling schedules, or comparing FIM approximations of the same design ",
+              "(FIMTYPE, APPROX, VARCROSS) as a numerical sanity check. ",
+              "<em>Atkinson &amp; Donev (1992); Mentr&eacute; et al. (1997).</em>"
+            ))),
+            tags$p(HTML(paste0(
+              "<strong>Robust D-criterion [P10-P90]</strong> = geometric mean of ",
+              "det(FIM)<sup>1/p</sup> over n Monte-Carlo realisations of the parameter ",
+              "priors (n = number of $SIM TRUE=PRIOR subproblems). The bracket shows ",
+              "the 10th-90th percentile spread: narrow = design is stable across the ",
+              "prior; wide = design quality is sensitive to the true parameter values."
+            )))
           )
         ),
-        if (has_times) tagList(
-          br(),
-          div(class = "param-table-wrap",
-              p(class = "section-title", "Optimal sampling times (h)"),
-              DTOutput(ns("dt_times"))
-          )
+        div(class = "param-table-wrap",
+            p(class = "section-title", "Parameters - run comparison"),
+            DTOutput(ns("dt_all"))
         )
       )
     })
 
+
     # -------------------------------------------------------------------------
-    # DT — Critere OFV
+    # Unified Parameters table
+    # Single DT grouping OFV / RSE (THETA/OMEGA/SIGMA) / Shrinkage / Times.
+    # Column 0 is the Group key (hidden, drives DT RowGroup section headers).
+    # Row colours applied via rowCallback JS, per-group thresholds:
+    #   %RSE*      : 20 / 50 / 100 (green / orange / red / dark red)
+    #   Shrinkage  : 30            (green / red)
+    #   Others     : no colouring
     # -------------------------------------------------------------------------
-    output$dt_ofv <- renderDT({
+    params_table_df <- reactive({
       runs <- all_runs(); req(length(runs) > 0L)
       tbl  <- tbl_no()
+      rnms <- run_names()
+      fmt  <- function(x, d = 2) ifelse(is.na(x), NA_character_,
+                                        formatC(x, format = "f", digits = d))
 
+      sections <- list()
+
+      # --- OFV + D-efficiency + Robust D-criterion --------------------------
       ofv_vals <- vapply(runs, function(r) {
         if (is.null(r$ext_data)) return(NA_real_)
         val <- tryCatch(get_ofv(r$ext_data, tbl), error = function(e) NA_real_)
         if (length(val) == 0L) return(NA_real_)
         round(val, 4)
       }, numeric(1))
-      names(ofv_vals) <- vapply(runs, function(r) r$name %||% "?", character(1))
+      names(ofv_vals) <- rnms
 
       ext_for_crit <- ext_data()
-      lines <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
-      crit  <- if (!is.null(lines)) detect_criterion(lines) else "D-OPTIMALITY"
+      ext_ln <- ext_lines() %||% if (!is.null(ext_for_crit)) attr(ext_for_crit, "ext_lines") else NULL
+      crit   <- if (!is.null(ext_ln)) detect_criterion(ext_ln) else "D-OPTIMALITY"
 
-      # -- Ligne OFV -----------------------------------------------------------
-      ofv_label <- paste0("\u2212log(det(FIM)) [", crit, "]")
-      rows <- list(as.data.frame(
-        c(list(Metric = ofv_label), as.list(ofv_vals)),
-        check.names = FALSE
-      ))
+      ofv_label <- if (crit == "D-OPTIMALITY") {
+        "OFV  [−log(det FIM)]"
+      } else {
+        paste0("OFV  [", crit, "]")
+      }
+      ofv_row_vals <- setNames(lapply(ofv_vals, function(v) fmt(v, 4)), rnms)
+      ofv_rows <- list(c(list(Group = "Optimality criterion",
+                              Parameter = ofv_label), ofv_row_vals))
 
-      # -- Ligne efficience relative (vs run primaire) -----------------------
       primary_ofv <- ofv_vals[[1]]
-      has_comparison <- length(ofv_vals) >= 2L &&
-        !is.na(primary_ofv) &&
-        any(!is.na(ofv_vals[-1]))
+      has_cmp <- length(ofv_vals) >= 2L && !is.na(primary_ofv) && any(!is.na(ofv_vals[-1]))
+      if (has_cmp) {
+        # ΔOFV row: raw scale difference (OFV_ref - OFV_run).
+        # For D-optimality: positive = run is more informative than ref.
+        delta_disp <- vapply(seq_along(ofv_vals), function(i) {
+          if (i == 1L) return("ref")
+          if (is.na(ofv_vals[i])) return(NA_character_)
+          sprintf("%+.4f", round(primary_ofv - ofv_vals[i], 4))
+        }, character(1))
+        names(delta_disp) <- rnms
+        ofv_rows[[length(ofv_rows) + 1L]] <- c(
+          list(Group = "Optimality criterion",
+               Parameter = "ΔOFV vs ref"),
+          as.list(delta_disp))
 
-      if (has_comparison) {
+        # D-efficiency (D-optimality) or relative %ΔOFV (other criteria).
+        n_params <- tryCatch(nrow(get_rse(runs[[1]]$ext_data, tbl)),
+                             error = function(e) NA_integer_)
         if (crit == "D-OPTIMALITY") {
-          # D-efficiency : (exp(ΔOFV / p) - 1) x 100%
-          # p = nombre de params estimables depuis la run primaire
-          n_params <- tryCatch({
-            rse_df <- get_rse(runs[[1]]$ext_data, tbl)
-            nrow(rse_df)
-          }, error = function(e) NA_integer_)
-
-          eff_vals <- vapply(seq_along(ofv_vals), function(i) {
-            if (i == 1L) return(NA_real_)   # reference
-            if (is.na(ofv_vals[i]) || is.na(primary_ofv)) return(NA_real_)
-            if (is.na(n_params) || n_params == 0L) return(NA_real_)
-            delta <- primary_ofv - ofv_vals[i]
-            round((exp(delta / n_params) - 1) * 100, 2)
-          }, numeric(1))
-          names(eff_vals) <- names(ofv_vals)
-
-          eff_display <- vapply(seq_along(eff_vals), function(i) {
+          eff_disp <- vapply(seq_along(ofv_vals), function(i) {
             if (i == 1L) return("ref")
-            if (is.na(eff_vals[i])) return(NA_character_)
-            sprintf("%+.2f%%", eff_vals[i])
+            if (is.na(ofv_vals[i]) || is.na(n_params) || n_params == 0L) return(NA_character_)
+            sprintf("%+.2f%%", round((exp((primary_ofv - ofv_vals[i]) / n_params) - 1) * 100, 2))
           }, character(1))
-          names(eff_display) <- names(ofv_vals)
-
-          eff_label <- paste0("D-efficiency vs ref (p=", n_params, ")")
+          eff_label <- "D-efficiency vs ref"
         } else {
-          # Autres criteres : ΔOFV% = (OFV_ref - OFV_run) / |OFV_ref| x 100%
-          eff_display <- vapply(seq_along(ofv_vals), function(i) {
+          eff_disp <- vapply(seq_along(ofv_vals), function(i) {
             if (i == 1L) return("ref")
-            if (is.na(ofv_vals[i]) || is.na(primary_ofv) || primary_ofv == 0) return(NA_character_)
-            delta_pct <- (primary_ofv - ofv_vals[i]) / abs(primary_ofv) * 100
-            sprintf("%+.2f%%", round(delta_pct, 2))
+            if (is.na(ofv_vals[i]) || primary_ofv == 0) return(NA_character_)
+            sprintf("%+.2f%%", round((primary_ofv - ofv_vals[i]) / abs(primary_ofv) * 100, 2))
           }, character(1))
-          names(eff_display) <- names(ofv_vals)
-          eff_label <- paste0("\u0394OFV% vs ref [", crit, "]")
+          eff_label <- "Relative ΔOFV vs ref"
         }
-
-        rows[[length(rows) + 1L]] <- as.data.frame(
-          c(list(Metric = eff_label), as.list(eff_display)),
-          check.names = FALSE
-        )
+        names(eff_disp) <- rnms
+        ofv_rows[[length(ofv_rows) + 1L]] <- c(list(Group = "Optimality criterion",
+                                                    Parameter = eff_label), as.list(eff_disp))
       }
 
-      # -- Ligne D-critère robuste (design Monte Carlo uniquement) ------------
+      # Robust D-criterion (Monte-Carlo designs only)
       if (crit == "D-OPTIMALITY") {
         primary_ext <- runs[[1]]$ext_data
         if (!is.null(primary_ext)) {
-          n_params_r <- tryCatch(nrow(get_rse(primary_ext, tbl)), error = function(e) NA_integer_)
-          rdc <- tryCatch(get_robust_d_criterion(primary_ext, n_params_r), error = function(e) NULL)
+          n_params_r <- tryCatch(nrow(get_rse(primary_ext, tbl)),
+                                 error = function(e) NA_integer_)
+          rdc <- tryCatch(get_robust_d_criterion(primary_ext, n_params_r),
+                          error = function(e) NULL)
           if (!is.null(rdc)) {
-            d_str <- sprintf("%.4f [%.4f \u2013 %.4f]", rdc$d_robust, rdc$d_p10, rdc$d_p90)
-            rdc_row <- as.data.frame(
-              c(list(Metric = sprintf("Robust D-criterion P10-P90 (n=%d)", rdc$n_subprob)),
-                setNames(
-                  lapply(seq_along(runs), function(i) if (i == 1L) d_str else NA_character_),
-                  names(ofv_vals)
-                )),
-              check.names = FALSE
+            d_str <- sprintf("%.4f [%.4f – %.4f]", rdc$d_robust, rdc$d_p10, rdc$d_p90)
+            rdc_vals <- setNames(
+              lapply(seq_along(runs), function(i) if (i == 1L) d_str else NA_character_),
+              rnms
             )
-            rows[[length(rows) + 1L]] <- rdc_row
+            ofv_rows[[length(ofv_rows) + 1L]] <- c(
+              list(Group = "Optimality criterion",
+                   Parameter = "Robust D-criterion  [P10-P90]"),
+              rdc_vals
+            )
           }
         }
       }
+      # check.names=FALSE preserves run names with '/', '=', '(' etc. that
+      # would otherwise be sanitised by make.names() and stop matching rnms.
+      sections$ofv <- dplyr::bind_rows(lapply(
+        ofv_rows,
+        function(r) as.data.frame(r, check.names = FALSE, stringsAsFactors = FALSE)
+      ))
 
-      df <- do.call(rbind, rows)
-
-      datatable(df, rownames = FALSE, class = "stripe compact",
-                options = list(dom = "t", ordering = FALSE))
-    })
-
-    # -------------------------------------------------------------------------
-    # DT — %RSE
-    # -------------------------------------------------------------------------
-    output$dt_rse <- renderDT({
-      long <- rse_long()
-      req(nrow(long) > 0L)
-
-      rnms      <- run_names()
-
-      wide <- long |>
-        pivot_wider(names_from = run, values_from = value) |>
-        rename(Parameter = metric) |>
-        select(Parameter, any_of(rnms))
-
-      dt <- datatable(
-        wide, rownames = FALSE, class = "stripe hover compact",
-        options = list(dom = "t", ordering = FALSE, pageLength = -1)
-      )
-
-      # Utiliser les indices de colonnes (pas les noms) pour que formatStyle
-      # reste stable meme si le nom de la run change apres chargement
-      run_col_indices <- which(names(wide) %in% rnms)
-      for (col_idx in run_col_indices) {
-        dt <- dt |>
-          formatStyle(col_idx,
-            color      = styleInterval(c(20, 50, 100), c("#16a34a", "#d97706", "#dc2626", "#7f1d1d")),
-            fontWeight = "bold"
-          )
+      # --- RSE split by param type ------------------------------------------
+      rse <- rse_long()
+      if (nrow(rse) > 0L) {
+        rse_wide <- rse |>
+          pivot_wider(names_from = run, values_from = value) |>
+          rename(Parameter = metric)
+        for (col in rnms) {
+          if (col %in% names(rse_wide)) {
+            rse_wide[[col]] <- vapply(rse_wide[[col]], function(v) fmt(v, 2), character(1))
+          }
+        }
+        rse_wide$Group <- dplyr::case_when(
+          grepl("THETA", rse_wide$Parameter) ~ "%RSE - THETA",
+          grepl("OMEGA", rse_wide$Parameter) ~ "%RSE - OMEGA",
+          grepl("SIGMA", rse_wide$Parameter) ~ "%RSE - SIGMA",
+          TRUE                                ~ "%RSE - other"
+        )
+        rse_wide <- rse_wide[, c("Group", "Parameter", rnms[rnms %in% names(rse_wide)])]
+        rse_wide <- rse_wide[order(match(rse_wide$Group,
+                                        c("%RSE - THETA", "%RSE - OMEGA",
+                                          "%RSE - SIGMA", "%RSE - other"))), ]
+        sections$rse <- rse_wide
       }
-      dt
+
+      # --- Shrinkage --------------------------------------------------------
+      shk <- shk_long()
+      if (nrow(shk) > 0L) {
+        shk_wide <- shk |>
+          pivot_wider(names_from = run, values_from = value) |>
+          rename(Parameter = metric) |>
+          mutate(Group = "EBV Shrinkage") |>
+          select(Group, Parameter, any_of(rnms))
+        for (col in rnms) {
+          if (col %in% names(shk_wide)) {
+            shk_wide[[col]] <- vapply(shk_wide[[col]], function(v) fmt(v, 2), character(1))
+          }
+        }
+        sections$shk <- shk_wide
+      }
+
+      # --- Optimal sampling times -------------------------------------------
+      tms <- times_long()
+      if (nrow(tms) > 0L) {
+        tms_wide <- tms |>
+          pivot_wider(names_from = run, values_from = value) |>
+          rename(Parameter = metric) |>
+          mutate(Group = "Optimal sampling times (h)") |>
+          select(Group, Parameter, any_of(rnms))
+        for (col in rnms) {
+          if (col %in% names(tms_wide)) {
+            tms_wide[[col]] <- vapply(tms_wide[[col]], function(v) fmt(v, 3), character(1))
+          }
+        }
+        sections$times <- tms_wide
+      }
+
+      out <- dplyr::bind_rows(sections)
+      for (col in rnms) {
+        if (col %in% names(out)) {
+          out[[col]] <- ifelse(is.na(out[[col]]), "—", as.character(out[[col]]))
+        } else {
+          out[[col]] <- "—"
+        }
+      }
+      out[, c("Group", "Parameter", rnms)]
     })
 
-    # -------------------------------------------------------------------------
-    # DT — Shrinkage EBV
-    # -------------------------------------------------------------------------
-    output$dt_shk <- renderDT({
-      long <- shk_long()
-      req(nrow(long) > 0L)
-
+    output$dt_all <- renderDT({
+      df <- params_table_df(); req(!is.null(df), nrow(df) > 0L)
       rnms <- run_names()
 
-      wide <- long |>
-        pivot_wider(names_from = run, values_from = value) |>
-        rename(ETA = metric) |>
-        select(ETA, any_of(rnms))
-
-      dt <- datatable(
-        wide, rownames = FALSE, class = "stripe hover compact",
-        options = list(dom = "t", ordering = FALSE)
-      )
-
-      run_col_indices <- which(names(wide) %in% rnms)
-      for (col_idx in run_col_indices) {
-        dt <- dt |>
-          formatStyle(col_idx,
-            color      = styleInterval(30, c("#16a34a", "#dc2626")),
-            fontWeight = "bold"
-          )
-      }
-      dt
-    })
-
-    # -------------------------------------------------------------------------
-    # DT — Temps optimaux
-    # -------------------------------------------------------------------------
-    output$dt_times <- renderDT({
-      long <- times_long()
-      req(nrow(long) > 0L)
-
-      rnms <- run_names()
-
-      wide <- long |>
-        pivot_wider(names_from = run, values_from = value) |>
-        rename(Time = metric) |>
-        select(Time, any_of(rnms))
+      n_runs <- length(rnms)
+      # JS rowCallback applies per-group conditional colours to run cells.
+      # data[0] = Group (hidden), data[1] = Parameter, data[2..n+1] = runs.
+      # DOM td indices are offset -1 because the Group column is hidden:
+      # td:eq(0) = Parameter, td:eq(1..n) = run cells.
+      js_cb <- DT::JS(sprintf("
+        function(row, data) {
+          var group = String(data[0] || '');
+          var nRuns = %d;
+          for (var i = 0; i < nRuns; i++) {
+            var dataIdx = 2 + i;
+            var domIdx  = 1 + i;
+            var raw     = String(data[dataIdx] || '');
+            var num     = parseFloat(raw.replace(/[^0-9.\\-]/g, ''));
+            var color   = null;
+            if (group.indexOf('%%RSE') === 0) {
+              if (!isNaN(num)) {
+                if (num < 20)       color = '#16a34a';
+                else if (num < 50)  color = '#d97706';
+                else if (num < 100) color = '#dc2626';
+                else                color = '#7f1d1d';
+              }
+            } else if (group === 'EBV Shrinkage') {
+              if (!isNaN(num)) color = num < 30 ? '#16a34a' : '#dc2626';
+            }
+            if (color) {
+              $('td:eq(' + domIdx + ')', row).css({color: color, 'fontWeight': 'bold'});
+            }
+          }
+        }
+      ", n_runs))
 
       datatable(
-        wide, rownames = FALSE, class = "stripe hover compact",
-        options = list(dom = "t", ordering = FALSE)
+        df, rownames = FALSE, class = "stripe hover compact",
+        extensions = "RowGroup",
+        options = list(
+          dom = "t", ordering = FALSE, pageLength = -1,
+          rowGroup   = list(dataSrc = 0),
+          columnDefs = list(list(visible = FALSE, targets = 0)),
+          rowCallback = js_cb
+        )
       )
     })
 
-    # -- Return table_no + groupsize for use by other modules -----------------
-    list(
-      tbl_no    = tbl_no,
-      groupsize = groupsize_r
-    )
+
   })
 }

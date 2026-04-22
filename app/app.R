@@ -263,7 +263,7 @@ server <- function(input, output, session) {
       if (!is.null(design_name)) {
         updateTextInput(session, "primary_run_name", value = design_name)
       }
-      # GROUPSIZE -> mod_params via suggested_gs
+      # GROUPSIZE -> mod_power via suggested_gs
       gs <- tryCatch(parse_groupsize(ctl_lines), error = function(e) NA_integer_)
       if (!is.na(gs)) suggested_gs(gs)
     }
@@ -365,18 +365,26 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   # -- Module servers ---------------------------------------------------------
-  # mod_params owns table_no + groupsize — call first, capture return values
-  params_out <- mod_params_server("params",
+  # mod_power now owns table_no + groupsize (they only affect FIM/Power/NSN
+  # computations and robust-block selection, so they live in Decision > Power).
+  # Call first so sibling modules can consume the exposed reactives.
+  power_out <- mod_power_server("power",
+    ext_data            = merged_ext,
+    param_labels        = param_labels_r,
+    suggested_groupsize = suggested_gs,
+    table_no_range      = examples$table_no_range,
+    reset_trigger       = reset_trigger,
+    all_runs            = all_runs)
+
+  tbl_no      <- power_out$tbl_no
+  groupsize_r <- power_out$groupsize
+
+  mod_params_server("params",
     ext_data = merged_ext, shk_data = merged_shk,
     ext_lines = upload$ext_lines,
     param_labels = param_labels_r,
-    table_no_range = examples$table_no_range,
-    suggested_groupsize = suggested_gs,
-    reset_trigger = reset_trigger,
+    tbl_no = tbl_no,
     all_runs = all_runs)
-
-  tbl_no     <- params_out$tbl_no
-  groupsize_r <- params_out$groupsize
 
   mod_rse_server("rse",
     ext_data = merged_ext, tbl_no = tbl_no,
@@ -409,13 +417,6 @@ server <- function(input, output, session) {
 
   mod_ctl_stream_server("ctl",
     ctl_lines = merged_ctl_lines)
-
-  mod_power_server("power",
-    ext_data     = merged_ext,
-    tbl_no       = tbl_no,
-    param_labels = param_labels_r,
-    groupsize    = groupsize_r,
-    all_runs     = all_runs)
 
   # -- SSE centralized upload --
   sse_upload <- mod_sse_upload_server("sse_upload", reset_trigger = reset_trigger)
