@@ -8,18 +8,62 @@
 
 mod_power_ui <- function(id) {
   ns <- NS(id)
-  tagList(uiOutput(ns("content")))
+  tagList(
+    # Design-level controls that feed FIM/Power/NSN computations downstream.
+    # Owned here because GROUPSIZE and TABLE NO. only have a visible effect
+    # on power/NSN and robust-design block selection -- neither belongs in
+    # the Parameters tab, whose tables are run-comparison views.
+    settings_bar(
+      selectInput(ns("table_no"), "TABLE NO.",
+                  choices = "1", selected = "1", width = "120px"),
+      numericInput(ns("groupsize"), "GROUPSIZE",
+                   value = 1L, min = 1L, step = 1L, width = "110px")
+    ),
+    uiOutput(ns("content"))
+  )
 }
 
-mod_power_server <- function(id, ext_data, tbl_no, param_labels,
-                             groupsize = reactive(1L),
+mod_power_server <- function(id, ext_data, param_labels,
+                             suggested_groupsize = reactive(1L),
+                             table_no_range = reactive(NULL),
+                             reset_trigger = reactive(0L),
                              all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- Sync N total from parent (auto-fill depuis .ctl) ----------------------
-    observeEvent(groupsize(), {
-      gs <- groupsize()
+    # -- Design-level reactives owned by this module --------------------------
+    tbl_no <- reactive({ as.integer(input$table_no) })
+    groupsize_r <- reactive({ as.integer(input$groupsize %||% 1L) })
+
+    # Update TABLE NO choices when ext_data changes
+    observe({
+      ext <- ext_data(); req(ext)
+      tabs <- sort(unique(ext$table_no))
+      tnr  <- table_no_range()
+      if (!is.null(tnr) && length(tnr) == 2L) {
+        tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
+        if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
+      }
+      updateSelectInput(session, "table_no",
+        choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
+        selected = as.character(max(tabs)))
+    })
+
+    # Auto-fill groupsize from .ctl when upload/example suggests one
+    observeEvent(suggested_groupsize(), {
+      gs <- suggested_groupsize()
+      if (!is.na(gs) && gs >= 1L) updateNumericInput(session, "groupsize", value = gs)
+    }, ignoreInit = TRUE)
+
+    # Reset handler
+    observeEvent(reset_trigger(), {
+      updateSelectInput(session, "table_no", choices = "1", selected = "1")
+      updateNumericInput(session, "groupsize", value = 1L)
+    }, ignoreInit = TRUE)
+
+    # -- Sync N total from parsed groupsize (auto-fill depuis .ctl) -----------
+    observeEvent(groupsize_r(), {
+      gs <- groupsize_r()
       if (!is.null(gs) && !is.na(gs) && gs >= 1L) {
         updateNumericInput(session, "n_total", value = gs)
       }
@@ -85,7 +129,7 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
                        min = 0.50, max = 0.99, step = 0.05, width = "90px"),
           checkboxInput(ns("two_sided"), "Two-sided", value = TRUE),
           numericInput(ns("n_total"), "N total",
-                       value = groupsize() %||% 1L,
+                       value = groupsize_r() %||% 1L,
                        min = 1L, step = 1L, width = "90px"),
           tags$span(style = "font-size:.72rem; color:#64748b; align-self:center;",
             HTML("Wald: W = (&theta; &minus; H<sub>0</sub>) / SE"))
@@ -559,5 +603,10 @@ mod_power_server <- function(id, ext_data, tbl_no, param_labels,
       }
     )
 
+    # -- Expose design-level reactives to parent/sibling modules --------------
+    list(
+      tbl_no    = tbl_no,
+      groupsize = groupsize_r
+    )
   })
 }
