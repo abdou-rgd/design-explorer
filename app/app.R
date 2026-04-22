@@ -19,8 +19,8 @@ library(readr)
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================
-.APP_VERSION      <- "V5.5"
-.APP_VERSION_NAME <- "mrgsolve integration"
+.APP_VERSION      <- "V5.7"
+.APP_VERSION_NAME <- "Terre des hommes"
 
 # =============================================================================
 # Logger — écrit dans la console R et dans app/logs/app.log

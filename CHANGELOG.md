@@ -2,6 +2,67 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V5.7 — 2026-04-22 — *Terre des hommes* (SSE matrix conditioning + PsN compat)
+
+### SSE diagnostics (`R/sse_metrics.R`, `R/report_design.R`, `app/R/mod_sse_validation.R`)
+- [feat] **Dual raw/correlation D-criterion** : `compute_empirical_d_criterion()` renvoie désormais à la fois `det(VarCov)^(1/p)` (brut, scale-dependent) et `det(Corr)^(1/p)` (corrélation, scale-invariant dans [0,1]). Les deux diagnostics se lisent conjointement : raw ill-conditioned + corr clean → artefact d'échelle (bénin) ; les deux ill-conditioned → paramètres quasi-colinéaires ; les deux clean → design bien identifié.
+- [feat] **Matrix conditioning panel** : carte diagnostique côte-à-côte (phi_D, kappa, rcond — raw vs corrélation) avec verdict une ligne. Panel repliable avec spectre de valeurs propres (FIM-prédit vs SSE-empirique, ligne de référence λ=1) et heatmap corrélation empirique SSE.
+- [feat] **Filtrage zero-variance** : colonnes à variance nulle (paramètres fixés à travers les runs SSE) sont retirées avant `cov2cor()` pour éviter les `NaN`.
+- [fix] **FIM eigenvalues fallback .coi** (commit `0f07e5f`) : NONMEM n'émet les valeurs propres de la matrice de corrélation (lignes `.ext` `-1000000002`/`-1000000003`) que si `$COV PRINT=E` est actif. La plupart des runs `$DESIGN` ne l'activent pas → calcul fallback via `eigen(cov2cor(solve(FIM)))` depuis le `.coi` (ou `.clt` en secours). Validé sur `fullmodel_eval` : κ_FIM = 14.04 vs κ_SSE = 22.61.
+
+### PsN compatibility (`R/sse_metrics.R`, `app/R/mod_sse_validation.R`) — PRs #44, #45
+- [fix] **PR #45 — Positional mapping for unnumbered PsN `;--th-`/`;--eps-` columns** : PsN écrit parfois les headers SSE avec des commentaires non-indexés (`;--th-` au lieu de `;--th1-`). Le mapping est désormais positionnel par ordre d'apparition dans `$THETA`/`$SIGMA`.
+- [fix] **PR #44 — Validation tab fallback pour THETAs sans label** : les plots Validation s'affichent désormais avec les noms bruts `THETA1`/`THETA2`/... quand aucune étiquette n'est détectable dans le `.ctl`, au lieu de disparaître silencieusement.
+- [fix] **Auto-parse désactivé pour `.ctl` uploadés** : suppression de l'auto-extraction des labels THETA à l'upload — évite les conflits de labels entre `.ctl` utilisateur et SSE PsN.
+
+### Tests
+- [test] 13 nouveaux tests dans `test-sse_labels.R` : dual output, invariant de trace, détection d'artefact d'échelle, filtre zero-variance, constructeurs de plots.
+
+---
+
+## V5.6 — 2026-04-20 — Shrinkage Identifiability + Public Repo Sanitization
+
+### SSE shrinkage diagnostics (`R/sse_diagnostics.R`, `app/R/mod_sse_analysis.R`) — PR #43
+- [feat] **Shrinkage identifiability panel** : calcul `shrinkage_eta*(%)` par paramètre sur les runs SSE convergés avec citation Pantaleo (règle des 30%).
+- [feat] **Tip PsN shrinkage** : banner explicatif sur la configuration PsN (`-shrinkage`) quand aucune colonne shrinkage n'est détectée dans le fichier SSE.
+- [feat] **Seuils Djokoto 2024** : citation ajoutée sur le REE boxplot comme référence bibliographique sur les seuils d'acceptabilité empiriques.
+
+### Bugfixes
+- [fix] **`ctl_parsers.R` — labels THETA dupliqués** : quand plusieurs `;--thN- LABEL` partageaient le même LABEL, la table RSE collapsait sur les doublons. Stratégie de dédup : drop des labels dupliqués → fallback raw `THETAn` (jamais de suffixe automatique `_2`).
+
+### Chore
+- [chore] **Sanitize repo for public sharing** : suppression des références internes Sanofi/frexalimab, README anglais, licence MIT, fichiers sous copyright retirés du tracking.
+
+---
+
+## V5.5 — 2026-04-14 — *mrgsolve integration* (smooth PK simulation)
+
+### Core (`R/report_design.R`, `app/R/mod_times.R`)
+- [feat] **Intégration `mrgsolve`** pour la simulation lisse des profils PK prédits (remplace les interpolations linéaires entre timepoints). Supporte les modèles PK à 1/2/3 compartiments via parsing du `.ctl`. Test Linux encore à faire.
+- [fix] **Toggle unité de temps dans prediction plot** : les conversions h/min/j étaient gelées au premier upload — corrigées pour refléter les changements de settings bar en temps réel.
+- [refactor] **`report_design.R` aminci** : extraction des helpers (`.empty_plot()`, `.prep_points()`, `.select_representative_ids()`), suppression du code mort.
+- [fix] **`read_true_values()` multi-valeur THETA** : lignes `$THETA (0, 1.2, 10)` étaient mal parsées (prenait la borne inférieure au lieu de la valeur initiale). Gestion robuste des trois formats (`VAL`, `(LB, VAL)`, `(LB, VAL, UB)`).
+- [fix] **`prepare_tab_obs()` hardening** : gestion des `.tab` sans colonne `EVID` (fallback sur `AMT > 0`).
+
+---
+
+## V5.4 — 2026-04-14 — *Centralized SSE Uploads + A/B Design Selector*
+
+### Architecture (`app/app.R`, `app/R/mod_sse_upload.R`)
+- [refactor] **Upload wiring centralisé** : tous les uploads `.ctl`/`.ext`/`.coi`/`.tab`/`.shk` transitent par un module unique `mod_upload`. Suppression des `fileInput` dupliqués dans les modules enfants.
+- [feat] **Module SSE Upload dédié** : nouveau tab qui centralise l'upload des fichiers SSE (raw_results CSV + `.ctl`). Les modules Validation et Analysis consomment le même `sse_upload$file_path()` / `true_vals()`.
+- [feat] **Sélecteur A/B design** : dans Validation et Analysis, dropdown pour comparer deux designs SSE chargés simultanément (ex: design initial vs design optimisé).
+
+---
+
+## V5.3 — 2026-04-13 — *Two-SSE Comparison Module*
+
+### New module (`R/sse_comparison.R`, `app/R/mod_sse_comparison.R`)
+- [feat] **Module comparaison deux SSE** : onglet dédié pour superposer les distributions d'estimés de deux SSE runs (densités, RSE, bias). Cas d'usage : comparer un design initial vs un design optimisé, ou deux stratégies de sampling.
+- [feat] **Computation pure** : `compute_sse_comparison()` isolée sans dépendance Shiny.
+
+---
+
 ## V5.2 — 2026-04-13 — SSE Intrinsic Analysis
 
 ### New module: SSE Analysis (`R/sse_diagnostics.R`, `app/R/mod_sse_analysis.R`)
