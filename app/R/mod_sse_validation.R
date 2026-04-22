@@ -118,6 +118,58 @@ mod_sse_validation_ui <- function(id) {
           )
         ),
 
+        tags$h5("About the Empirical D-criterion", style = "margin-top:10px;"),
+        tags$p(
+          "The ", tags$strong("Empirical D-criterion"), " is a single scalar ",
+          "summarising the global precision of the parameter estimates ",
+          "across the K SSE replicates. It is defined as the geometric mean ",
+          "of the eigenvalues of the empirical variance-covariance matrix:"
+        ),
+        tags$p(style = "text-align:center; font-family:monospace; margin:6px 0;",
+          HTML("&phi;<sub>D</sub><sup>SSE</sup> = det(VarCov)<sup>1/p</sup> = (&prod; &lambda;<sub>i</sub>)<sup>1/p</sup>")
+        ),
+        tags$p(
+          "Intuitively, it is the \"average variance per parameter\" once ",
+          "correlations have been absorbed into the eigendecomposition. ",
+          tags$strong("Smaller is better"), " (less empirical uncertainty)."
+        ),
+        tags$h6("Difference with the (theoretical) D-criterion",
+                style = "margin-top:8px; font-weight:bold;"),
+        tags$p(
+          "The D-criterion displayed in the ", tags$strong("FIM"),
+          " tab comes from NONMEM's ", tags$code("$DESIGN"),
+          " output and is defined on the Fisher Information Matrix:"
+        ),
+        tags$p(style = "text-align:center; font-family:monospace; margin:6px 0;",
+          HTML("&phi;<sub>D</sub><sup>FIM</sup> = det(FIM)<sup>1/p</sup>")
+        ),
+        tags$p(
+          "It is a ", tags$strong("theoretical asymptotic"),
+          " prediction of design informativeness (larger = more information). ",
+          "Under asymptotic normality, ",
+          tags$code("VarCov ≈ FIM⁻¹"),
+          ", so the two are reciprocal: ",
+          HTML("&phi;<sub>D</sub><sup>FIM</sup> &times; &phi;<sub>D</sub><sup>SSE</sup> &asymp; 1"),
+          ". Comparing them is the point of this tab — a large discrepancy ",
+          "means the FIM is ", tags$em("underestimating"),
+          " the real-world uncertainty (small samples, mis-specification, ",
+          "FIMTYPE approximation, optimiser bias…)."
+        ),
+        tags$h6("Why this tab splits raw vs correlation D-criterion",
+                style = "margin-top:8px; font-weight:bold;"),
+        tags$p(
+          "The raw form ", tags$code("det(VarCov)^(1/p)"),
+          " is scale-dependent: when parameters span several orders of ",
+          "magnitude (e.g. CL ≈ 6e-3 vs VC ≈ 3.2), the determinant ",
+          "inherits the disparity and rcond can collapse to ∼0 ",
+          tags$em("without any real collinearity"),
+          ". The Validation tab therefore also reports ",
+          tags$code("det(Corr)^(1/p)"),
+          " (scale-invariant, bounded in [0,1]) so that numerical ",
+          "ill-conditioning can be attributed to units vs structural ",
+          "near-collinearity. See the \"Matrix diagnostics\" card below."
+        ),
+
         tags$h5("D-criterion warning", style = "margin-top:10px;"),
         tags$p(
           "The empirical D-criterion requires the full variance-covariance ",
