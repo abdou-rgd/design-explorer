@@ -197,7 +197,12 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
           }
         }
       }
-      sections$ofv <- dplyr::bind_rows(lapply(ofv_rows, as.data.frame, stringsAsFactors = FALSE))
+      # check.names=FALSE preserves run names with '/', '=', '(' etc. that
+      # would otherwise be sanitised by make.names() and stop matching rnms.
+      sections$ofv <- dplyr::bind_rows(lapply(
+        ofv_rows,
+        function(r) as.data.frame(r, check.names = FALSE, stringsAsFactors = FALSE)
+      ))
 
       # --- RSE split by param type ------------------------------------------
       rse <- rse_long()
