@@ -101,8 +101,35 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
   if (!is.finite(t_max) || t_max <= 0) return(NULL)
   times <- seq(0, t_max, length.out = 300L)
 
-  # Build call args from required template params
-  args <- list(times = times, dose = 100, dose_times = 0)
+  # Extract dose + dose times from tab's EVID=1 rows (or DOSE column if no EVID)
+  dose_val <- 100
+  dose_t   <- 0
+  if (nrow(tab) > 0L) {
+    if ("EVID" %in% names(tab)) {
+      dose_rows <- tab[!is.na(tab$EVID) & tab$EVID == 1L, , drop = FALSE]
+    } else {
+      dose_rows <- tab[FALSE, , drop = FALSE]
+    }
+    if (nrow(dose_rows) == 0L && "AMT" %in% names(tab)) {
+      dose_rows <- tab[!is.na(tab$AMT) & tab$AMT > 0, , drop = FALSE]
+    }
+    if (nrow(dose_rows) == 0L && "DOSE" %in% names(tab)) {
+      dose_rows <- tab[!is.na(tab$DOSE) & tab$DOSE > 0, , drop = FALSE]
+    }
+    if (nrow(dose_rows) > 0L) {
+      amt_col <- intersect(c("AMT", "DOSE"), names(dose_rows))[1L]
+      if (!is.na(amt_col)) {
+        amt_vals <- dose_rows[[amt_col]]
+        amt_vals <- amt_vals[!is.na(amt_vals) & amt_vals > 0]
+        if (length(amt_vals) > 0L) dose_val <- amt_vals[1L]
+      }
+      t_vals <- dose_rows$TIME
+      t_vals <- sort(unique(t_vals[is.finite(t_vals)]))
+      if (length(t_vals) > 0L) dose_t <- t_vals
+    }
+  }
+
+  args <- list(times = times, dose = dose_val, dose_times = dose_t)
   for (p in tmpl$required) args[[p]] <- unname(theta_values[p])
 
   ipred <- tryCatch(do.call(tmpl$fn, args), error = function(e) NULL)

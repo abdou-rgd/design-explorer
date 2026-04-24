@@ -17,8 +17,8 @@ mod_times_ui <- function(id) {
       ),
       tags$div(style = "display:inline-flex; gap:12px; margin-left:16px;",
         checkboxInput(ns("show_ctp"),   "CTP",   TRUE),
-        checkboxInput(ns("show_doses"), "Doses", TRUE),
-        checkboxInput(ns("show_rug"),   "Rug",   TRUE)
+        checkboxInput(ns("show_doses"), "Doses", TRUE)
+        # Rug toggle deferred — geom_rug not yet wired into plot_pk_profile
       )
     ),
     mod_mrgsolve_ui(ns("mrgsolve")),
