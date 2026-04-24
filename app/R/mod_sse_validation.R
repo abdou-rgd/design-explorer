@@ -33,9 +33,6 @@ mod_sse_validation_ui <- function(id) {
       )
     ),
 
-    # --- Status banner ---
-    uiOutput(ns("status_banner")),
-
     # --- Methodology panel (collapsible) ---
     tags$details(
       style = paste0(
@@ -62,7 +59,7 @@ mod_sse_validation_ui <- function(id) {
 
         tags$table(
           style = paste0(
-            "border-collapse:collapse; width:100%%; margin:8px 0;",
+            "border-collapse:collapse; width:100%; margin:8px 0;",
             " font-size:0.92em;"
           ),
           tags$thead(
@@ -536,45 +533,6 @@ mod_sse_validation_server <- function(id, ext_data,
       comp |> dplyr::filter(param %in% sel)
     })
 
-    # --- Status banner ---
-    output$status_banner <- renderUI({
-      dat <- sse_data()
-      if (is.null(dat)) return(NULL)
-
-      tv <- true_vals()
-      n_params <- if (!is.null(tv)) length(tv) else 0L
-
-      n_total <- attr(dat, "n_total") %||% nrow(dat)
-      n_success <- attr(dat, "n_success") %||% sum(dat$converged)
-      pre_filtered <- isTRUE(attr(dat, "pre_filtered"))
-
-      filter_msg <- if (pre_filtered) {
-        sprintf(
-          paste0("SSE: %s runs loaded (no minimization_successful column ",
-                 "-- assuming pre-filtered, e.g. via PsN -out_filter)"),
-          n_success
-        )
-      } else {
-        sprintf("SSE: %s/%s valid runs (minimization_successful = 1)",
-                n_success, n_total)
-      }
-
-      ctl_source <- if (!is.null(shared_ctl_lines())) {
-        " (from Home upload)"
-      } else {
-        ""
-      }
-
-      div(class = "alert alert-success",
-          style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
-        tags$strong(filter_msg),
-        if (n_params > 0L) {
-          tags$span(style = "margin-left:16px;",
-            sprintf("| %d parameters%s", n_params, ctl_source))
-        }
-      )
-    })
-
     # --- D-criterion / matrix diagnostics card ---
     # Shows BOTH raw and correlation-based D-criterion.
     # Raw form (det(cov)^(1/p)) is scale-dependent: with parameters spanning
@@ -782,12 +740,12 @@ mod_sse_validation_server <- function(id, ext_data,
           `Bias CI low` = rb_ci_lower,
           `Bias CI high` = rb_ci_upper,
           Ratio = ratio,
-          `+/-20%` = pass_20pct
+          `±20%` = pass_20pct
         ) |>
         dplyr::mutate(
           `RSE FIM (%)` = round(`RSE FIM (%)`, 2),
           Ratio = round(Ratio, 2),
-          `+/-20%` = ifelse(`+/-20%`, "OK", "Out of band")
+          `±20%` = ifelse(`±20%`, "OK", "Out of band")
         )
 
       datatable(display, rownames = FALSE,

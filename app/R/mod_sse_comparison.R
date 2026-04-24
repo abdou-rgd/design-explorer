@@ -290,11 +290,14 @@ mod_sse_comparison_server <- function(id,
 
     # --- RSE plot ---
     rse_plot_fn <- reactive({
-      rc <- rse_comp_filtered()
+      if (is.null(sse_all_orig()) || is.null(sse_all_opti()) ||
+          is.null(true_vals())) {
+        return(.empty_plot(
+          "Upload Design B SSE (and a .ctl) to see the comparison"))
+      }
+      rc <- tryCatch(rse_comp_filtered(), error = function(e) NULL)
       if (is.null(rc) || nrow(rc) == 0L) {
-        return(ggplot() +
-          labs(title = "Upload two SSE CSVs and a .ctl") +
-          .theme_design())
+        return(.empty_plot("No parameters selected"))
       }
       plot_rse_comparison(rc, name_orig = name_orig(), name_opti = name_opti())
     })

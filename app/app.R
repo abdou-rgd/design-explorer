@@ -184,6 +184,7 @@ server <- function(input, output, session) {
   example_cpu      <- reactiveVal(NA_real_)
   example_ctl      <- reactiveVal(NULL)
   example_ctl_lines <- reactiveVal(NULL)
+  example_ext_lines <- reactiveVal(NULL)
   example_comp_run <- reactiveVal(NULL)
 
   observeEvent(examples$file_paths(), ignoreNULL = FALSE, {
@@ -191,13 +192,16 @@ server <- function(input, output, session) {
     if (is.null(paths)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
       example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
-      example_ctl(NULL); example_ctl_lines(NULL)
+      example_ctl(NULL); example_ctl_lines(NULL); example_ext_lines(NULL)
       example_comp_run(NULL)
       updateTextAreaInput(session, "param_labels", value = "")
       updateTextAreaInput(session, "cmt_labels",   value = "")
       return()
     }
     example_ext(.safe_load(read_ext, paths$ext, ".ext"))
+    example_ext_lines(if (!is.null(paths$ext))
+      tryCatch(readr::read_lines(paths$ext, progress = FALSE),
+               error = function(e) NULL) else NULL)
     example_shk(.safe_load(read_shk, paths$shk, ".shk"))
     example_coi(.safe_load(read_coi, paths$coi, ".coi"))
     example_clt(.safe_load(read_clt, paths$clt, ".clt"))
@@ -246,7 +250,7 @@ server <- function(input, output, session) {
     if (!is.null(fps$ext)) {
       example_ext(NULL); example_shk(NULL); example_coi(NULL)
       example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
-      example_ctl(NULL); example_ctl_lines(NULL)
+      example_ctl(NULL); example_ctl_lines(NULL); example_ext_lines(NULL)
       example_comp_run(NULL)
     }
     # Auto-remplissage depuis le .ctl uploade
@@ -289,6 +293,7 @@ server <- function(input, output, session) {
   })
   merged_summary   <- reactive({ examples$summary_data() %||% upload_summary() })
   merged_ctl_lines <- reactive({ example_ctl_lines() %||% upload$ctl_lines() })
+  merged_ext_lines <- reactive({ example_ext_lines() %||% upload$ext_lines() })
   merged_true_vals <- reactive({
     cl <- merged_ctl_lines()
     if (is.null(cl)) return(NULL)
@@ -454,7 +459,7 @@ server <- function(input, output, session) {
     merged_ext   = merged_ext,
     merged_cpu   = merged_cpu,
     merged_tab   = merged_tab,
-    ext_lines    = upload$ext_lines,
+    ext_lines    = merged_ext_lines,
     primary_name = primary_name,
     tbl_no       = tbl_no,
     param_labels = param_labels_r,

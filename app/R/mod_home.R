@@ -26,7 +26,7 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
         return(tags$div(
           class = "surface-card",
           style = "text-align:center; padding:40px 20px; color:var(--text-muted);",
-          tags$h4("No run loaded"),
+          tags$h4("No run loaded", class = "section-title"),
           tags$p("Upload NONMEM output files or load a built-in example to get started.")
         ))
       }
