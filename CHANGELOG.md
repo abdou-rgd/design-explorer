@@ -2,6 +2,29 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## [En cours] — Times-tab redesign (V5.8)
+
+### Architecture (`R/tab_dispatch.R`, `R/pk_templates.R`, `app/R/mod_times.R`)
+- [feat] **Single dispatcher** `detect_tab_pattern()` classifies `.tab` into 8 canonical $DESIGN shapes (elementary_fo, focei_repl, robust_subprob, pkpd_multi, dose_time_opt, classical, stratified, discrete). `mod_times` routes on pattern — replaces scattered `is_robust` / `has_multi_id` / `has_cmt` heuristics.
+- [feat] **3-tier smooth-curve engine** : mrgsolve (green) → closed-form ADVAN1-4 templates (yellow) → dot-connect (red). Traffic-light badge surfaces the tier. Templates remove Rtools as a hard dependency for standard PK structures.
+- [feat] **Interactive zoom** via native shiny brush + `coord_cartesian(xlim=...)` — preserves `sec.axis`, `geom_rug`, theme. Two numericInputs mirror the brush; double-click or Reset link clears.
+- [feat] **Row-click zoom** : clicking an optimal-times row auto-zooms to `[TIME ± doseInterval/2]`.
+
+### Parser hardening (`R/design_utils.R`, `R/report_design.R`, `R/ctl_parsers.R`)
+- [fix] **`prepare_tab_obs()`** drops TIME=0 baseline **per ID**, not globally — restores classical-population support.
+- [fix] **`.select_representative_ids()`** fallback hierarchy : ARM -> ROUTE -> STRAT before positional `ID[1:2]`; signature includes ID range to stop identical-TSTRAT arms from collapsing.
+- [fix] **`plot_model_prediction()`** caps `sec.axis` at 15 breaks (port from `plot_pk_profile()`).
+- [fix] **dose_df** filtered to representative IDs before `geom_vline()` — prevents ghost dose markers from unrepresented arms.
+- [feat] **`parse_advan_trans()`** in `R/ctl_parsers.R` extracts `$SUBROUTINES ADVANn TRANSm` for template routing.
+
+### mrgsolve sub-module (`app/R/mod_mrgsolve.R`)
+- [feat] Returns a `tier` reactive and a `warning_reason` reactive. Param-mapping mismatch now downgrades to template with a user-visible banner (no more silent wrong-curve).
+
+### Tests
+- [test] 23 new tests across `test-tab_dispatch.R`, `test-parser_hardening.R`, `test-pk_templates.R`, `test-times_integration.R`. Closed-form templates validated to 1e-8 against analytical references. Integration walkthrough covers Bauer examples 2-7.
+
+---
+
 ## V5.7.5 — 2026-04-24 — Visual QA polish + Power/NSN UX
 
 ### Bugfixes post-QA (commits `9e0e59c`, `d69fea3`)
