@@ -46,3 +46,29 @@ test_that("unknown: empty tab", {
   expect_equal(detect_tab_pattern(tibble::tibble()), "unknown")
   expect_equal(detect_tab_pattern(NULL), "unknown")
 })
+
+source(file.path(PROJECT_ROOT, "R", "pk_templates.R"))
+source(file.path(PROJECT_ROOT, "R", "ctl_parsers.R"))
+
+test_that("pick_smooth_curve_engine returns tier=template for ADVAN2 TRANS2 ctl", {
+  tab <- load_tab("app/examples/example2/warfarin2.tab")
+  ctl <- load_ctl_lines("app/examples/example2/warfarin2.ctl")
+  res <- pick_smooth_curve_engine(
+    tab = tab, ctl_lines = ctl,
+    theta_values = c(CL = 0.15, V = 8.0, KA = 1.0),
+    mrgsolve_available = FALSE
+  )
+  expect_equal(res$tier, "template")
+  expect_true(nrow(res$sim_data) > 0L)
+  expect_true(all(is.finite(res$sim_data$IPRED)))
+})
+
+test_that("pick_smooth_curve_engine downgrades to dots when ADVAN unknown", {
+  tab <- tibble::tibble(ID = 1, TIME = 0:10, IPRED = runif(11))
+  res <- pick_smooth_curve_engine(
+    tab = tab, ctl_lines = c("$PROBLEM X"),
+    theta_values = numeric(),
+    mrgsolve_available = FALSE
+  )
+  expect_equal(res$tier, "dots")
+})

@@ -49,3 +49,64 @@ detect_tab_pattern <- function(tab, ctl_lines = NULL) {
 
   "unknown"
 }
+
+
+#' Select the smooth-curve engine tier for the given .tab + .ctl.
+#'
+#' Tier 1 (green):  mrgsolve — if mrgsolve_sim is non-null
+#' Tier 2 (yellow): closed-form template — if ADVAN parse + THETAs map cleanly
+#' Tier 3 (red):    dot-connect — graceful floor
+#'
+#' @param tab             tibble from read_tab
+#' @param ctl_lines       character vector of .ctl lines (may be NULL)
+#' @param theta_values    named numeric vector; names matching template params
+#' @param mrgsolve_sim    optional tibble returned by mrgsolve simulation
+#' @param mrgsolve_available logical; hint from mod_mrgsolve
+#' @return list(tier, sim_data, warning)
+#' @export
+pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
+                                     theta_values = numeric(),
+                                     mrgsolve_sim = NULL,
+                                     mrgsolve_available = FALSE) {
+
+  if (!is.null(mrgsolve_sim) && nrow(mrgsolve_sim) > 0L) {
+    return(list(tier = "mrgsolve", sim_data = mrgsolve_sim, warning = NULL))
+  }
+
+  advan_trans <- tryCatch(parse_advan_trans(ctl_lines), error = function(e) NULL)
+  tmpl <- pk_template_for_advan(advan_trans)
+
+  if (!is.null(tmpl)) {
+    missing_params <- setdiff(tmpl$required, names(theta_values))
+    if (length(missing_params) == 0L) {
+      sim <- .simulate_template(tab, tmpl, theta_values)
+      if (!is.null(sim) && nrow(sim) > 0L) {
+        warn <- if (mrgsolve_available)
+          "mrgsolve available but no sim result — using closed-form template"
+        else NULL
+        return(list(tier = "template", sim_data = sim, warning = warn))
+      }
+    }
+  }
+
+  list(tier = "dots", sim_data = NULL,
+       warning = "Smooth curve unavailable — showing IPRED points only")
+}
+
+
+# Internal: simulate the template at a dense grid spanning the tab's TIME range.
+.simulate_template <- function(tab, tmpl, theta_values) {
+  if (is.null(tab) || !"TIME" %in% names(tab)) return(NULL)
+  t_max <- max(tab$TIME, na.rm = TRUE)
+  if (!is.finite(t_max) || t_max <= 0) return(NULL)
+  times <- seq(0, t_max, length.out = 300L)
+
+  # Build call args from required template params
+  args <- list(times = times, dose = 100, dose_times = 0)
+  for (p in tmpl$required) args[[p]] <- unname(theta_values[p])
+
+  ipred <- tryCatch(do.call(tmpl$fn, args), error = function(e) NULL)
+  if (is.null(ipred)) return(NULL)
+
+  tibble::tibble(time = times, IPRED = ipred, cmt = 1L, arm = 1L)
+}
