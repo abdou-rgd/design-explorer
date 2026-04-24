@@ -382,8 +382,10 @@ read_true_values <- function(ctl_lines) {
       for (ps in paren_strs) {
         inner <- sub("^\\((.*)\\)$", "\\1", ps)
         inner <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT)\\b", "", inner)
-        nums <- suppressWarnings(as.numeric(trimws(strsplit(inner, ",")[[1]])))
-        nums <- nums[!is.na(nums)]
+        toks <- trimws(strsplit(inner, ",")[[1]])
+        toks <- toks[nzchar(toks) &
+                     grepl("^-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?$", toks)]
+        nums <- as.numeric(sub("[dD]", "e", toks))
         if (length(nums) == 3L)      vals <- c(vals, nums[2])
         else if (length(nums) == 2L) vals <- c(vals, nums[2])
         else if (length(nums) == 1L) vals <- c(vals, nums[1])
