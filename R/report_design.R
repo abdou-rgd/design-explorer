@@ -976,10 +976,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
 
   # Detect multi-ID (e.g. IV vs SC elementary designs or dataset classique)
   has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
+  rep_ids <- NULL
   if (has_multi_id) {
     if (n_distinct(obs$ID) > 4L) {
       rep_ids <- .select_representative_ids(obs, group_col, max_ids = 4L)
       obs <- obs |> dplyr::filter(ID %in% rep_ids)
+    } else {
+      rep_ids <- unique(obs$ID)
     }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
@@ -1045,6 +1048,9 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   # --- Dose markers ---
   if (!is.null(dose_times) && nrow(dose_times) > 0L) {
     dose_df <- dose_times
+    if (!is.null(rep_ids) && "ID" %in% names(dose_df)) {
+      dose_df <- dose_df |> dplyr::filter(ID %in% rep_ids)
+    }
     # If multi-ID with arm labels, match dose times to facets
     if (has_multi_id && "ID" %in% names(dose_df)) {
       dose_df <- dose_df |> dplyr::mutate(id_label = paste0("ID ", ID))
