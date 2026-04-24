@@ -1080,8 +1080,12 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     )
   }
 
-  # Secondary x-axis with exact sampling times
+  # Secondary x-axis with exact sampling times (cap at 15 to avoid axis clutter)
   sampling_breaks <- sort(unique(round(obs$TIME, 1)))
+  if (length(sampling_breaks) > 15L) {
+    idx <- seq(1, length(sampling_breaks), length.out = 15)
+    sampling_breaks <- sampling_breaks[round(idx)]
+  }
   p <- p +
     scale_x_continuous(
       sec.axis = dup_axis(breaks = sampling_breaks, name = sec_label)
