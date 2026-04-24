@@ -29,7 +29,8 @@ test_that("multi-dose superposition equals sum of single-dose shifted curves", {
   t <- seq(0, 48, by = 0.5)
   CL <- 5; V <- 50
   single <- function(t) pk_1cpt_iv(times = t, dose = 100, rate = NULL, CL = CL, V = V)
-  manual <- single(pmax(t - 0, 0)) + single(pmax(t - 24, 0))
+  # Correct superposition: second dose contributes only for t >= 24
+  manual <- single(t) + ifelse(t >= 24, single(t - 24), 0)
   auto   <- pk_1cpt_iv(times = t, dose = 100, rate = NULL, CL = CL, V = V,
                        dose_times = c(0, 24))
   expect_equal(auto, manual, tolerance = 1e-8)

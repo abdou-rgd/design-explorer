@@ -12,12 +12,14 @@
 # ---- Utilities ---------------------------------------------------------------
 
 .superpose <- function(times, dose_times, single_dose_fn) {
-  # Sum single-dose curves shifted by each dose time via pmax(t - dt, 0).
-  # This mirrors the standard superposition formula: C_total(t) = sum_k C(pmax(t - t_k, 0)).
+  # Sum single-dose curves shifted by each dose time. Pre-dose contribution
+  # is zeroed so a future dose doesn't leak into past times:
+  #   C_total(t) = sum_k C(t - t_k) * I(t >= t_k)
   mat <- vapply(dose_times, function(dt) {
-    single_dose_fn(pmax(times - dt, 0))
+    out <- single_dose_fn(pmax(times - dt, 0))
+    out[times < dt] <- 0
+    out
   }, numeric(length(times)))
-  # vapply returns a vector (not a matrix) when length(dose_times) == 1
   if (is.null(dim(mat))) mat <- matrix(mat, ncol = 1)
   rowSums(mat)
 }
