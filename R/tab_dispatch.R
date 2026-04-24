@@ -110,3 +110,82 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
 
   tibble::tibble(time = times, IPRED = ipred, cmt = 1L, arm = 1L)
 }
+
+
+# =============================================================================
+# Renderers dispatched by mod_times
+# =============================================================================
+
+#' Render an explanatory empty-state plot for deferred patterns.
+#'
+#' @param pattern one of "classical","stratified","discrete","unknown"
+#' @return ggplot
+#' @export
+render_empty_state <- function(pattern) {
+  msg <- switch(pattern,
+    classical  = paste("Pattern detected: classical population design",
+                       "(one ID per subject, no TSTRAT).",
+                       "Timeline rendering for this pattern is not implemented yet.",
+                       "Showing raw optimal-times table below.", sep = "\n"),
+    stratified = paste("Pattern detected: stratified design (STRAT/STRATF).",
+                       "Timeline rendering not implemented — see raw table below.",
+                       sep = "\n"),
+    discrete   = paste("Pattern detected: DISCRETE design (NMIN/NMAX, MDV toggles).",
+                       "Timeline rendering not implemented — see raw table below.",
+                       sep = "\n"),
+    paste("Unable to classify this .tab shape.",
+          "Showing raw optimal-times table below.", sep = "\n")
+  )
+  .empty_plot(msg)
+}
+
+#' Fallback plot: connect IPRED points with dashed line (tier 3).
+#' Thin wrapper around existing plot_model_prediction().
+#' @export
+render_fallback_dot_plot <- function(tab, time_unit = "hours",
+                                     arm_labels = NULL, cmt_labels = NULL) {
+  plot_model_prediction(
+    tab_data    = tab,
+    time_unit   = time_unit,
+    arm_labels  = arm_labels,
+    cmt_labels  = cmt_labels,
+    show_doses  = TRUE
+  )
+}
+
+#' Render the smooth PK timeline (tier 1 or tier 2) with overlays.
+#'
+#' @param smooth  list from pick_smooth_curve_engine() (must not be tier "dots")
+#' @param obs_points tab (already filtered to obs) for Optimise markers
+#' @param compare_points optional 2nd-run tab for CTP markers
+#' @param dose_times numeric vector or data.frame with $TIME
+#' @param time_unit "hours" | "days"
+#' @param facet "route" | "cmt" | "id" | "auto" | "none"
+#' @param arm_labels named character vector
+#' @param cmt_labels named character vector
+#' @param xlim optional c(xmin, xmax) for brush-zoom
+#' @return ggplot
+#' @export
+render_pk_timeline <- function(smooth, obs_points, compare_points = NULL,
+                               dose_times = NULL, time_unit = "hours",
+                               facet = "auto", arm_labels = NULL,
+                               cmt_labels = NULL, xlim = NULL) {
+
+  # Delegate to existing plot_pk_profile for the heavy lifting — it already
+  # does facet, rug, CTP overlay, sec.axis, dose markers.
+  p <- plot_pk_profile(
+    sim_data       = smooth$sim_data,
+    obs_points     = obs_points,
+    dose_times     = if (is.data.frame(dose_times)) dose_times$TIME else dose_times,
+    time_unit      = time_unit,
+    cmt_labels     = cmt_labels,
+    arm_labels     = arm_labels,
+    compare_points = compare_points
+  )
+
+  if (!is.null(xlim) && length(xlim) == 2L && all(is.finite(xlim))) {
+    p <- p + ggplot2::coord_cartesian(xlim = xlim)
+  }
+
+  p
+}
