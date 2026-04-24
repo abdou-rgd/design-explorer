@@ -175,6 +175,22 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
 .settings-bar .radio-inline,
 .settings-bar .checkbox-inline { font-size: .84rem; }
 
+.settings-help {
+  font-size: .82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  padding: 4px 16px 12px 16px;
+  background: #f8fafc;
+  border-radius: 0 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.settings-bar + .settings-help {
+  margin-top: -14px;
+  border-top: 1px dashed #e2e8f0;
+}
+.settings-help b { color: #334155; font-weight: 600; }
+
 /* ── V5 Plot export bar ──────────────────────────────────────────────── */
 .plot-export-bar {
   display: flex;

@@ -381,7 +381,8 @@ read_true_values <- function(ctl_lines) {
       paren_strs <- regmatches(stripped, list(paren_locs))[[1]]
       for (ps in paren_strs) {
         inner <- sub("^\\((.*)\\)$", "\\1", ps)
-        nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
+        inner <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT)\\b", "", inner)
+        nums <- suppressWarnings(as.numeric(trimws(strsplit(inner, ",")[[1]])))
         nums <- nums[!is.na(nums)]
         if (length(nums) == 3L)      vals <- c(vals, nums[2])
         else if (length(nums) == 2L) vals <- c(vals, nums[2])

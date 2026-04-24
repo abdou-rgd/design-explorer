@@ -757,7 +757,7 @@ mod_sse_validation_server <- function(id, ext_data,
                     list(className = "dt-center", targets = 8:9)
                   )
                 )) |>
-        formatStyle("+/-20%",
+        formatStyle(ncol(display),
           backgroundColor = styleEqual(
             c("OK", "Out of band"),
             c("#d4edda", "#f8d7da")

@@ -19,6 +19,10 @@ mod_power_ui <- function(id) {
       numericInput(ns("groupsize"), "GROUPSIZE",
                    value = 1L, min = 1L, step = 1L, width = "110px")
     ),
+    tags$div(
+      class = "settings-help",
+      HTML("<b>TABLE NO.</b> = which $DESIGN block to read. Most runs have one (=1). Chained algorithms (RS&rarr;STGR&rarr;NELDER) produce one block per phase &mdash; pick the final one for the optimised design. Robust designs give one block per replicate.")
+    ),
     uiOutput(ns("content"))
   )
 }
@@ -128,11 +132,13 @@ mod_power_server <- function(id, ext_data, param_labels,
           numericInput(ns("power_target"), "Target power", value = 0.80,
                        min = 0.50, max = 0.99, step = 0.05, width = "90px"),
           checkboxInput(ns("two_sided"), "Two-sided", value = TRUE),
-          numericInput(ns("n_total"), "N total",
+          numericInput(ns("n_total"), "N (what-if)",
                        value = groupsize_r() %||% 1L,
-                       min = 1L, step = 1L, width = "90px"),
-          tags$span(style = "font-size:.72rem; color:#64748b; align-self:center;",
-            HTML("Wald: W = (&theta; &minus; H<sub>0</sub>) / SE"))
+                       min = 1L, step = 1L, width = "100px")
+        ),
+        tags$div(
+          class = "settings-help",
+          HTML("<b>N (what-if)</b> seeded from GROUPSIZE &mdash; change to explore power/NSN at a different N without re-running $DESIGN. &nbsp;&middot;&nbsp; Wald statistic: W = (&theta; &minus; H<sub>0</sub>) / SE.")
         ),
 
         # Tabs (popkin-style underline)
@@ -163,7 +169,8 @@ mod_power_server <- function(id, ext_data, param_labels,
           ),
           tabPanel("Sample Size (NSN)",
             br(),
-            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;",
+            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
+                         border-left: 4px solid #059669;",
               HTML(paste0(
                 "<p style='margin:0 0 6px 0; font-weight:600;'>How to read this table?</p>",
                 "<p style='font-size:.85rem; color:#475569; margin:0;'>",
@@ -256,14 +263,14 @@ mod_power_server <- function(id, ext_data, param_labels,
               ))
             ),
             div(class = "surface-card",
-              p(class = "section-title", "N needed -- equivalence"),
+              p(class = "section-title", "N needed — equivalence"),
               DTOutput(ns("equiv_nsn_table")),
               downloadButton(ns("dl_equiv_nsn"), "CSV", class = "btn btn-default btn-sm",
                              style = "margin-top:8px;")
             ),
             br(),
             div(class = "surface-card",
-              p(class = "section-title", "Power curve Power(N) -- equivalence"),
+              p(class = "section-title", "Power curve Power(N) — equivalence"),
               fluidRow(
                 column(4,
                   uiOutput(ns("equiv_param_selector"))
@@ -550,7 +557,7 @@ mod_power_server <- function(id, ext_data, param_labels,
         scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2),
                            labels = function(x) paste0(x * 100, "%")) +
         labs(x = "Number of subjects (N)", y = "TOST Power",
-             title = paste0("TOST Power vs N -- ", row$label),
+             title = paste0("TOST Power vs N — ", row$label),
              subtitle = subtitle_txt) +
         .theme_design()
 
