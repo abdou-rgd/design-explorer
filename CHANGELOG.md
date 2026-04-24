@@ -2,6 +2,20 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## V5.7.5 — 2026-04-24 — Visual QA polish + Power/NSN UX
+
+### Bugfixes post-QA (commits `9e0e59c`, `d69fea3`)
+- [fix] **`mod_sse_validation` — formatStyle crash** : la colonne `+/-20%` avait été renommée `±20%` lors du pass i18n mais `formatStyle("+/-20%", …)` n'avait pas suivi → crash runtime. Corrigé en référencant la colonne par index robuste : `which(names(display) == "±20%")`.
+- [fix] **`sse_metrics::.extract_theta_inits` — NAs silencieux** : `as.numeric()` recevait des tokens contenant `FIX`/`FIXED`/`SAME`/`UNINT` non strippés → warning *"NAs introduits"*. Corrigé en filtrant les tokens via regex numérique avant conversion (pas de `suppressWarnings`).
+- [fix] **`mod_power` — 3 em-dashes manquants** : le pass typography avait laissé `--` dans les titres/labels de l'onglet Equivalence (TOST). Remplacés par `—`.
+
+### Power/NSN settings UX (`app/R/mod_power.R`, `app/www/styles.css`)
+- [feat] **Rename `N total` → `N (what-if)`** : clarifie que ce levier ne duplique pas GROUPSIZE mais permet d'explorer power/NSN à un N différent sans re-run `$DESIGN`.
+- [feat] **Hints inline sous settings bars** : nouveau composant `.settings-help` (CSS) rendu en bandeau attaché sous chaque barre, explicant TABLE NO. (quel bloc `$DESIGN` lire, cas des chained algorithms et designs robustes) et N (what-if) + rappel formule Wald.
+- [feat] **Bordure gauche verte sur carte NSN** : harmonisation visuelle avec Wald (bleu) et TOST (violet).
+
+---
+
 ## V5.7 — 2026-04-22 — *Terre des hommes* (SSE matrix conditioning + PsN compat)
 
 ### SSE diagnostics (`R/sse_metrics.R`, `R/report_design.R`, `app/R/mod_sse_validation.R`)
