@@ -329,17 +329,48 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       sim_result(result)
     })
 
+    # -- Internal helper: detect obvious param-mapping failure ------------------
+    validate_param_mapping_mismatch <- reactive({
+      sim <- sim_result()
+      if (is.null(sim) || nrow(sim) == 0L) return(NA)
+      if (!"IPRED" %in% names(sim)) return(NA)
+      ipred <- sim$IPRED
+      all(is.na(ipred)) || all(!is.na(ipred) & ipred == 0)
+    })
+
+    # -- Tier reactive ---------------------------------------------------------
+    tier_reactive <- reactive({
+      if (!mrg_status$available)                                return("unavailable")
+      if (!is.null(compile_error()))                            return("compile_failed")
+      if (is.null(sim_result()))                                return("no_sim")
+      if (isTRUE(validate_param_mapping_mismatch()))            return("param_mismatch")
+      "mrgsolve"
+    })
+
+    # -- Warning reason reactive -----------------------------------------------
+    warning_reason_reactive <- reactive({
+      switch(tier_reactive(),
+        unavailable    = paste("Rtools/mrgsolve not installed -",
+                               mrg_status$reason %||% "install mrgsolve + Rtools for smooth PK curves"),
+        compile_failed = paste("mrgsolve model failed to compile:",
+                               compile_error() %||% "unknown error"),
+        no_sim         = NULL,
+        param_mismatch = "Parameter mapping incomplete - using template fallback",
+        NULL
+      )
+    })
+
     # -- Return named list of reactives ----------------------------------------
     list(
-      sim_data     = reactive({ sim_result() }),
-      is_available = reactive({
-        !is.null(sim_result()) && nrow(sim_result()) > 0L
-      }),
-      dose_times   = reactive({
+      sim_data       = reactive({ sim_result() }),
+      is_available   = reactive({ identical(tier_reactive(), "mrgsolve") }),
+      dose_times     = reactive({
         ds <- dose_schedule()
         if (is.null(ds)) return(NULL)
         unique(ds$time)
-      })
+      }),
+      tier           = tier_reactive,
+      warning_reason = warning_reason_reactive
     )
   })
 }
