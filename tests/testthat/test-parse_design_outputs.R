@@ -369,7 +369,7 @@ test_that("read_coi() falls back to last table with warning when table_no=1 abse
   # ex6 .coi has TABLE NO. 4 only (4 chained $DESIGN blocks)
   expect_warning(
     fim <- read_coi(ex6_coi, table_no = 1L),
-    "repli sur la derniere table"
+    "falling back to the last table"
   )
   expect_true(is.matrix(fim))
   expect_equal(nrow(fim), ncol(fim))
@@ -399,7 +399,7 @@ test_that("read_clt() falls back to last table with warning when table_no=1 abse
   # ex6 .clt has TABLE NO. 4 only
   expect_warning(
     fim <- read_clt(ex6_clt, table_no = 1L),
-    "repli sur la derniere table"
+    "falling back to the last table"
   )
   expect_true(is.matrix(fim))
   expect_equal(nrow(fim), ncol(fim))

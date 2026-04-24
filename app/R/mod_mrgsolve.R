@@ -26,10 +26,10 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
         return(tags$div(
           class = "surface-card",
           style = "padding: 12px; margin-bottom: 12px; background: #fffbeb; border-left: 3px solid #f59e0b;",
-          tags$strong("Simulation PK non disponible"),
+          tags$strong("PK simulation unavailable"),
           tags$p(style = "margin: 4px 0 0 0; font-size: 0.85em; color: #92400e;",
             mrg_status$reason,
-            " — Installez mrgsolve et Rtools pour obtenir des courbes PK lisses."
+            " — Install mrgsolve and Rtools for smooth PK curves."
           )
         ))
       }
@@ -41,7 +41,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
         tags$div(
           style = "display: flex; align-items: center; gap: 8px; cursor: pointer;",
           onclick = paste0("Shiny.setInputValue('", ns("toggle_panel"), "', Math.random())"),
-          tags$strong("Simulation PK (mrgsolve)"),
+          tags$strong("PK simulation (mrgsolve)"),
           icon("chevron-down", style = "font-size: 0.85em; color: #6b7280;")
         ),
 
@@ -61,16 +61,16 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
 
       tags$div(style = "margin-top: 10px;",
         # File upload for .cpp / .mod
-        fileInput(ns("mrg_file"), "Modele mrgsolve (.cpp / .mod)",
+        fileInput(ns("mrg_file"), "mrgsolve model (.cpp / .mod)",
           accept = c(".cpp", ".mod", ".txt"),
           width = "100%",
-          placeholder = "Deposer un fichier mrgsolve"
+          placeholder = "Drop an mrgsolve file"
         ),
 
         # OR: text area
         tags$details(style = "margin-top: 6px;",
           tags$summary(style = "cursor: pointer; font-size: 0.85em; color: #6b7280;",
-            "Ou coller le code mrgsolve"),
+            "Or paste mrgsolve code"),
           textAreaInput(ns("mrg_code"), label = NULL,
             rows = 8, width = "100%",
             placeholder = "$PARAM CL = 1, V = 10, KA = 0.5\n$CMT DEPOT CENTRAL\n$ODE\ndxdt_DEPOT = -KA * DEPOT;\ndxdt_CENTRAL = KA * DEPOT - (CL/V) * CENTRAL;\n$CAPTURE CP = CENTRAL / V;"
@@ -78,7 +78,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
         ),
 
         # Compile button
-        actionButton(ns("compile"), "Compiler le modele",
+        actionButton(ns("compile"), "Compile model",
           class = "btn-sm", style = "margin-top: 8px;"),
 
         # Compile status
@@ -114,7 +114,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
     observeEvent(input$compile, {
       code <- mrg_code_text()
       if (is.null(code)) {
-        compile_error("Aucun code mrgsolve fourni")
+        compile_error("No mrgsolve code provided")
         compiled_model(NULL)
         sim_result(NULL)
         return()
@@ -142,7 +142,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       if (!is.null(err)) {
         return(tags$div(
           style = "margin-top: 8px; padding: 8px; background: #fef2f2; border-radius: 4px; font-size: 0.85em; color: #991b1b;",
-          tags$strong("Erreur: "), err
+          tags$strong("Error: "), err
         ))
       }
 
@@ -151,8 +151,8 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
         n_cmt <- length(mrgsolve::cmt(mod))
         return(tags$div(
           style = "margin-top: 8px; padding: 8px; background: #f0fdf4; border-radius: 4px; font-size: 0.85em; color: #166534;",
-          tags$strong("Modele compile"),
-          sprintf(" — %d parametres, %d compartiments", n_params, n_cmt)
+          tags$strong("Model compiled"),
+          sprintf(" — %d parameters, %d compartments", n_params, n_cmt)
         ))
       }
 
@@ -172,7 +172,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       if (length(mapping$unmatched_mrg) == 0L && length(mapping$matched) > 0L) {
         return(tags$div(
           style = "margin-top: 6px; font-size: 0.82em; color: #166534;",
-          sprintf("Mapping OK : %d/%d parametres mappes",
+          sprintf("Mapping OK: %d/%d parameters mapped",
                   length(mapping$matched), length(mrg_params))
         ))
       }
@@ -181,7 +181,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       tbl <- mapping$mapping_table
       tags$div(style = "margin-top: 6px;",
         tags$p(style = "font-size: 0.82em; color: #92400e;",
-          "Mapping parametres (labels THETA -> noms mrgsolve):"),
+          "Parameter mapping (THETA labels → mrgsolve names):"),
         tags$table(class = "table table-sm", style = "font-size: 0.8em;",
           tags$thead(tags$tr(
             tags$th("mrgsolve"), tags$th("THETA"), tags$th("Status")
@@ -223,8 +223,8 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       if (is.null(ds)) {
         return(tags$div(
           style = "margin-top: 8px; padding: 8px; background: #fffbeb; border-radius: 4px; font-size: 0.85em;",
-          "Aucun evenement de dose detecte dans le .tab. ",
-          "Verifiez que le fichier contient des lignes EVID=1."
+          "No dose events detected in .tab. ",
+          "Verify the file contains EVID=1 lines."
         ))
       }
 
@@ -233,7 +233,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
 
       tags$div(style = "margin-top: 8px;",
         tags$p(style = "font-size: 0.85em; font-weight: 600;",
-          "Dose (AMT absent du .tab) :"),
+          "Dose (AMT missing from .tab):"),
         lapply(arm_ids, function(aid) {
           n_doses <- sum(ds$id == aid)
           tags$div(style = "display: flex; gap: 8px; align-items: center; margin-bottom: 4px;",
@@ -268,7 +268,7 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       }
 
       tags$div(style = "margin-top: 10px;",
-        actionButton(ns("simulate"), "Simuler le profil PK",
+        actionButton(ns("simulate"), "Simulate PK profile",
           class = "btn-sm btn-primary",
           style = "width: 100%;")
       )

@@ -8,11 +8,11 @@ mod_rse_ui <- function(id) {
     div(class = "plot-card",
       settings_bar(
         radioButtons(ns("se_mode"), "Mode",
-                     choices = c("RSE (%)", "SE absolues"),
+                     choices = c("RSE (%)", "Absolute SE"),
                      selected = "RSE (%)", inline = TRUE),
         uiOutput(ns("plot_controls_ui"))
       ),
-      p(class = "section-title", "RSE / SE predicted by FIM -- per parameter"),
+      p(class = "section-title", "RSE / SE predicted by FIM — per parameter"),
       plotOutput(ns("plot"), height = "420px"),
       plot_export_ui(ns, "rse_export", default_fname = "rse_plot")
     )
@@ -43,17 +43,17 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, all_runs = reacti
 
       if (length(runs) <= 1) {
         plot_style <- input$plot_style %||% "bar"
-        if (plot_style == "waterfall" && (is.null(mode) || mode != "SE absolues")) {
+        if (plot_style == "waterfall" && (is.null(mode) || mode != "Absolute SE")) {
           return(plot_rse_waterfall(ext, table_no = tbl_no(), param_labels = param_labels()))
         }
-        if (!is.null(mode) && mode == "SE absolues") {
+        if (!is.null(mode) && mode == "Absolute SE") {
           return(plot_se(ext, table_no = tbl_no(), param_labels = param_labels()))
         } else {
           return(plot_rse(ext, table_no = tbl_no(), param_labels = param_labels()))
         }
       }
 
-      show_se <- (!is.null(mode) && mode == "SE absolues")
+      show_se <- (!is.null(mode) && mode == "Absolute SE")
       combined <- purrr::imap(runs, function(r, idx) {
         if (is.null(r$ext_data)) return(NULL)
         rse <- get_rse(r$ext_data, tbl_no())
@@ -81,7 +81,7 @@ mod_rse_server <- function(id, ext_data, tbl_no, param_labels, all_runs = reacti
                                    color = "grey40", size = 0.45)} +
         scale_fill_manual(values = run_colors, labels = run_labels,
                           name = NULL) +
-        labs(title = paste(y_lab, "-- Multi-run comparison"), x = NULL, y = y_lab) +
+        labs(title = paste(y_lab, "— Multi-run comparison"), x = NULL, y = y_lab) +
         .theme_design() +
         theme(panel.grid.major.x = element_blank(),
               axis.text.x = element_text(angle = 30, hjust = 1, size = 9))

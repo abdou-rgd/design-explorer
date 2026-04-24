@@ -81,13 +81,13 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
   section  <- function(title) { cat("\n\u2500\u2500 ", title, " ", strrep("\u2500", max(0, 55 - nchar(title))), "\n", sep = "") }
 
   print_params <- function(dat, with_ri = FALSE) {
-    if (nrow(dat) == 0L) { cat("  (aucun paramètre estimable)\n"); return(invisible(NULL)) }
+    if (nrow(dat) == 0L) { cat("  (no estimable parameter)\n"); return(invisible(NULL)) }
     if (with_ri) {
       cat(sprintf("  %-16s %11s %11s %8s %5s %10s\n",
-                  "Paramètre", "Estimé", "SE (FIM)", "RSE (%)", "", "RelInf (%)"))
+                  "Parameter", "Estimate", "SE (FIM)", "RSE (%)", "", "RelInf (%)"))
     } else {
       cat(sprintf("  %-16s %11s %11s %8s\n",
-                  "Paramètre", "Estimé", "SE (FIM)", "RSE (%)"))
+                  "Parameter", "Estimate", "SE (FIM)", "RSE (%)"))
     }
     hr_thin(if (with_ri) 70 else 58)
     for (i in seq_len(nrow(dat))) {
@@ -104,7 +104,7 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
     }
   }
 
-  # ── Affichage ────────────────────────────────────────────────────────────
+  # -- Display -----------------------------------------------------------
   cat("\n")
   hr_thick(70)
   run_label <- if (!is.null(run_name)) run_name else "NONMEM $DESIGN"
@@ -113,19 +113,19 @@ summary_design <- function(ext, shk = NULL, table_no = NULL,
   cat(sprintf("  OFV  : %g\n", ofv))
   cat("  RSE  : [+] < 20%   [~] 20-50%   [!] > 50%\n")
 
-  section("Effets fixes (THETA)")
+  section("Fixed effects (THETA)")
   print_params(thetas, with_ri = FALSE)
 
-  section("Effets aléatoires — OMEGA diagonal")
+  section("Random effects — OMEGA diagonal")
   print_params(omega_diag |> select(param, estimate, se, rse_pct, relativeinf_pct),
                with_ri = TRUE)
 
   if (nrow(omega_off) > 0) {
-    section("Effets aléatoires — OMEGA hors-diagonal")
+    section("Random effects — OMEGA off-diagonal")
     print_params(omega_off, with_ri = FALSE)
   }
 
-  section("Variance résiduelle — SIGMA diagonal")
+  section("Residual variance — SIGMA diagonal")
   print_params(sigmas_d, with_ri = FALSE)
 
   cat("\n")

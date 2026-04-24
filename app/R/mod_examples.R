@@ -87,8 +87,8 @@
         "Mechanism: SUBPROB=1000 generates 1000 independent sub-problems. For each subprob, true THETAs are drawn from the prior ($PRIOR NWPRI or $OMEGA/$SIGMA) and the FIM is evaluated/optimized with those values",
         "'Optimal Times' tab: the P10/median/P90 table by stratum shows the optimal times distribution. Our data: medians 0.13 h, triplet grouped around 6.9 h [P2.5=1.5, P97.5=23], 158.1 h. Bauer reports 159.9 h with a different seed",
         "Practical interpretation (Bauer): choose times as 0.13, 1.5, 7.0, 23.0, 160.0 h. Resulting OFV = -51.374, close to optimal (mean OFV = -51.95 in our data, -51.598 in Bauer)",
-        "'Parameters' tab: the 'Robust D-criterion' row shows exp(-mean(OFV_i)/p) with P10/P90 bounds -- the geometric mean of det(FIM)^(1/p) over 1000 prior realizations",
-        "RSE and RELATIVEINF reflect sub-problem 1000 (last). They are not averages -- the RSE distribution is not directly accessible here"
+        "'Parameters' tab: the 'Robust D-criterion' row shows exp(-mean(OFV_i)/p) with P10/P90 bounds — the geometric mean of det(FIM)^(1/p) over 1000 prior realizations",
+        "RSE and RELATIVEINF reflect sub-problem 1000 (last). They are not averages — the RSE distribution is not directly accessible here"
       )
     )
   ),
@@ -122,7 +122,7 @@
             "FIMTYPE=1 vs FIMDIAG=1: different assumptions on FIM structure",
             "GROUPSIZE=26 (half of step 1): direct impact on precision (FIM proportional to N)",
             "Compare RSEs with step 1: effect of GROUPSIZE and FIMTYPE",
-            "No .tab for this step (no $TABLE) -- optimal times not available"
+            "No .tab for this step (no $TABLE) — optimal times not available"
           )
         )
       ),
@@ -147,7 +147,7 @@
         guide = list(
           context = "Second NELDER optimization pass with GROUPSIZE=26. Refines the design from step 3.",
           points = c(
-            "GROUPSIZE=26: half the subjects -- impact on expected RSEs",
+            "GROUPSIZE=26: half the subjects — impact on expected RSEs",
             "Compare with step 3: do optimal times change with fewer subjects?",
             "OFV should be different (FIM proportional to N)",
             "Final optimal times are in the 'Optimal Times' tab"
@@ -187,7 +187,7 @@
         "STRAT/STRATF: dose stratification. STRATF optimizes the subject proportion per stratum (~59%/41%)",
         "Multi-CMT: CMT=1 (drug) and CMT=3 (receptor) observed. 2 separate residual errors (EPS(1-2) PK, EPS(3-4) receptor)",
         "ODE model (ADVAN13): required for non-linear TMDD kinetics. TOL=12, ATOL=12 for precision",
-        "8 diagonal OMEGAs + 4 SIGMAs (2 FIXED at 0.001) -- 20x20 FIM matrix"
+        "8 diagonal OMEGAs + 4 SIGMAs (2 FIXED at 0.001) — 20x20 FIM matrix"
       )
     )
   ),
@@ -203,7 +203,7 @@
       points = c(
         "2-step workflow (Bauer): optimize with D-opt (fast, robust) then evaluate with Bayes FIM (more realistic)",
         "OFVTYPE=8 = Bayesian FIM: incorporates prior information ($OMEGA) into the criterion",
-        "The .bfm contains the ETC matrix (conditional variance-covariance) -- measures individual precision, not population-level (visualization planned)",
+        "The .bfm contains the ETC matrix (conditional variance-covariance) — measures individual precision, not population-level (visualization planned)",
         "Compare with pure Bayes optimization (Compare button): same parameters but different criterion",
         "Simultaneous TIME+DOSE optimization (DESEL=TIME and DESEL=AMT in the same $DESIGN block)"
       )

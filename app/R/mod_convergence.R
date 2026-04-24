@@ -71,7 +71,7 @@ mod_convergence_server <- function(id, ext_data,
           if (nrow(finals) == 0L) {
             return(ggplot() +
               labs(title = paste0("Robust design (", n_blocs,
-                                  " subproblems) -- no final OFV data")) +
+                                  " subproblems) — no final OFV data")) +
               .theme_design())
           }
 
@@ -159,7 +159,7 @@ mod_convergence_server <- function(id, ext_data,
           p +
             scale_fill_manual(values  = run_colors, labels = run_labels, name = NULL) +
             scale_color_manual(values = run_colors, labels = run_labels, name = NULL) +
-            labs(title   = "Final OFV distribution -- Multi-run comparison",
+            labs(title   = "Final OFV distribution — Multi-run comparison",
                  x       = "OFV (-log det FIM)",
                  y       = "Density",
                  caption = caption_txt) +
@@ -182,7 +182,7 @@ mod_convergence_server <- function(id, ext_data,
         geom_line(size = 0.75, alpha = 0.9) +
         scale_color_manual(values = run_colors, labels = run_labels,
                            name = NULL) +
-        labs(title = "Convergence -- Multi-run comparison",
+        labs(title = "Convergence — Multi-run comparison",
              x = "Iteration ($DESIGN)", y = "OFV (-log det FIM)",
              caption = "Source: .ext") +
         .theme_design()

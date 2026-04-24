@@ -205,8 +205,8 @@ mod_prior_server <- function(id, summary_data, ctl_data = reactive(NULL),
           title    = paste0("Mean prediction and 95% CI (", n_sub,
                             " prior replications)"),
           subtitle = "Horizontal bars = 95% CI of times  |  Ribbon = 95% CI of IPRED",
-          x        = "Time (h) -- Mean +/- 95% CI",
-          y        = "IPRED -- Mean +/- 95% CI"
+          x        = "Time (h) — Mean ± 95% CI",
+          y        = "IPRED — Mean ± 95% CI"
         ) +
         theme_bw(base_size = 11) +
         theme(panel.grid.minor = element_blank())

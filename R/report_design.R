@@ -148,8 +148,8 @@ plot_relativeinf <- function(shk, table_no = NULL, param_labels = NULL, title = 
   ri <- get_relativeinf(shk, table_no)
 
   if (nrow(ri) == 0L) {
-    warning("Aucune donnée RELATIVEINF (TYPE 11) dans le fichier .shk fourni.")
-    return(.empty_plot("Pas de donnees RELATIVEINF"))
+    warning("No RELATIVEINF data (TYPE 11) in the supplied .shk file.")
+    return(.empty_plot("No RELATIVEINF data"))
   }
 
   # Renommage optionnel des ETAs
@@ -226,8 +226,8 @@ plot_rse <- function(ext, table_no = NULL, param_labels = NULL,
   rse <- get_rse(ext, table_no)
 
   if (nrow(rse) == 0L) {
-    warning("Aucun paramètre estimable trouvé dans le fichier .ext fourni.")
-    return(.empty_plot("Pas de donnees RSE"))
+    warning("No estimable parameter found in the supplied .ext file.")
+    return(.empty_plot("No RSE data"))
   }
 
   # Déterminer le type de paramètre AVANT renommage
@@ -326,8 +326,8 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
     arrange(table_no, ITERATION)
 
   if (nrow(dat) == 0L) {
-    warning("Aucune ligne d'itération dans .ext (run d'évaluation MAXEVAL=0 ?).")
-    return(.empty_plot("Pas de donnees de convergence (MAXEVAL=0)"))
+    warning("No iteration line in .ext (evaluation run with MAXEVAL=0?).")
+    return(.empty_plot("No convergence data (MAXEVAL=0)"))
   }
 
   n_blocs <- n_distinct(dat$table_no)
@@ -346,8 +346,8 @@ plot_convergence <- function(ext, log_iter = FALSE, title = NULL) {
     geom_point(size = 0.6, alpha = 0.4) +
     labs(
       title = ttl,
-      x     = "Itération",
-      y     = "OFV (critère d'optimalité)",
+      x     = "Iteration",
+      y     = "OFV (optimality criterion)",
       color = NULL
     ) +
     .theme_design()
@@ -441,7 +441,7 @@ build_convergence_steps <- function(ext, cpu_secs = NA_real_,
 #' @export
 plot_convergence_steps <- function(steps_df, title = NULL) {
   if (is.null(steps_df) || nrow(steps_df) == 0L) {
-    return(.empty_plot("Pas de donnees de convergence par phase"))
+    return(.empty_plot("No per-phase convergence data"))
   }
 
   col_eval <- "#D4883A"
@@ -541,13 +541,13 @@ plot_convergence_steps <- function(steps_df, title = NULL) {
 #' @export
 plot_fim_heatmap <- function(fim_matrix, labels = NULL, title = NULL) {
   if (is.null(fim_matrix) || nrow(fim_matrix) == 0L) {
-    return(.empty_plot("Pas de matrice FIM disponible"))
+    return(.empty_plot("No FIM matrix available"))
   }
 
   # Utiliser get_cor_matrix() pour filtrage + inversion + correlation
   corr_mat <- get_cor_matrix(fim_matrix)
   if (is.null(corr_mat)) {
-    return(.empty_plot("FIM singuliere -- correlations non calculables"))
+    return(.empty_plot("FIM singular — correlations not computable"))
   }
 
   # Renommer les paramètres si labels fournis
@@ -721,7 +721,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
                                cmt_col = NULL, title = NULL) {
 
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
-    return(.empty_plot("Pas de donnees .tab disponibles"))
+    return(.empty_plot("No .tab data available"))
   }
 
   # Filtrer observations uniquement (EVID == 0)
@@ -731,12 +731,12 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
   }
 
   if (nrow(obs) == 0L) {
-    return(.empty_plot("Aucune observation (EVID=0) dans le .tab"))
+    return(.empty_plot("No observation (EVID=0) in .tab"))
   }
 
   # Vérifier que les colonnes existent
   if (!group_col %in% names(obs)) {
-    warning("Colonne '", group_col, "' absente du .tab. Utilisation d'un groupe unique.")
+    warning("Column '", group_col, "' missing from .tab. Using a single group.")
     obs[[group_col]] <- 1
   }
   if (!time_col %in% names(obs)) {
@@ -803,7 +803,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   rse <- get_rse(ext, table_no)
 
   if (nrow(rse) == 0L) {
-    return(.empty_plot("Pas de donnees SE"))
+    return(.empty_plot("No SE data"))
   }
 
   rse <- rse |>
@@ -857,7 +857,7 @@ plot_se <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
 plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title = NULL) {
   rse <- get_rse(ext, table_no)
   if (nrow(rse) == 0L) {
-    return(.empty_plot("Pas de donnees RSE"))
+    return(.empty_plot("No RSE data"))
   }
 
   if (!is.null(param_labels)) {
@@ -870,7 +870,7 @@ plot_rse_waterfall <- function(ext, table_no = NULL, param_labels = NULL, title 
       levels = names(.COLORS_RSE)
     ))
 
-  ttl <- title %||% "RSE prédit par la FIM (%) -- Waterfall"
+  ttl <- title %||% "RSE predicted by FIM (%) — Waterfall"
 
   ggplot(rse, aes(x = reorder(param, rse_pct), y = rse_pct, fill = quality)) +
     geom_col(width = 0.65, color = "white", size = 0.3) +
@@ -910,7 +910,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
                                   time_unit = "hours", show_doses = TRUE,
                                   arm_labels = NULL, cmt_labels = NULL) {
   if (is.null(tab_data) || nrow(tab_data) == 0L) {
-    return(.empty_plot("Pas de donnees .tab"))
+    return(.empty_plot("No .tab data"))
   }
 
   # Extract dose times BEFORE filtering (for dose markers)
@@ -930,13 +930,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   obs <- tab_data
   if ("EVID" %in% names(obs)) obs <- filter(obs, EVID == 0)
   if (nrow(obs) == 0L) {
-    return(.empty_plot("Aucune observation"))
+    return(.empty_plot("No observation"))
   }
 
   # Determine Y variable
   y_col <- intersect(c("IPRED", "PRED", "DV", "CONC"), names(obs))[1]
   if (is.na(y_col)) {
-    return(.empty_plot("Colonne IPRED/PRED/DV absente"))
+    return(.empty_plot("IPRED/PRED/DV column missing"))
   }
 
   if (!group_col %in% names(obs)) obs[[group_col]] <- 1
@@ -1096,7 +1096,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
                             arm_labels = NULL, title = NULL,
                             compare_points = NULL) {
   if (is.null(sim_data) || nrow(sim_data) == 0L) {
-    return(.empty_plot("Pas de donnees de simulation"))
+    return(.empty_plot("No simulation data"))
   }
 
   # -- Time unit conversion ---------------------------------------------------

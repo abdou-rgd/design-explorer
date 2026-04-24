@@ -847,7 +847,7 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
   n_pass <- sum(df$pass_20pct, na.rm = TRUE)
   n_total <- nrow(df)
   sub_txt <- sprintf(
-    "Circles = RSE vs RSE | Triangles = RRMSE (includes bias) | +/-20%% band | %d/%d within band",
+    "Circles = RSE vs RSE | Triangles = RRMSE (includes bias) | ±20%% band | %d/%d within band",
     n_pass, n_total
   )
 

@@ -149,7 +149,7 @@ mod_power_server <- function(id, ext_data, param_labels,
                 "The statistic W = (&theta;<sub>0</sub> &minus; ",
                 "<span style='text-decoration:overline'>&theta;</span>) / SE follows a normal distribution.<br>",
                 "<b>Power</b> = probability of rejecting H<sub>0</sub> when the effect truly exists. ",
-                "Power &ge; 80%% means the design will detect the effect in 80%% of cases.<br>",
+                "Power &ge; 80% means the design will detect the effect in 80% of cases.<br>",
                 "<b>Usage</b>: \"Does my design have enough subjects to estimate this parameter precisely?\"<br>",
                 "<em>Ref.: Retout et al. 2007, Mentre &amp; Rousseau 2011.</em></p>"
               ))

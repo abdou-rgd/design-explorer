@@ -161,8 +161,8 @@ read_shk <- function(file) {
   tbl_i <- which(tbl_nums == table_no)[1L]
   if (is.na(tbl_i)) {
     warning(
-      caller, "(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
-      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+      caller, "(): TABLE NO. ", table_no, " not found in: ", basename(file),
+      " — falling back to the last table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
     )
     tbl_i <- length(table_idx)
   }
@@ -189,8 +189,8 @@ read_shk <- function(file) {
     if (length(vals) == n) {
       mat[i, ] <- vals
     } else {
-      warning(caller, "() ligne ", i, " : ", length(vals),
-              " valeurs au lieu de ", n, " attendues -- ligne ignoree")
+      warning(caller, "() line ", i, ": ", length(vals),
+              " values instead of ", n, " expected — line skipped")
     }
   }
 
@@ -280,8 +280,8 @@ read_clt <- function(file, table_no = 1L) {
   tbl_i <- which(tbl_nums == table_no)[1L]
   if (is.na(tbl_i)) {
     warning(
-      "read_clt(): TABLE NO. ", table_no, " introuvable dans : ", basename(file),
-      " -- repli sur la derniere table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
+      "read_clt(): TABLE NO. ", table_no, " not found in: ", basename(file),
+      " — falling back to the last table (TABLE NO. ", tbl_nums[length(tbl_nums)], ")."
     )
     tbl_i <- length(table_idx)
   }

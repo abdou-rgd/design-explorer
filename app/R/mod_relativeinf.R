@@ -58,7 +58,7 @@ mod_relativeinf_server <- function(id, shk_data, tbl_no, param_labels, all_runs 
         scale_fill_manual(values = run_colors, labels = run_labels,
                           name = NULL) +
         coord_flip() +
-        labs(title = "RELATIVEINF (%) -- Multi-run comparison", x = NULL, y = "RELATIVEINF (%)") +
+        labs(title = "RELATIVEINF (%) — Multi-run comparison", x = NULL, y = "RELATIVEINF (%)") +
         theme_bw(base_size = 11) +
         theme(legend.position = "bottom", panel.grid.minor = element_blank(),
               panel.grid.major.y = element_blank())

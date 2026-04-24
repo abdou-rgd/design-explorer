@@ -390,7 +390,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
                        position = position_dodge(width = 0.4)) +
             scale_color_manual(values = run_colors, labels = run_labels,
                                name = NULL) +
-            labs(title = "Sampling times -- Multi-run comparison",
+            labs(title = "Sampling times — Multi-run comparison",
                  x = "Time (h)", y = NULL,
                  caption = "Each point = optimal sampling time for this patient group (TSTRAT)") +
             theme_bw(base_size = 12) +

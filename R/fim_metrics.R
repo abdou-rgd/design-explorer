@@ -151,7 +151,7 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
   if (is.na(theta_val) || abs(theta_val) < 1e-12 || is.na(rse_at_n)) {
     return(
       ggplot() +
-        labs(title = paste0("Power(N) non calculable",
+        labs(title = paste0("Power(N) not computable",
                             if (!is.null(param_name)) paste0(" — ", param_name) else "")) +
         .theme_design()
     )
@@ -174,11 +174,11 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
                           h0, power_target, alpha, two_sided)
 
   title_txt <- if (!is.null(param_name)) {
-    paste0("Puissance vs N — ", param_name)
+    paste0("Power vs N — ", param_name)
   } else {
-    "Puissance vs N"
+    "Power vs N"
   }
-  subtitle_txt <- sprintf("RSE actuel = %.1f%% | N actuel = %d | N necessaire = %s",
+  subtitle_txt <- sprintf("Current RSE = %.1f%% | Current N = %d | Required N = %s",
                            rse_at_n, n_current,
                            if (is.na(nsn$n_needed)) "N/A" else as.character(nsn$n_needed))
 
@@ -192,11 +192,11 @@ plot_power_curve <- function(theta_val, rse_at_n, n_current,
              label = paste0("N=", n_current), hjust = -0.15,
              size = 3.2, color = "#6b7280") +
     annotate("text", x = max(n_range) * 0.95, y = power_target + 0.03,
-             label = sprintf("Cible = %g%%", power_target * 100),
+             label = sprintf("Target = %g%%", power_target * 100),
              hjust = 1, size = 3.2, color = "#dc2626") +
     scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2),
                        labels = function(x) paste0(x * 100, "%")) +
-    labs(x = "Nombre de sujets (N)", y = "Puissance",
+    labs(x = "Number of subjects (N)", y = "Power",
          title = title_txt, subtitle = subtitle_txt) +
     .theme_design()
 
