@@ -5,6 +5,7 @@ source(file.path(PROJECT_ROOT, "R", "design_utils.R"))
 source(file.path(PROJECT_ROOT, "R", "design_io.R"))
 source(file.path(PROJECT_ROOT, "R", "design_metrics.R"))
 source(file.path(PROJECT_ROOT, "R", "report_design.R"))
+source(file.path(PROJECT_ROOT, "R", "ctl_parsers.R"))
 
 test_that("prepare_tab_obs drops TIME=0 per ID, not globally", {
   # 3 IDs, each with a dose at TIME=0 + 2 observations
@@ -55,4 +56,22 @@ test_that("select_representative_ids falls back to ARM column when TSTRAT missin
   rep_ids <- .select_representative_ids(obs, "TSTRAT", max_ids = 4L)
   # With TSTRAT absent, fallback should find both ARMs
   expect_gte(length(rep_ids), 2L)
+})
+
+test_that("parse_advan_trans extracts ADVAN2 TRANS2 from example2.ctl", {
+  lines <- load_ctl_lines("app/examples/example2/warfarin2.ctl")
+  res <- parse_advan_trans(lines)
+  expect_equal(res$advan, "ADVAN2")
+  expect_equal(res$trans, "TRANS2")
+})
+
+test_that("parse_advan_trans returns NULL when $SUBROUTINES absent", {
+  expect_null(parse_advan_trans(c("$PROBLEM X", "$THETA (0, 1)")))
+})
+
+test_that("parse_advan_trans handles multi-whitespace and lowercase", {
+  lines <- c("$subroutines advan4  TRANS4 ", "$THETA (0, 1)")
+  res <- parse_advan_trans(lines)
+  expect_equal(res$advan, "ADVAN4")
+  expect_equal(res$trans, "TRANS4")
 })
