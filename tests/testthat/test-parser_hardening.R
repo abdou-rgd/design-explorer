@@ -33,3 +33,26 @@ test_that("prepare_tab_obs drops TIME=0 baseline per ID even when EVID missing",
   expect_equal(nrow(obs), 6L)
   expect_true(all(obs$TIME > 0))
 })
+
+test_that("select_representative_ids returns one ID per arm when TSTRAT signatures collide", {
+  # Two arms (ID 1-3 vs 4-6) share the same TSTRAT values but are different arms.
+  obs <- tibble::tibble(
+    ID     = rep(1:6, each = 3),
+    TSTRAT = rep(c(1, 2, 3), times = 6),
+    TIME   = rep(c(1, 5, 24), times = 6)
+  )
+  rep_ids <- .select_representative_ids(obs, "TSTRAT", max_ids = 4L)
+  # Collision signature must not drop the second arm — expect at least 2 IDs
+  expect_gte(length(rep_ids), 2L)
+})
+
+test_that("select_representative_ids falls back to ARM column when TSTRAT missing", {
+  obs <- tibble::tibble(
+    ID   = rep(1:10, each = 3),
+    ARM  = rep(c("IV", "SC"), each = 15),
+    TIME = rep(c(1, 5, 24), times = 10)
+  )
+  rep_ids <- .select_representative_ids(obs, "TSTRAT", max_ids = 4L)
+  # With TSTRAT absent, fallback should find both ARMs
+  expect_gte(length(rep_ids), 2L)
+})
