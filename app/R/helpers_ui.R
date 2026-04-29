@@ -17,7 +17,13 @@ extract_design_files <- function(files, tmp_prefix = "design") {
     tmp <- file.path(tempdir(),
                      paste0(tmp_prefix, "_", format(Sys.time(), "%H%M%S")))
     dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
-    untar(files$datapath, exdir = tmp)
+    tryCatch(
+      untar(files$datapath, exdir = tmp),
+      error = function(e) {
+        stop("Unable to extract archive '", files$name, "': ",
+             conditionMessage(e), call. = FALSE)
+      }
+    )
 
     all_f <- list.files(tmp, recursive = TRUE, full.names = TRUE)
     all_n <- basename(all_f)

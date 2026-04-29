@@ -273,7 +273,9 @@ get_cor_matrix <- function(fim_matrix) {
   if (sum(nonzero) < 2L) return(NULL)
   fim_sub <- fim_matrix[nonzero, nonzero]
   tryCatch({
-    vcov <- solve(fim_sub)
+    if (is.na(rcond(fim_sub)) || rcond(fim_sub) < 1e-15) return(NULL)
+    vcov <- chol2inv(chol(fim_sub))
+    dimnames(vcov) <- dimnames(fim_sub)
     cov2cor(vcov)
   }, error = function(e) NULL)
 }
@@ -314,8 +316,16 @@ scale_fim <- function(fim, n_from, n_to) {
 #' @export
 vcov_from_fim <- function(fim) {
   if (is.null(fim) || nrow(fim) == 0L) return(NULL)
-  tryCatch(solve(fim), error = function(e) {
-    warning("FIM singuliere, inversion impossible : ", e$message)
+  tryCatch({
+    if (is.na(rcond(fim)) || rcond(fim) < 1e-15) {
+      warning("FIM singuliere ou mal conditionnee, inversion impossible")
+      return(NULL)
+    }
+    vcov <- chol2inv(chol(fim))
+    dimnames(vcov) <- dimnames(fim)
+    vcov
+  }, error = function(e) {
+    warning("FIM non definie positive, inversion impossible : ", e$message)
     NULL
   })
 }

@@ -25,6 +25,14 @@ test_that("pk_2cpt_iv returns positive concentrations and monotonic decay after 
   expect_true(all(diff(out) < 0))  # already past peak at t=0.1 for IV bolus
 })
 
+test_that("pk_2cpt_iv refuses infusion rather than silently plotting bolus", {
+  expect_error(
+    pk_2cpt_iv(times = c(0, 1), dose = 100, rate = 10,
+               CL = 5, V2 = 50, Q = 10, V3 = 100),
+    "supports IV bolus only"
+  )
+})
+
 test_that("multi-dose superposition equals sum of single-dose shifted curves", {
   t <- seq(0, 48, by = 0.5)
   CL <- 5; V <- 50

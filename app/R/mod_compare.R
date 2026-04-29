@@ -67,7 +67,7 @@ mod_compare_server <- function(id) {
           fileInput(ns(paste0("upload_", rid)), NULL, multiple = TRUE,
                     accept = c(".ext", ".shk", ".coi", ".clt", ".tab",
                                ".ctl", ".mod", ".con",
-                               ".tar.gz", ".tgz", ".gz"),
+                               ".tar.gz", ".tgz"),
                     buttonLabel = "Files"),
           uiOutput(ns(paste0("status_", rid)))
         )

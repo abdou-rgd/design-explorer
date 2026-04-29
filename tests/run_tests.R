@@ -15,35 +15,54 @@ Sys.setenv(DESIGN_EXPLORER_ROOT = PROJECT_ROOT)
 cat("Project root:", PROJECT_ROOT, "\n")
 cat("Running tests...\n\n")
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-parse_design_outputs.R"),
-          reporter = "progress")
+has_test_failures <- FALSE
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-fim_metrics.R"),
-          reporter = "progress")
+run_testthat_file <- function(rel_path) {
+  res <- test_file(file.path(PROJECT_ROOT, rel_path), reporter = "progress")
+  failed <- sum(res$failed, na.rm = TRUE)
+  errored <- sum(res$error, na.rm = TRUE)
+  if (failed > 0L || errored > 0L) {
+    has_test_failures <<- TRUE
+  }
+  invisible(res)
+}
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-sse_metrics.R"),
-          reporter = "progress")
+run_testthat_file(file.path("tests", "testthat", "test-parse_design_outputs.R"))
+run_testthat_file(file.path("tests", "testthat", "test-fim_metrics.R"))
+run_testthat_file(file.path("tests", "testthat", "test-sse_metrics.R"))
+run_testthat_file(file.path("tests", "testthat", "test-tab_dispatch.R"))
+run_testthat_file(file.path("tests", "testthat", "test-parser_hardening.R"))
+run_testthat_file(file.path("tests", "testthat", "test-pk_templates.R"))
+run_testthat_file(file.path("tests", "testthat", "test-mrgsolve_bridge.R"))
+run_testthat_file(file.path("tests", "testthat", "test-project_contracts.R"))
+run_testthat_file(file.path("tests", "testthat", "test-times_integration.R"))
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-tab_dispatch.R"),
-          reporter = "progress")
+run_local_smoke <- function(script, required_paths) {
+  missing <- required_paths[!file.exists(file.path(PROJECT_ROOT, required_paths))]
+  if (length(missing) > 0L) {
+    cat("\n\n--- Skipping ", basename(script), " (missing local fixture: ",
+        missing[1], ") ---\n", sep = "")
+    return(invisible(FALSE))
+  }
+  cat("\n\n--- ", basename(script), " ---\n", sep = "")
+  source(file.path(PROJECT_ROOT, script))
+  invisible(TRUE)
+}
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-parser_hardening.R"),
-          reporter = "progress")
+# Local SSE smoke tests depend on docs/results, which is intentionally ignored.
+# Run them when fixtures are present; skip explicitly in clean public clones.
+run_local_smoke("tests/test_sse_pipeline.R", c(
+  "docs/results/SSE/raw_results_psm_eval_sparseSSE_TABLE.csv",
+  "docs/results/SSE/raw_results_run_psm_opti.csv",
+  "docs/results/psm_eval/psm_eval.ctl"
+))
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-pk_templates.R"),
-          reporter = "progress")
+run_local_smoke("tests/test_sse_comparison.R", c(
+  "docs/results/SSE/raw_results_psm_eval_sparseSSE_TABLE.csv",
+  "docs/results/SSE/raw_results_run_psm_opti.csv",
+  "docs/results/psm_eval/psm_eval.ctl"
+))
 
-test_file(file.path(PROJECT_ROOT, "tests", "testthat",
-                    "test-times_integration.R"),
-          reporter = "progress")
-
-# SSE pipeline smoke test — standalone stopifnot() style, not testthat.
-# Catches silent breakage if PsN column naming or the normalizer drifts.
-cat("\n\n--- SSE pipeline smoke test ---\n")
-source(file.path(PROJECT_ROOT, "tests", "test_sse_pipeline.R"))
+if (has_test_failures) {
+  stop("One or more testthat files failed", call. = FALSE)
+}

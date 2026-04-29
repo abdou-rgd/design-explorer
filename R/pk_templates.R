@@ -90,6 +90,9 @@ pk_1cpt_oral <- function(times, dose, CL, V, KA, F = 1, dose_times = 0) {
 #'
 #' @export
 pk_2cpt_iv <- function(times, dose, rate = NULL, CL, V2, Q, V3, dose_times = 0) {
+  if (!is.null(rate) && is.finite(rate) && rate > 0) {
+    stop("pk_2cpt_iv() closed-form template currently supports IV bolus only; use mrgsolve for infusion designs.")
+  }
   mac <- .two_cpt_macro(CL, V2, Q, V3)
   alpha <- mac$alpha; beta <- mac$beta; k21 <- mac$k21
   A <- (dose / V2) * (alpha - k21) / (alpha - beta)

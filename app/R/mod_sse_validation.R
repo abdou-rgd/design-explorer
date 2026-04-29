@@ -106,18 +106,18 @@ mod_sse_validation_ui <- function(id) {
                       "Empirical precision (cf. FIM-predicted RSE)")
             ),
             tags$tr(
-              tags$td(style = "padding:4px 8px;", HTML("Empirical D-criterion")),
+              tags$td(style = "padding:4px 8px;", HTML("Empirical generalized variance")),
               tags$td(style = "padding:4px 8px; font-family:monospace;",
                       HTML("&phi;<sub>D</sub> = det(VarCov)^(1/p)")),
               tags$td(style = "padding:4px 8px;",
-                      "Global summary of estimation uncertainty")
+                      "Global uncertainty summary; lower is better")
             )
           )
         ),
 
-        tags$h5("About the Empirical D-criterion", style = "margin-top:10px;"),
+        tags$h5("About the empirical generalized variance", style = "margin-top:10px;"),
         tags$p(
-          "The ", tags$strong("Empirical D-criterion"), " is a single scalar ",
+          "The ", tags$strong("empirical generalized variance"), " is a single scalar ",
           "summarising the global precision of the parameter estimates ",
           "across the K SSE replicates. It is defined as the geometric mean ",
           "of the eigenvalues of the empirical variance-covariance matrix:"
@@ -167,12 +167,12 @@ mod_sse_validation_ui <- function(id) {
           "near-collinearity. See the \"Matrix diagnostics\" card below."
         ),
 
-        tags$h5("D-criterion warning", style = "margin-top:10px;"),
+        tags$h5("Generalized-variance warning", style = "margin-top:10px;"),
         tags$p(
-          "The empirical D-criterion requires the full variance-covariance ",
+          "The empirical generalized variance requires the full variance-covariance ",
           "matrix of the estimated parameters to be well-conditioned. ",
           "When the matrix is ill-conditioned (near-singular), the determinant ",
-          "is unreliable and the D-criterion cannot be estimated. ",
+          "is unreliable and the generalized variance cannot be estimated. ",
           "This was observed by Fayette et al. (2026) in the crossover example ",
           "with NONMEM-SAEM and NONMEM-FOCE."
         ),
@@ -291,15 +291,18 @@ mod_sse_validation_ui <- function(id) {
           "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
           " margin-bottom:10px; background:#fafafa;"
         ),
-          div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
-            tags$strong("Plots to display:", style = "white-space:nowrap;"),
-            checkboxGroupInput(
-              ns("visible_plots"), label = NULL,
-              choices = c("Scatter" = "scatter",
-                          "REE Boxplot" = "ree",
-                          "RSE Bar Chart" = "rse"),
-              selected = c("scatter", "ree", "rse"),
-              inline = TRUE
+          div(style = "display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;",
+            tags$strong("Plots to display:",
+              style = "white-space:nowrap; padding-top:7px; line-height:1.2;"),
+            div(style = "margin-bottom:-15px;",
+              checkboxGroupInput(
+                ns("visible_plots"), label = NULL,
+                choices = c("Scatter" = "scatter",
+                            "REE Boxplot" = "ree",
+                            "RSE Bar Chart" = "rse"),
+                selected = c("scatter", "ree", "rse"),
+                inline = TRUE
+              )
             )
           )
         )
@@ -397,7 +400,8 @@ mod_sse_validation_server <- function(id, ext_data,
                                       name_a = reactive("Design A"),
                                       name_b = reactive("Design B"),
                                       coi_data = reactive(NULL),
-                                      clt_data = reactive(NULL)) {
+                                      clt_data = reactive(NULL),
+                                      tbl_no = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
     # --- Design selector (show only when B is loaded) ---
@@ -472,12 +476,16 @@ mod_sse_validation_server <- function(id, ext_data,
       compute_empirical_d_criterion(dat, true_vals())
     })
 
-    # --- Get FIM RSE (from already-loaded .ext, last table) ---
+    # --- Get FIM RSE (from already-loaded .ext, selected table) ---
     fim_rse <- reactive({
       ext <- ext_data()
       req(ext)
-      last_tbl <- max(ext$table_no)
-      get_rse(ext, table_no = last_tbl)
+      selected_tbl <- tbl_no()
+      if (is.null(selected_tbl) || is.na(selected_tbl) ||
+          !(selected_tbl %in% ext$table_no)) {
+        selected_tbl <- max(ext$table_no)
+      }
+      get_rse(ext, table_no = selected_tbl)
     })
 
     # --- Compare ---

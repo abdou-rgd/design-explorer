@@ -9,12 +9,6 @@ mod_times_ui <- function(id) {
       radioButtons(ns("time_unit"), "Time unit",
         choices = c("Hours" = "hours", "Days" = "days"),
         selected = "hours", inline = TRUE),
-      tags$div(style = "display:inline-flex; gap:6px; align-items:center; margin-left:16px;",
-        tags$span("Zoom:"),
-        numericInput(ns("x_min"), NULL, value = NA, width = "90px"),
-        numericInput(ns("x_max"), NULL, value = NA, width = "90px"),
-        actionLink(ns("reset_zoom"), "Reset")
-      ),
       tags$div(style = "display:inline-flex; gap:12px; margin-left:16px;",
         checkboxInput(ns("show_ctp"),   "CTP",   TRUE),
         checkboxInput(ns("show_doses"), "Doses", TRUE)
@@ -37,6 +31,9 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
 
     # -- Helper: robust distribution boxplot + optional multi-run overlay ------
     .robust_plot_impl <- function(tab, runs, time_unit = "hours") {
+      time_divisor <- if (identical(time_unit, "days")) 24 else 1
+      time_label <- if (identical(time_unit, "days")) "Time (days)" else "Time (h)"
+      time_suffix <- if (identical(time_unit, "days")) "d" else "h"
       obs <- tab
       if ("EVID" %in% names(obs)) obs <- dplyr::filter(obs, EVID == 0)
       if (!"TSTRAT" %in% names(obs)) {
@@ -45,19 +42,23 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
           dplyr::mutate(TSTRAT = dplyr::row_number()) |>
           dplyr::ungroup()
       }
-      obs <- obs |> dplyr::mutate(group = factor(paste0("Stratum ", TSTRAT)))
+      obs <- obs |>
+        dplyr::mutate(
+          group = factor(paste0("Stratum ", TSTRAT)),
+          TIME_DISPLAY = TIME / time_divisor
+        )
       n_tabs <- dplyr::n_distinct(tab$table_no)
 
       med_labels <- obs |>
         dplyr::group_by(group) |>
-        dplyr::summarise(med = median(TIME), .groups = "drop")
+        dplyr::summarise(med = median(TIME_DISPLAY), .groups = "drop")
 
-      p <- ggplot(obs, aes(x = TIME, y = group, fill = group)) +
+      p <- ggplot(obs, aes(x = TIME_DISPLAY, y = group, fill = group)) +
         geom_boxplot(alpha = 0.7, outlier.size = 0.8,
                      outlier.alpha = 0.4) +
         geom_text(data = med_labels,
                   aes(x = med, y = group,
-                      label = sprintf("%.1fh", med)),
+                      label = sprintf("%.1f%s", med, time_suffix)),
                   inherit.aes = FALSE,
                   vjust = -0.6, size = 3.2, fontface = "bold",
                   color = "#1e3a5f") +
@@ -77,8 +78,9 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
             comp_tab$TSTRAT <- seq_len(nrow(comp_tab))
           comp_tab |>
             dplyr::mutate(group = factor(paste0("Stratum ", TSTRAT)),
-                          run = rid) |>
-            dplyr::select(dplyr::any_of(c("TIME", "group", "run")))
+                          run = rid,
+                          TIME_DISPLAY = TIME / time_divisor) |>
+            dplyr::select(dplyr::any_of(c("TIME_DISPLAY", "group", "run")))
         }) |> dplyr::bind_rows()
 
         if (nrow(comp_pts) > 0L) {
@@ -90,7 +92,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
             names(runs[-1]))
           p <- p +
             geom_point(data = comp_pts,
-                       aes(x = TIME, y = group, color = run),
+                       aes(x = TIME_DISPLAY, y = group, color = run),
                        inherit.aes = FALSE, size = 3, alpha = 0.85,
                        position = position_dodge(width = 0.3)) +
             scale_color_manual(values = run_colors, labels = run_labels,
@@ -109,7 +111,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
       p +
         labs(
           title = "Optimal times distribution by stratum",
-          x     = "Time (h)",
+          x     = time_label,
           y     = NULL,
           caption = caption_txt
         ) +
@@ -235,35 +237,6 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
       )
     })
 
-    # -- Zoom state ------------------------------------------------------------
-    zoom_xlim <- reactiveVal(NULL)
-
-    observeEvent(input$plot_brush, {
-      b <- input$plot_brush
-      if (!is.null(b)) {
-        zoom_xlim(c(b$xmin, b$xmax))
-        updateNumericInput(session, "x_min", value = round(b$xmin, 2))
-        updateNumericInput(session, "x_max", value = round(b$xmax, 2))
-      }
-    })
-
-    observeEvent(input$plot_dblclick, {
-      zoom_xlim(NULL)
-      updateNumericInput(session, "x_min", value = NA)
-      updateNumericInput(session, "x_max", value = NA)
-    })
-
-    observeEvent(input$reset_zoom, {
-      zoom_xlim(NULL)
-      updateNumericInput(session, "x_min", value = NA)
-      updateNumericInput(session, "x_max", value = NA)
-    }, ignoreInit = TRUE)
-
-    observeEvent(c(input$x_min, input$x_max), {
-      xm <- input$x_min; xM <- input$x_max
-      if (is.finite(xm) && is.finite(xM) && xM > xm) zoom_xlim(c(xm, xM))
-    }, ignoreInit = TRUE)
-
     # -- Traffic-light badge ---------------------------------------------------
     output$tier_badge <- renderUI({
       pat <- pattern()
@@ -347,11 +320,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
         fluidRow(column(12,
           div(class = "plot-card",
             p(class = "section-title", "Predicted curve and sampling points"),
-            plotOutput(ns("prediction"), height = "420px",
-                       brush = brushOpts(id = ns("plot_brush"),
-                                          direction = "x",
-                                          resetOnNew = TRUE),
-                       dblclick = ns("plot_dblclick")),
+            plotOutput(ns("prediction"), height = "420px"),
             plot_export_ui(ns, "pred_export", default_fname = "prediction_plot")
           )
         )),
@@ -371,14 +340,13 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
       tab <- effective_tab_data()
       pat <- pattern()
       tu  <- input$time_unit %||% "hours"
-      xlim_val <- zoom_xlim()
 
       if (identical(pat, "robust_subprob")) {
         return(.robust_plot_impl(tab, all_runs(), tu))
       }
 
       if (identical(pat, "focei_repl")) {
-        return(render_sampling_schedule(tab, time_unit = tu, xlim = xlim_val))
+        return(render_sampling_schedule(tab, time_unit = tu))
       }
 
       if (pat %in% c("classical", "stratified", "discrete", "unknown")) {
@@ -415,37 +383,12 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
         dose_times     = dose_t,
         time_unit      = tu,
         cmt_labels     = cmt_labels(),
-        xlim           = xlim_val
+        xlim           = NULL
       )
     })
 
     output$prediction <- renderPlot({ pred_plot() }, res = 110)
     plot_export_server(input, output, session, "pred_export", pred_plot)
-
-    # -- Row-click zoom on times table ----------------------------------------
-    observeEvent(input$times_table_rows_selected, {
-      sel <- input$times_table_rows_selected
-      req(length(sel) == 1L)
-      obs <- prepare_tab_obs(effective_tab_data())
-      if (is.null(obs) || nrow(obs) == 0L || sel > nrow(obs)) return()
-      t_sel <- obs$TIME[sel]
-      d_times <- mrg_sim$dose_times() %||% extract_tab_dose_times(effective_tab_data())
-      half_window <- if (!is.null(d_times) && length(d_times) > 1L) {
-        median(diff(sort(d_times))) / 2
-      } else {
-        max(2, abs(t_sel) * 0.1)
-      }
-      if (identical(input$time_unit, "days")) {
-        t_disp <- t_sel / 24
-        half_disp <- half_window / 24
-      } else {
-        t_disp <- t_sel
-        half_disp <- half_window
-      }
-      zoom_xlim(c(t_disp - half_disp, t_disp + half_disp))
-      updateNumericInput(session, "x_min", value = round(t_disp - half_disp, 2))
-      updateNumericInput(session, "x_max", value = round(t_disp + half_disp, 2))
-    })
 
     # -- Table -----------------------------------------------------------------
     output$times_table <- renderDT({

@@ -30,15 +30,27 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   border-radius: 0;
   margin-bottom: 0;
 }
+.navbar-inverse .navbar-header {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+}
 .navbar-inverse .navbar-brand {
   color: #fff;
-  padding: 10px 15px;
-  height: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 15px;
+  line-height: 1;
 }
 .navbar-inverse .navbar-nav > li > a {
   color: #cbd5e1;
   font-weight: 500;
   font-size: 14px;
+  line-height: 20px;
+  padding-top: 15px;
+  padding-bottom: 15px;
 }
 .navbar-inverse .navbar-nav > li > a:hover,
 .navbar-inverse .navbar-nav > li > a:focus {

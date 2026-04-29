@@ -407,6 +407,22 @@ read_true_values <- function(ctl_lines) {
     vals
   }
 
+  .numeric_tokens <- function(line) {
+    line <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT|BLOCK)\\b", " ", line, perl = TRUE)
+    locs <- gregexpr("-?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?",
+                     line, perl = TRUE)[[1]]
+    if (locs[1] < 0) return(numeric(0L))
+    raw <- regmatches(line, list(locs))[[1]]
+    vals <- as.numeric(gsub("[dD]", "E", raw))
+    vals[!is.na(vals)]
+  }
+
+  .block_inline_values <- function(line, keyword) {
+    stripped <- sub(paste0("^\\s*\\$", keyword, "\\s*"), "", line, ignore.case = TRUE)
+    stripped <- sub("(?i)^\\s*BLOCK\\s*\\(\\s*\\d+\\s*\\)", "", stripped, perl = TRUE)
+    .numeric_tokens(stripped)
+  }
+
   # --- Parse $THETA ---
   theta_vals <- numeric(0L)
   theta_names <- character(0L)
@@ -438,13 +454,12 @@ read_true_values <- function(ctl_lines) {
     if (is_block) {
       # BLOCK(n): lower-triangular values
       n <- as.integer(sub(".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*", "\\1", first_line))
-      all_nums <- numeric(0L)
-      for (i in (rng[1] + 1L):rng[2]) {
+      all_nums <- .block_inline_values(first_line, "OMEGA")
+      idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
+      for (i in idx_lines) {
         ln <- lines_clean[i]
         if (grepl("^\\s*$", ln)) next
-        nums_raw <- regmatches(ln, gregexpr("-?[0-9.]+(?:[eEdD][+-]?[0-9]+)?", ln))[[1]]
-        nums_raw <- nums_raw[!toupper(nums_raw) %in% c("FIX", "FIXED")]
-        all_nums <- c(all_nums, as.numeric(gsub("[dD]", "E", nums_raw)))
+        all_nums <- c(all_nums, .numeric_tokens(ln))
       }
       # Lower-triangular: row 1 has 1 element, row 2 has 2, etc.
       idx <- 1L
@@ -495,12 +510,12 @@ read_true_values <- function(ctl_lines) {
 
     if (is_block) {
       n <- as.integer(sub(".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*", "\\1", first_line))
-      all_nums <- numeric(0L)
-      for (i in (rng[1] + 1L):rng[2]) {
+      all_nums <- .block_inline_values(first_line, "SIGMA")
+      idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
+      for (i in idx_lines) {
         ln <- lines_clean[i]
         if (grepl("^\\s*$", ln)) next
-        nums_raw <- regmatches(ln, gregexpr("-?[0-9.]+(?:[eEdD][+-]?[0-9]+)?", ln))[[1]]
-        all_nums <- c(all_nums, as.numeric(gsub("[dD]", "E", nums_raw)))
+        all_nums <- c(all_nums, .numeric_tokens(ln))
       }
       idx <- 1L
       for (row in seq_len(n)) {
@@ -618,11 +633,14 @@ compute_sse_metrics <- function(sse_raw, true_values,
 # compute_empirical_d_criterion() — D-criterion from SSE variance-covariance
 # =============================================================================
 
-#' Compute the empirical D-criterion from SSE parameter estimates.
+#' Compute the empirical generalized variance from SSE parameter estimates.
 #'
-#' The empirical D-criterion is defined as det(VarCov)^(1/p) where VarCov is
-#' the empirical variance-covariance matrix across K SSE runs, and p is the
-#' number of parameters (Fayette et al. 2026, Pharm Res).
+#' The raw empirical quantity is det(VarCov)^(1/p), where VarCov is the
+#' empirical variance-covariance matrix across K SSE runs, and p is the
+#' number of parameters (Fayette et al. 2026, Pharm Res). This is a
+#' generalized variance: lower values mean better precision. It is therefore
+#' not directionally comparable to FIM D = det(FIM)^(1/p), where higher is
+#' better.
 #'
 #' This raw form is scale-dependent: with parameters spanning several orders of
 #' magnitude (e.g. CL = 6e-3 vs VC = 3.2), the determinant inherits the scale
@@ -737,6 +755,17 @@ compute_empirical_d_criterion <- function(sse_raw, true_values,
   result
 }
 
+#' Compute the empirical parameter correlation matrix from SSE estimates.
+#'
+#' @param sse_raw Tibble from read_sse_raw() or read_sse_raw_all()
+#' @param true_values Named numeric vector from read_true_values()
+#' @return Named correlation matrix, or NULL if not computable
+#' @export
+compute_empirical_correlations <- function(sse_raw, true_values) {
+  dc <- compute_empirical_d_criterion(sse_raw, true_values)
+  dc$corr
+}
+
 
 # =============================================================================
 # compare_fim_sse() — Joindre metriques FIM et SSE
@@ -790,9 +819,10 @@ compare_fim_sse <- function(sse_metrics, fim_rse, max_rse = 200) {
   comp$pass_20pct <- !is.na(comp$ratio) & abs(comp$ratio - 1) <= 0.20
 
   # Cap extreme RSE values for plotting
-  comp$rse_fim_capped <- pmin(comp$rse_fim, max_rse, na.rm = TRUE)
-  comp$rse_sse_capped <- pmin(comp$rse_sse, max_rse, na.rm = TRUE)
-  comp$rmse_sse_capped <- pmin(comp$rmse_sse, max_rse, na.rm = TRUE)
+  cap_metric <- function(x) ifelse(is.na(x), NA_real_, pmin(x, max_rse))
+  comp$rse_fim_capped <- cap_metric(comp$rse_fim)
+  comp$rse_sse_capped <- cap_metric(comp$rse_sse)
+  comp$rmse_sse_capped <- cap_metric(comp$rmse_sse)
 
   comp
 }

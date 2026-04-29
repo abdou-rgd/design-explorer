@@ -776,7 +776,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
 
   obs <- obs |>
     mutate(
-      group = factor(paste0("Strate ", .data[[group_col]])),
+      group = factor(paste0("Stratum ", .data[[group_col]])),
       time  = .data[[time_col]]
     )
 
@@ -784,15 +784,15 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
     obs <- obs |> mutate(cmt_lbl = paste0("CMT=", .data[[cmt_col]]))
   }
 
-  ttl <- title %||% "Temps de prelevement optimaux par groupe (TSTRAT)"
-  cap  <- "Un point = temps de prelevement optimal pour ce groupe de patients (TSTRAT)"
+  ttl <- title %||% "Optimal sampling times by group (TSTRAT)"
+  cap  <- "One point = optimal sampling time for this patient group (TSTRAT)"
 
   if (use_cmt) {
     p <- ggplot(obs, aes(x = time, y = group, color = cmt_lbl, shape = cmt_lbl)) +
       geom_point(size = 3.5, alpha = 0.85) +
       scale_color_manual(values = c("#2563eb", "#dc2626", "#16a34a", "#d97706"),
-                         name = "Reponse") +
-      scale_shape_manual(values = c(16L, 17L, 15L, 18L), name = "Reponse")
+                         name = "Response") +
+      scale_shape_manual(values = c(16L, 17L, 15L, 18L), name = "Response")
   } else {
     p <- ggplot(obs, aes(x = time, y = group, color = group)) +
       geom_point(size = 3.5, alpha = 0.85) +
@@ -800,7 +800,7 @@ plot_optimal_times <- function(tab_data, group_col = "TSTRAT", time_col = "TIME"
   }
 
   p +
-    labs(title = ttl, x = "Temps (h)", y = NULL, caption = cap) +
+    labs(title = ttl, x = "Time (h)", y = NULL, caption = cap) +
     .theme_design() +
     theme(
       panel.grid.major.y = element_blank(),
@@ -990,7 +990,7 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   has_cmt <- "CMT" %in% names(obs) && n_distinct(obs$CMT) > 1
   if (has_cmt) {
     obs <- obs |>
-      mutate(response = paste0("Reponse CMT=", CMT)) |>
+      mutate(response = paste0("Response CMT=", CMT)) |>
       arrange(response, TIME)
   } else {
     obs <- obs |>
@@ -1002,13 +1002,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   if (has_multi_id) obs <- obs |> arrange(id_label, TIME)
 
   y_label <- if (has_cmt) "Prediction (IPRED)" else y_col
-  ttl <- title %||% if (has_cmt) "Predictions PK/PD aux temps de sampling optimaux" else
-                     paste0("Predictions (", y_col, ") aux temps de sampling optimaux")
+  ttl <- title %||% if (has_cmt) "PK/PD predictions at optimal sampling times" else
+                     paste0("Predictions (", y_col, ") at optimal sampling times")
 
   # --- Time unit conversion (BEFORE ggplot captures the data) ---
   use_days <- identical(time_unit, "days")
-  time_label <- if (use_days) "Temps (jours)" else "Temps (h)"
-  sec_label  <- if (use_days) "Temps de sampling (jours)" else "Temps de sampling (h)"
+  time_label <- if (use_days) "Time (days)" else "Time (h)"
+  sec_label  <- if (use_days) "Sampling times (days)" else "Sampling times (h)"
   if (use_days) {
     obs$TIME <- obs$TIME / 24
     if (!is.null(dose_times)) dose_times$TIME <- dose_times$TIME / 24
@@ -1096,8 +1096,8 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
       sec.axis = dup_axis(breaks = sampling_breaks, name = sec_label)
     ) +
     labs(title = ttl, x = time_label, y = y_label,
-         caption = if (has_multi_id) "Chaque facette = un elementary design (ID) | Tirets = connexion des points"
-                   else "Chaque point = prediction du modele a un temps optimal") +
+         caption = if (has_multi_id) "Each facet = one elementary design (ID) | Dashed lines connect points"
+                   else "Each point = model prediction at an optimal time") +
     .theme_design() +
     theme(plot.caption = element_text(size = 8, color = "#6b7280"),
           axis.text.x.top = element_text(size = 6, angle = 45, hjust = 0,
@@ -1139,7 +1139,7 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
 
   # -- Time unit conversion ---------------------------------------------------
   time_div <- if (time_unit == "days") 24 else 1
-  time_label <- if (time_unit == "days") "Temps (jours)" else "Temps (heures)"
+  time_label <- if (time_unit == "days") "Time (days)" else "Time (hours)"
 
   sim <- sim_data |>
     dplyr::mutate(time_plot = time / time_div)
@@ -1228,23 +1228,23 @@ plot_pk_profile <- function(sim_data, obs_points, dose_times = NULL,
     }
     p <- p + scale_x_continuous(
       sec.axis = dup_axis(breaks = samp_breaks,
-                          name = "Points de prelevement")
+                          name = "Sampling points")
     )
   }
 
   # -- Labels & theme ---------------------------------------------------------
-  ttl <- title %||% "Profil PK predit et points de prelevement"
+  ttl <- title %||% "Predicted PK profile and sampling points"
   sub <- if (has_ctp) {
-    "Simulation population (ETA=0) | Ronds = Optimise | Triangles = CTP"
+    "Population simulation (ETA=0) | Circles = optimized | Triangles = CTP"
   } else {
-    "Simulation population (ETA=0) | Points = temps optimaux"
+    "Population simulation (ETA=0) | Points = optimal times"
   }
 
-  caption_text <- "Pointilles rouges = doses"
+  caption_text <- "Red dotted lines = doses"
 
   p <- p +
     labs(title = ttl, subtitle = sub, x = time_label,
-         y = "Concentration predite", caption = caption_text) +
+         y = "Predicted concentration", caption = caption_text) +
     .theme_design() +
     theme(
       plot.caption = element_text(size = 8, color = "#6b7280"),

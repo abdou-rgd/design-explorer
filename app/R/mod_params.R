@@ -337,6 +337,8 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
 
       n_runs <- length(rnms)
       # JS rowCallback applies per-group conditional colours to run cells.
+      # It also paints light in-cell bars, scaled within each metric row, so
+      # differences across runs remain visible in dense comparison tables.
       # data[0] = Group (hidden), data[1] = Parameter, data[2..n+1] = runs.
       # DOM td indices are offset -1 because the Group column is hidden:
       # td:eq(0) = Parameter, td:eq(1..n) = run cells.
@@ -344,12 +346,23 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
         function(row, data) {
           var group = String(data[0] || '');
           var nRuns = %d;
+          var barColors = ['37,99,235', '22,163,74', '217,119,6', '124,58,237', '220,38,38', '8,145,178'];
+          var nums = [];
+          for (var i = 0; i < nRuns; i++) {
+            var dataIdx = 2 + i;
+            var raw     = String(data[dataIdx] || '');
+            var num     = parseFloat(raw.replace(/[^0-9.\\-]/g, ''));
+            nums.push(isNaN(num) ? null : Math.abs(num));
+          }
+          var maxAbs = Math.max.apply(null, nums.filter(function(x) { return x !== null; }));
+          if (!isFinite(maxAbs) || maxAbs <= 0) maxAbs = null;
           for (var i = 0; i < nRuns; i++) {
             var dataIdx = 2 + i;
             var domIdx  = 1 + i;
             var raw     = String(data[dataIdx] || '');
             var num     = parseFloat(raw.replace(/[^0-9.\\-]/g, ''));
             var color   = null;
+            var cell    = $('td:eq(' + domIdx + ')', row);
             if (group.indexOf('%%RSE') === 0) {
               if (!isNaN(num)) {
                 if (num < 20)       color = '#16a34a';
@@ -360,8 +373,16 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
             } else if (group === 'EBV Shrinkage') {
               if (!isNaN(num)) color = num < 30 ? '#16a34a' : '#dc2626';
             }
+            if (maxAbs !== null && !isNaN(num)) {
+              var pct = Math.max(4, Math.min(100, Math.abs(num) / maxAbs * 100));
+              var rgb = barColors[i %% barColors.length];
+              cell.css({
+                'background': 'linear-gradient(90deg, rgba(' + rgb + ',0.18) 0%%, rgba(' + rgb + ',0.18) ' + pct + '%%, transparent ' + pct + '%%)',
+                'backgroundClip': 'padding-box'
+              });
+            }
             if (color) {
-              $('td:eq(' + domIdx + ')', row).css({color: color, 'fontWeight': 'bold'});
+              cell.css({color: color, 'fontWeight': 'bold'});
             }
           }
         }

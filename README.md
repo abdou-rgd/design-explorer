@@ -1,6 +1,6 @@
 # NONMEM $DESIGN -- Post-Processing & Optimal Design
 
-**V5.5** -- M2 Health Data Science Internship Project
+**V5.8** -- M2 Health Data Science Internship Project
 Optimization of clinical trial designs in pharmacometrics using the Fisher Information Matrix (FIM).
 
 ---
@@ -26,7 +26,7 @@ Optimization of clinical trial designs in pharmacometrics using the Fisher Infor
 |   |-- report_design.R          # ggplot2 visualizations: plot_rse(), plot_convergence(), ...
 |   `-- sse_diagnostics.R        # SSE intrinsic analysis: compute_param_diagnostics(), ...
 |-- app/
-|   |-- app.R                    # Shiny application "DE$IGN EXPLORER" (V5.5)
+|   |-- app.R                    # Shiny application "DE$IGN EXPLORER" (V5.8)
 |   |-- install_deps.R           # Install Shiny dependencies
 |   |-- examples/                # Built-in examples (Bauer 2021, examples 1-7)
 |   `-- R/                       # 18 Shiny modules
@@ -50,7 +50,7 @@ Optimization of clinical trial designs in pharmacometrics using the Fisher Infor
 |       `-- helpers_ui.R         # UI helpers: badges, pills, detect_method()
 |-- tests/
 |   |-- run_tests.R              # Test runner script
-|   `-- testthat/                # 175 unit tests
+|   `-- testthat/                # unit tests + local SSE smoke checks
 `-- docs/
     `-- papers/                  # Reference literature
 ```
@@ -196,6 +196,14 @@ plot_model_prediction(tab) # IPRED vs TIME curve by arm
 | 7 | TMDD | Bayesian FIM, dose + time optimization |
 
 Example files are available in `app/examples/`.
+
+### Fixture Policy
+
+`app/examples/` intentionally tracks Bauer 2021 NONMEM example outputs so the
+app and parser tests work without private data. Large local research material
+and generated outputs under `docs/results/`, `docs/papers/`, and one-off
+`scripts/` stay ignored; smoke tests that need those local fixtures skip
+explicitly when the files are absent.
 
 ---
 

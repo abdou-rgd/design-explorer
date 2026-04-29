@@ -93,7 +93,7 @@ extract_params_for_mrgsolve <- function(ext_data, theta_labels = NULL,
   theta_vals <- vals[theta_mask]
   if (!is.null(theta_labels) && length(theta_labels) > 0L) {
     # Map THETA1 -> CL etc. using provided labels
-    mapped <- character(0)
+    mapped <- numeric(0)
     for (nm in names(theta_vals)) {
       if (nm %in% names(theta_labels)) {
         mapped[theta_labels[[nm]]] <- theta_vals[[nm]]

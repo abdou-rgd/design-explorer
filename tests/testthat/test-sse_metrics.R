@@ -109,6 +109,51 @@ test_that("compare_fim_sse() flags FIM-only and SSE-only params via status", {
   expect_equal(comp$status[comp$param == "OMEGA(1,1)"], "SSE only")
 })
 
+test_that("compare_fim_sse() preserves NA when capping missing values", {
+  sse_metrics <- tibble::tibble(
+    param = "THETA1", param_type = "THETA", param_label = "CL",
+    rse_empirical = NA_real_, rmse_relative = NA_real_,
+    relative_bias = 0, rb_ci_lower = -1, rb_ci_upper = 1
+  )
+  fim_rse <- tibble::tibble(param = "THETA1", rse_pct = 250)
+
+  comp <- compare_fim_sse(sse_metrics, fim_rse, max_rse = 200)
+
+  expect_equal(comp$rse_fim_capped, 200)
+  expect_true(is.na(comp$rse_sse_capped))
+  expect_true(is.na(comp$rmse_sse_capped))
+})
+
+test_that("read_true_values() parses inline OMEGA and SIGMA BLOCK values", {
+  vals <- read_true_values(c(
+    "$THETA (0, 1, 10)",
+    "$OMEGA BLOCK(2) 0.1 0.01 0.2",
+    "$SIGMA BLOCK(2) 1D-2 0.003 0.04"
+  ))
+
+  expect_equal(unname(vals["THETA1"]), 1)
+  expect_equal(unname(vals["OMEGA(1,1)"]), 0.1)
+  expect_equal(unname(vals["OMEGA(2,1)"]), 0.01)
+  expect_equal(unname(vals["OMEGA(2,2)"]), 0.2)
+  expect_equal(unname(vals["SIGMA(1,1)"]), 0.01)
+  expect_equal(unname(vals["SIGMA(2,1)"]), 0.003)
+  expect_equal(unname(vals["SIGMA(2,2)"]), 0.04)
+})
+
+test_that("compute_empirical_correlations() returns the SSE correlation matrix", {
+  sse_raw <- tibble::tibble(
+    THETA1 = c(1.0, 1.1, 0.9, 1.2),
+    THETA2 = c(2.0, 2.2, 1.8, 2.1)
+  )
+  true_values <- c(THETA1 = 1, THETA2 = 2)
+
+  corr <- compute_empirical_correlations(sse_raw, true_values)
+
+  expect_true(is.matrix(corr))
+  expect_equal(dim(corr), c(2L, 2L))
+  expect_equal(unname(diag(corr)), c(1, 1), tolerance = 1e-12)
+})
+
 
 # =============================================================================
 # C. plot_rse_bar()

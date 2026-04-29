@@ -34,11 +34,17 @@ compute_power_wald <- function(theta_val, rse_pct, h0 = 0,
   if (is.na(theta_val) || abs(theta_val) < 1e-12 || is.na(rse_pct) || rse_pct <= 0) {
     return(NA_real_)
   }
-  if (two_sided) alpha <- alpha / 2
-  z_alpha <- qnorm(1 - alpha)
   se <- abs(theta_val) * rse_pct / 100
-  W <- (h0 - theta_val) / se
-  1 - pnorm(W + z_alpha) + pnorm(W - z_alpha)
+  delta <- (theta_val - h0) / se
+
+  if (two_sided) {
+    z_alpha <- qnorm(1 - alpha / 2)
+    return(1 - pnorm(z_alpha - delta) + pnorm(-z_alpha - delta))
+  }
+
+  # One-sided policy: H1 is theta > h0, as documented by the UI/API.
+  z_alpha <- qnorm(1 - alpha)
+  1 - pnorm(z_alpha - delta)
 }
 
 
@@ -63,6 +69,9 @@ compute_n_needed <- function(theta_val, rse_pct, groupsize_current,
                              h0 = 0, power_target = 0.80,
                              alpha = 0.05, two_sided = TRUE) {
   if (is.na(theta_val) || abs(theta_val) < 1e-12 || is.na(rse_pct) || rse_pct <= 0) {
+    return(list(n_needed = NA_integer_, rse_current = rse_pct, rse_needed = NA_real_))
+  }
+  if (!two_sided && theta_val <= h0) {
     return(list(n_needed = NA_integer_, rse_current = rse_pct, rse_needed = NA_real_))
   }
   if (two_sided) alpha <- alpha / 2

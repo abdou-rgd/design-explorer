@@ -60,6 +60,19 @@ test_that("power_wald: H0 = theta gives power = alpha", {
   expect_equal(p, 0.05, tolerance = 0.01)
 })
 
+test_that("power_wald: one-sided H1 theta > h0 respects direction", {
+  p_above <- compute_power_wald(2, 20, h0 = 0, alpha = 0.05,
+                                two_sided = FALSE)
+  p_below <- compute_power_wald(-2, 20, h0 = 0, alpha = 0.05,
+                                two_sided = FALSE)
+  p_null <- compute_power_wald(2, 20, h0 = 2, alpha = 0.05,
+                               two_sided = FALSE)
+
+  expect_gt(p_above, 0.99)
+  expect_lt(p_below, 1e-6)
+  expect_equal(p_null, 0.05, tolerance = 0.01)
+})
+
 test_that("power_wald: theta=0 returns NA", {
   expect_true(is.na(compute_power_wald(0, 20)))
 })
@@ -128,6 +141,12 @@ test_that("n_needed: scaling is consistent with power", {
   rse_at_n_needed <- 30 * sqrt(50 / res$n_needed)
   p <- compute_power_wald(2, rse_at_n_needed, h0 = 0, alpha = 0.05)
   expect_gte(p, 0.80 - 0.01)  # tolerance for ceiling
+})
+
+test_that("n_needed: one-sided H1 theta > h0 is impossible when theta <= h0", {
+  res <- compute_n_needed(-2, 20, 50, h0 = 0, two_sided = FALSE)
+  expect_true(is.na(res$n_needed))
+  expect_true(is.na(res$rse_needed))
 })
 
 test_that("n_needed: higher power target requires more subjects", {
@@ -204,6 +223,36 @@ test_that("parse_groupsize: handles multiline $DESIGN", {
 
 test_that("parse_groupsize: handles NULL input", {
   expect_true(is.na(parse_groupsize(NULL)))
+})
+
+test_that("robust D-criterion summarizes all TABLE NO. blocks", {
+  ext <- tibble::tibble(
+    table_no = c(1L, 2L, 3L),
+    type = rep("final", 3),
+    ITERATION = NA_real_,
+    OBJ = c(-10, -12, -14)
+  )
+
+  rdc <- get_robust_d_criterion(ext, n_params = 2L)
+
+  expect_equal(rdc$n_subprob, 3L)
+  expect_equal(rdc$d_robust, exp(-mean(ext$OBJ) / 2), tolerance = 1e-12)
+  expect_equal(rdc$d_p10, exp(-stats::quantile(ext$OBJ, 0.90)[[1]] / 2),
+               tolerance = 1e-12)
+  expect_equal(rdc$d_p90, exp(-stats::quantile(ext$OBJ, 0.10)[[1]] / 2),
+               tolerance = 1e-12)
+})
+
+test_that("robust D-criterion refuses single-table or parameterless inputs", {
+  ext <- tibble::tibble(
+    table_no = 1L,
+    type = "final",
+    ITERATION = NA_real_,
+    OBJ = -10
+  )
+
+  expect_null(get_robust_d_criterion(ext, n_params = 2L))
+  expect_null(get_robust_d_criterion(ext, n_params = 0L))
 })
 
 

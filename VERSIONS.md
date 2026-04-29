@@ -31,7 +31,7 @@ Format technique : `MAJOR.MINOR.PATCH` (ex: `V4.12.3`)
 
 ## Version actuelle
 
-**V5.0.0** — *Le d\u00e9part du Petit Prince*
+**V5.8** — *Terre des hommes* — Times-tab redesign, codebase review fixes, and reproducible test hygiene
 
 ---
 

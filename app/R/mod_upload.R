@@ -11,7 +11,7 @@ mod_upload_ui <- function(id) {
       fileInput(ns("upload"), "tar.gz archive or individual files",
                 multiple = TRUE,
                 accept   = c(".ext", ".shk", ".coi", ".clt", ".tab", ".bfm", ".cpu",
-                             ".ctl", ".mod", ".con", ".tar.gz", ".tgz", ".gz"),
+                             ".ctl", ".mod", ".con", ".tar.gz", ".tgz"),
                 buttonLabel = "Browse"),
       helpText("Upload a .tar.gz (nrm workflow) or multiple individual files."),
       helpText(style = "font-size:0.82em; color:#854d0e;",
