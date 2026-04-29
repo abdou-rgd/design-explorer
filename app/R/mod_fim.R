@@ -130,7 +130,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
 
       popkin_tabs(ns,
         tabPanel("Criteria Summary",
-          robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no()),
+          uiOutput(ns("cards")),
           br(),
           if (length(all_runs()) > 1) {
             div(class = "surface-card",
@@ -164,91 +164,11 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       )
     })
 
-    robust_criterion_summary <- reactive({
-      ext <- ext_data()
-      if (is.null(ext) || !"table_no" %in% names(ext)) return(NULL)
-      tbls <- sort(unique(ext$table_no))
-      if (length(tbls) <= 1L) return(NULL)
-
-      n_params <- tryCatch(nrow(get_rse(ext, tbl_no())), error = function(e) 0L)
-      if (is.na(n_params) || n_params <= 0L) {
-        for (tbl in tbls) {
-          n_params <- tryCatch(nrow(get_rse(ext, tbl)), error = function(e) 0L)
-          if (!is.na(n_params) && n_params > 0L) break
-        }
-      }
-      if (is.na(n_params) || n_params <= 0L) return(NULL)
-
-      rdc <- tryCatch(get_robust_d_criterion(ext, n_params),
-                      error = function(e) NULL)
-      if (is.null(rdc)) return(NULL)
-      list(n_params = n_params, stats = rdc)
-    })
-
     # Metric cards FIM — synchronisees avec le run selectionne
     output$cards <- renderUI({
       ext <- selected_ext()
       if (is.null(ext)) return(NULL)
-      ofv      <- get_ofv(ext, tbl_no())
-      if (length(ofv) != 1L) ofv <- NA_real_
-      rse      <- get_rse(ext, tbl_no())
-      n_params <- nrow(rse)
-      d_crit   <- get_d_criterion(ofv, n_params)
-      det_fim  <- if (!is.na(ofv)) exp(-ofv) else NA_real_
-      cn       <- get_condition_number(ext, tbl_no())
-
-      fluidRow(
-        column(3, metric_card_v5("D-criterion", signif(d_crit, 4),
-                                 icon_name = "chart-bar", color = "#2563eb",
-                                 sub = "exp(-OFV/p)")),
-        column(3, metric_card_v5("Determinant",
-                                 if (!is.na(det_fim)) formatC(det_fim, format = "e", digits = 3) else "N/A",
-                                 icon_name = "calculator", color = "#7c3aed",
-                                 sub = "exp(-OFV)")),
-        column(3, metric_card_v5("Cond. # (FE)",
-                                 if (!is.na(cn$condition_number)) signif(cn$condition_number, 4) else "N/A",
-                                 icon_name = "balance-scale", color = "#16a34a",
-                                 sub = "Fixed effects")),
-        column(3, metric_card_v5("Eigenvalues",
-                                 if (!is.na(cn$min_eigenvalue))
-                                   sprintf("%.3g - %.3g", cn$min_eigenvalue, cn$max_eigenvalue)
-                                 else "N/A",
-                                 icon_name = "sort-amount-down", color = "#d97706",
-                                 sub = "min - max"))
-      )
-    })
-
-    output$robust_cards <- renderUI({
-      smry <- robust_criterion_summary()
-      if (is.null(smry)) return(NULL)
-      rdc <- smry$stats
-      tagList(
-        div(class = "alert alert-info",
-            style = "border-radius:8px; margin:12px 0; padding:10px 14px;",
-          tags$strong("Robust design summary"),
-          tags$p(style = "margin:4px 0 0; font-size:0.9em;",
-            "Computed over all ", rdc$n_subprob,
-            " TABLE NO. blocks. Use the TABLE NO. selector to inspect a single ",
-            "prior realization; use the robust D summary below as the decision metric."
-          )
-        ),
-        fluidRow(
-          column(3, metric_card_v5("Robust D", signif(rdc$d_robust, 4),
-                                   icon_name = "chart-bar", color = "#2563eb",
-                                   sub = "geometric mean")),
-          column(3, metric_card_v5("P10 - P90",
-                                   sprintf("%.4g - %.4g", rdc$d_p10, rdc$d_p90),
-                                   icon_name = "arrows-alt-h", color = "#7c3aed",
-                                   sub = "prior spread")),
-          column(3, metric_card_v5("OFV mean",
-                                   sprintf("%.4f", rdc$ofv_mean),
-                                   icon_name = "calculator", color = "#16a34a",
-                                   sub = paste0("SD ", sprintf("%.3f", rdc$ofv_sd)))),
-          column(3, metric_card_v5("Sub-problems", rdc$n_subprob,
-                                   icon_name = "th-large", color = "#d97706",
-                                   sub = paste0(smry$n_params, " estimable params")))
-        )
-      )
+      robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no())
     })
 
     # Multi-run comparison table
