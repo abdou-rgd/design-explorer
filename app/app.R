@@ -59,6 +59,8 @@ source("../R/sse_metrics.R",          local = TRUE)
 source("../R/sse_diagnostics.R",      local = TRUE)
 source("../R/sse_comparison.R",       local = TRUE)
 source("../R/mrgsolve_bridge.R",      local = TRUE)
+source("../R/pk_templates.R",         local = TRUE)
+source("../R/tab_dispatch.R",         local = TRUE)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)

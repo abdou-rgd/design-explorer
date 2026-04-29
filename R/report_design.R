@@ -74,26 +74,55 @@ library(purrr)
   )
 }
 
-# Select representative IDs when dataset has >max_ids unique IDs
+# Select representative IDs when dataset has >max_ids unique IDs.
+# Signature includes ID range to avoid collapsing distinct arms that share
+# the same TSTRAT values. Falls back to ARM/ROUTE/STRAT columns before
+# positional ID[1:2] as a last resort.
 .select_representative_ids <- function(obs, group_col, max_ids = 4L) {
   n_ids <- dplyr::n_distinct(obs$ID)
   if (n_ids <= max_ids) return(unique(obs$ID))
 
-  rep_ids <- NULL
-  if (group_col %in% names(obs)) {
-    arm_sig <- obs |>
+  .sig <- function(df, key_col) {
+    df |>
       dplyr::group_by(ID) |>
-      dplyr::summarise(sig = paste(sort(unique(.data[[group_col]])),
-                                   collapse = ","),
-                       .groups = "drop")
+      dplyr::summarise(
+        key    = paste(sort(unique(.data[[key_col]])), collapse = ","),
+        id_val = dplyr::first(ID),
+        .groups = "drop"
+      ) |>
+      dplyr::mutate(
+        id_bin = floor((id_val - 1L) / max(1L, floor(n_ids / max_ids))),
+        sig    = paste(key, id_bin, sep = "|")
+      )
+  }
+
+  rep_ids <- NULL
+
+  if (group_col %in% names(obs)) {
+    arm_sig <- .sig(obs, group_col)
     rep_ids <- arm_sig |>
       dplyr::group_by(sig) |>
       dplyr::slice_min(ID, n = 1L) |>
       dplyr::ungroup() |>
       dplyr::pull(ID)
   }
+
+  if (is.null(rep_ids) || length(rep_ids) < 2L) {
+    for (fallback_col in c("ARM", "ROUTE", "STRAT")) {
+      if (fallback_col %in% names(obs)) {
+        alt_sig <- .sig(obs, fallback_col)
+        rep_ids <- alt_sig |>
+          dplyr::group_by(sig) |>
+          dplyr::slice_min(ID, n = 1L) |>
+          dplyr::ungroup() |>
+          dplyr::pull(ID)
+        if (length(rep_ids) >= 2L) break
+      }
+    }
+  }
+
   if (is.null(rep_ids) || length(rep_ids) == 0L) {
-    rep_ids <- sort(unique(obs$ID))[1:2L]
+    rep_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
   }
   if (length(rep_ids) > max_ids) {
     rep_ids <- sort(rep_ids)[1:max_ids]
@@ -947,10 +976,13 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
 
   # Detect multi-ID (e.g. IV vs SC elementary designs or dataset classique)
   has_multi_id <- "ID" %in% names(obs) && n_distinct(obs$ID) > 1
+  rep_ids <- NULL
   if (has_multi_id) {
     if (n_distinct(obs$ID) > 4L) {
       rep_ids <- .select_representative_ids(obs, group_col, max_ids = 4L)
       obs <- obs |> dplyr::filter(ID %in% rep_ids)
+    } else {
+      rep_ids <- unique(obs$ID)
     }
     obs <- obs |> mutate(id_label = paste0("ID ", ID))
   }
@@ -1016,6 +1048,9 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
   # --- Dose markers ---
   if (!is.null(dose_times) && nrow(dose_times) > 0L) {
     dose_df <- dose_times
+    if (!is.null(rep_ids) && "ID" %in% names(dose_df)) {
+      dose_df <- dose_df |> dplyr::filter(ID %in% rep_ids)
+    }
     # If multi-ID with arm labels, match dose times to facets
     if (has_multi_id && "ID" %in% names(dose_df)) {
       dose_df <- dose_df |> dplyr::mutate(id_label = paste0("ID ", ID))
@@ -1051,8 +1086,12 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     )
   }
 
-  # Secondary x-axis with exact sampling times
+  # Secondary x-axis with exact sampling times (cap at 15 to avoid axis clutter)
   sampling_breaks <- sort(unique(round(obs$TIME, 1)))
+  if (length(sampling_breaks) > 15L) {
+    idx <- seq(1, length(sampling_breaks), length.out = 15)
+    sampling_breaks <- sampling_breaks[round(idx)]
+  }
   p <- p +
     scale_x_continuous(
       sec.axis = dup_axis(breaks = sampling_breaks, name = sec_label)

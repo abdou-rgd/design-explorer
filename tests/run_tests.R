@@ -27,6 +27,22 @@ test_file(file.path(PROJECT_ROOT, "tests", "testthat",
                     "test-sse_metrics.R"),
           reporter = "progress")
 
+test_file(file.path(PROJECT_ROOT, "tests", "testthat",
+                    "test-tab_dispatch.R"),
+          reporter = "progress")
+
+test_file(file.path(PROJECT_ROOT, "tests", "testthat",
+                    "test-parser_hardening.R"),
+          reporter = "progress")
+
+test_file(file.path(PROJECT_ROOT, "tests", "testthat",
+                    "test-pk_templates.R"),
+          reporter = "progress")
+
+test_file(file.path(PROJECT_ROOT, "tests", "testthat",
+                    "test-times_integration.R"),
+          reporter = "progress")
+
 # SSE pipeline smoke test — standalone stopifnot() style, not testthat.
 # Catches silent breakage if PsN column naming or the normalizer drifts.
 cat("\n\n--- SSE pipeline smoke test ---\n")

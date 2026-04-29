@@ -95,9 +95,13 @@ library(tidyr)
 #' @return data.frame nettoyé, sans ligne de dose
 prepare_tab_obs <- function(tab) {
   if ("EVID" %in% names(tab)) tab <- dplyr::filter(tab, EVID == 0)
-  # Drop TIME=0 baseline row (NONMEM $DESIGN artefact, not a real sampling time)
-  if (nrow(tab) > 1L && "TIME" %in% names(tab) && tab$TIME[1] == 0) {
-    tab <- tab[-1L, , drop = FALSE]
+  # Drop TIME=0 baseline row PER ID (NONMEM $DESIGN artefact).
+  # Safe when ID is absent — fallback to a single global group.
+  if (nrow(tab) > 1L && "TIME" %in% names(tab)) {
+    id_col <- if ("ID" %in% names(tab)) tab$ID else rep(1L, nrow(tab))
+    first_row_mask <- !duplicated(id_col)
+    drop_mask <- first_row_mask & tab$TIME == 0
+    if (any(drop_mask)) tab <- tab[!drop_mask, , drop = FALSE]
   }
   if (!"TSTRAT" %in% names(tab)) tab$TSTRAT <- 1L
   tab

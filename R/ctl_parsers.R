@@ -369,3 +369,25 @@ parse_groupsize <- function(lines) {
   if (length(m) == 0L) return(NA_integer_)
   as.integer(sub(".*=\\s*", "", m))
 }
+
+# =============================================================================
+# parse_advan_trans() — Extract $SUBROUTINES ADVANn TRANSm tokens
+# =============================================================================
+
+#' Parse the $SUBROUTINES record for ADVAN/TRANS identifiers.
+#'
+#' @param ctl_lines character vector from readr::read_lines()
+#' @return list(advan, trans) with uppercase tokens, or NULL if absent
+#' @export
+parse_advan_trans <- function(ctl_lines) {
+  if (is.null(ctl_lines) || length(ctl_lines) == 0L) return(NULL)
+  clean <- stringr::str_replace(ctl_lines, ";.*$", "")
+  idx <- which(stringr::str_detect(clean, stringr::regex("^\\s*\\$SUBROUTINES\\b",
+                                                          ignore_case = TRUE)))
+  if (length(idx) == 0L) return(NULL)
+  line <- toupper(clean[idx[1L]])
+  advan <- stringr::str_extract(line, "ADVAN\\d+")
+  trans <- stringr::str_extract(line, "TRANS\\d+")
+  if (is.na(advan)) return(NULL)
+  list(advan = advan, trans = if (is.na(trans)) NA_character_ else trans)
+}
