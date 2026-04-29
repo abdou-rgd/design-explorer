@@ -75,9 +75,9 @@ library(purrr)
 }
 
 # Select representative IDs when dataset has >max_ids unique IDs.
-# Signature includes ID range to avoid collapsing distinct arms that share
-# the same TSTRAT values. Falls back to ARM/ROUTE/STRAT columns before
-# positional ID[1:2] as a last resort.
+# NONMEM REPL/GROUPSIZE can expand a small elementary design into many copied
+# IDs. Collapse exact design signatures first; use ARM/ROUTE/STRAT only when
+# the requested grouping cannot distinguish at least two designs.
 .select_representative_ids <- function(obs, group_col, max_ids = 4L) {
   n_ids <- dplyr::n_distinct(obs$ID)
   if (n_ids <= max_ids) return(unique(obs$ID))
@@ -87,13 +87,9 @@ library(purrr)
       dplyr::group_by(ID) |>
       dplyr::summarise(
         key    = paste(sort(unique(.data[[key_col]])), collapse = ","),
-        id_val = dplyr::first(ID),
         .groups = "drop"
       ) |>
-      dplyr::mutate(
-        id_bin = floor((id_val - 1L) / max(1L, floor(n_ids / max_ids))),
-        sig    = paste(key, id_bin, sep = "|")
-      )
+      dplyr::mutate(sig = key)
   }
 
   rep_ids <- NULL
@@ -123,6 +119,9 @@ library(purrr)
 
   if (is.null(rep_ids) || length(rep_ids) == 0L) {
     rep_ids <- sort(unique(obs$ID))[1:min(2L, n_ids)]
+  }
+  if (length(rep_ids) < 2L && n_ids >= 2L) {
+    rep_ids <- sort(unique(obs$ID))[1:2L]
   }
   if (length(rep_ids) > max_ids) {
     rep_ids <- sort(rep_ids)[1:max_ids]

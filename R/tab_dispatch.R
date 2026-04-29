@@ -239,6 +239,78 @@ render_fallback_dot_plot <- function(tab, time_unit = "hours",
   )
 }
 
+#' Render optimized sampling times for REPL-expanded FOCEI designs.
+#'
+#' This view intentionally ignores IPRED. For repeated elementary designs, the
+#' decision-relevant output is the optimized sampling schedule, not a connected
+#' prediction trace through copied IDs.
+#'
+#' @param tab .tab data frame
+#' @param time_unit "hours" | "days"
+#' @param xlim optional c(xmin, xmax) in displayed units
+#' @return ggplot
+#' @export
+render_sampling_schedule <- function(tab, time_unit = "hours", xlim = NULL) {
+  obs <- prepare_tab_obs(tab)
+  if (is.null(obs) || nrow(obs) == 0L || !"TIME" %in% names(obs)) {
+    return(.empty_plot("No optimized sampling times available"))
+  }
+  if (!"TSTRAT" %in% names(obs)) obs$TSTRAT <- seq_len(nrow(obs))
+
+  rep_ids <- NULL
+  if ("ID" %in% names(obs) && dplyr::n_distinct(obs$ID) > 4L) {
+    rep_ids <- .select_representative_ids(obs, "TSTRAT", max_ids = 4L)
+    obs <- obs |> dplyr::filter(ID %in% rep_ids)
+  }
+
+  time_div <- if (identical(time_unit, "days")) 24 else 1
+  x_label <- if (identical(time_unit, "days")) "Time (days)" else "Time (h)"
+  obs <- obs |>
+    dplyr::mutate(
+      time_plot = TIME / time_div,
+      stratum = factor(TSTRAT, levels = sort(unique(TSTRAT))),
+      id_label = if ("ID" %in% names(obs)) paste0("ID ", ID) else "Design"
+    )
+
+  p <- ggplot2::ggplot(obs, ggplot2::aes(x = time_plot, y = stratum)) +
+    ggplot2::geom_point(color = "#2563eb", size = 3.2, alpha = 0.9) +
+    ggplot2::geom_text(ggplot2::aes(label = TSTRAT),
+                       nudge_y = 0.18, size = 3, color = "#334155") +
+    ggplot2::labs(
+      title = "Optimized sampling schedule",
+      subtitle = "One representative ID per repeated elementary design",
+      x = x_label,
+      y = "TSTRAT",
+      caption = "Each point is an optimized sampling time; IPRED is intentionally not shown."
+    ) +
+    .theme_design() +
+    ggplot2::theme(
+      panel.grid.major.y = ggplot2::element_blank(),
+      plot.caption = ggplot2::element_text(size = 8, color = "#6b7280")
+    )
+
+  dose_t <- extract_tab_dose_times(tab)
+  if (!is.null(dose_t) && length(dose_t) > 0L) {
+    p <- p + ggplot2::geom_vline(
+      xintercept = unique(dose_t / time_div),
+      linetype = "dotted",
+      color = "#ef4444",
+      alpha = 0.25,
+      size = 0.35
+    )
+  }
+
+  if ("ID" %in% names(obs) && dplyr::n_distinct(obs$ID) > 1L) {
+    p <- p + ggplot2::facet_wrap(~ id_label, ncol = 1, scales = "free_y")
+  }
+
+  if (!is.null(xlim) && length(xlim) == 2L && all(is.finite(xlim))) {
+    p <- p + ggplot2::coord_cartesian(xlim = xlim)
+  }
+
+  p
+}
+
 #' Render the smooth PK timeline (tier 1 or tier 2) with overlays.
 #'
 #' @param smooth  list from pick_smooth_curve_engine() (must not be tier "dots")

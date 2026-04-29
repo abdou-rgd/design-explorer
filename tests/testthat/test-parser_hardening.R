@@ -58,6 +58,14 @@ test_that("select_representative_ids falls back to ARM column when TSTRAT missin
   expect_gte(length(rep_ids), 2L)
 })
 
+test_that("select_representative_ids collapses REPL-expanded FOCEI tab signatures", {
+  tab <- load_tab("docs/results/opti_fenetre_large_FOCEI/psm_opti/psm_opti.tab")
+  obs <- prepare_tab_obs(tab)
+  rep_ids <- .select_representative_ids(obs, "TSTRAT", max_ids = 4L)
+
+  expect_equal(rep_ids, c(1, 2))
+})
+
 test_that("parse_advan_trans extracts ADVAN2 TRANS2 from example2.ctl", {
   lines <- load_ctl_lines("app/examples/example2/warfarin2.ctl")
   res <- parse_advan_trans(lines)

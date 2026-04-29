@@ -49,7 +49,9 @@ walk_example <- function(tab_rel, ctl_rel, expected_pattern) {
   if (pat %in% c("elementary_fo", "focei_repl", "pkpd_multi", "dose_time_opt")) {
     # These patterns have an implementation path (either timeline or fallback dots)
     obs <- prepare_tab_obs(tab)
-    if (s$tier == "dots") {
+    if (pat == "focei_repl") {
+      p <- render_sampling_schedule(tab)
+    } else if (s$tier == "dots") {
       p <- render_fallback_dot_plot(tab)
     } else {
       p <- render_pk_timeline(s, obs_points = obs)
@@ -119,4 +121,18 @@ test_that("example7 — dose_time_opt, TMDD Bayes optimization", {
   walk_example("app/examples/example7/tmdd2b.tab",
                "app/examples/example7/tmdd2b.ctl",
                "dose_time_opt")
+})
+
+test_that("FOCEI REPL run renders sampling schedule without IPRED curve", {
+  tab <- load_tab("docs/results/opti_fenetre_large_FOCEI/psm_opti/psm_opti.tab")
+  expect_equal(detect_tab_pattern(tab), "focei_repl")
+
+  p <- render_sampling_schedule(tab)
+  expect_true(inherits(p, "ggplot") || inherits(p, "gg"))
+  expect_true(any(vapply(p$layers, function(layer) {
+    inherits(layer$geom, "GeomPoint")
+  }, logical(1))))
+  expect_false(any(vapply(p$layers, function(layer) {
+    inherits(layer$geom, "GeomLine")
+  }, logical(1))))
 })

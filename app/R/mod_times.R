@@ -268,7 +268,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
     output$tier_badge <- renderUI({
       pat <- pattern()
       # No badge for patterns where smooth curve is not applicable
-      if (pat %in% c("robust_subprob", "classical", "stratified",
+      if (pat %in% c("robust_subprob", "focei_repl", "classical", "stratified",
                      "discrete", "unknown")) {
         return(tagList())
       }
@@ -375,6 +375,10 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
 
       if (identical(pat, "robust_subprob")) {
         return(.robust_plot_impl(tab, all_runs(), tu))
+      }
+
+      if (identical(pat, "focei_repl")) {
+        return(render_sampling_schedule(tab, time_unit = tu, xlim = xlim_val))
       }
 
       if (pat %in% c("classical", "stratified", "discrete", "unknown")) {
