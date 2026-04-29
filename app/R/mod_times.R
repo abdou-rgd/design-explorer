@@ -217,7 +217,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
           else {
             last <- finals[nrow(finals), ]
             theta_cols <- grep("^THETA", names(last), value = TRUE)
-            vals <- as.numeric(last[, theta_cols])
+            vals <- as.numeric(unlist(last[, theta_cols], use.names = FALSE))
             nms  <- theta_cols
             lbls <- tryCatch(theta_labels(), error = function(e) NULL)
             if (!is.null(lbls)) nms <- ifelse(nms %in% names(lbls), lbls[nms], nms)
@@ -398,7 +398,11 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
           }
         }
       }
-      dose_t <- if (isTRUE(input$show_doses)) mrg_sim$dose_times() else NULL
+      dose_t <- if (isTRUE(input$show_doses)) {
+        mrg_sim$dose_times() %||% extract_tab_dose_times(tab)
+      } else {
+        NULL
+      }
 
       render_pk_timeline(
         smooth         = s,
@@ -421,7 +425,7 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
       obs <- prepare_tab_obs(effective_tab_data())
       if (is.null(obs) || nrow(obs) == 0L || sel > nrow(obs)) return()
       t_sel <- obs$TIME[sel]
-      d_times <- mrg_sim$dose_times()
+      d_times <- mrg_sim$dose_times() %||% extract_tab_dose_times(effective_tab_data())
       half_window <- if (!is.null(d_times) && length(d_times) > 1L) {
         median(diff(sort(d_times))) / 2
       } else {

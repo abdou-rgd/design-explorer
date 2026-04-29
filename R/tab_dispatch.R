@@ -23,9 +23,15 @@ detect_tab_pattern <- function(tab, ctl_lines = NULL) {
   if (is.null(tab) || nrow(tab) == 0L) return("unknown")
 
   cols <- names(tab)
+  ctl_text <- if (is.null(ctl_lines)) "" else paste(ctl_lines, collapse = "\n")
+  ctl_text <- toupper(gsub(";.*$", "", ctl_text))
 
   n_blocks <- if ("table_no" %in% cols) dplyr::n_distinct(tab$table_no) else 1L
   if (n_blocks > 1L) return("robust_subprob")
+
+  has_discrete_ctl <- grepl("\\b(DISCRETE|NMIN|NMAX)\\b", ctl_text)
+  has_discrete_cols <- any(c("NMIN", "NMAX") %in% toupper(cols))
+  if (has_discrete_ctl || has_discrete_cols) return("discrete")
 
   has_cmt <- "CMT" %in% cols && dplyr::n_distinct(tab$CMT) > 1L
 
@@ -39,6 +45,10 @@ detect_tab_pattern <- function(tab, ctl_lines = NULL) {
 
   if (has_amt_varying) return("dose_time_opt")
   if (has_cmt) return("pkpd_multi")
+
+  has_strat_ctl <- grepl("\\b(STRAT|STRATF)\\b", ctl_text)
+  has_strat_cols <- any(c("STRAT", "STRATF") %in% toupper(cols))
+  if (has_strat_ctl || has_strat_cols) return("stratified")
 
   n_ids  <- if ("ID" %in% cols) dplyr::n_distinct(tab$ID) else 1L
   has_ts <- "TSTRAT" %in% cols
@@ -77,6 +87,7 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
   tmpl <- pk_template_for_advan(advan_trans)
 
   if (!is.null(tmpl)) {
+    theta_values <- .match_template_theta_values(theta_values, tmpl$required)
     missing_params <- setdiff(tmpl$required, names(theta_values))
     if (length(missing_params) == 0L) {
       sim <- .simulate_template(tab, tmpl, theta_values)
@@ -93,6 +104,58 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
        warning = "Smooth curve unavailable — showing IPRED points only")
 }
 
+.match_template_theta_values <- function(theta_values, required) {
+  if (length(theta_values) == 0L || is.null(names(theta_values))) {
+    return(theta_values)
+  }
+
+  norm <- function(x) toupper(gsub("[^A-Za-z0-9]", "", x))
+  aliases <- list(
+    CL = c("CL", "CLEARANCE"),
+    V  = c("V", "VC", "V1", "V2", "CENTRALVOLUME", "VOLUME"),
+    V2 = c("V2", "VC", "V", "CENTRALVOLUME"),
+    Q  = c("Q", "Q2", "INTERCOMPARTMENTALCLEARANCE"),
+    V3 = c("V3", "VP", "PERIPHERALVOLUME"),
+    KA = c("KA", "KABS", "ABSORPTION")
+  )
+
+  out <- stats::setNames(rep(NA_real_, length(required)), required)
+  src_names <- names(theta_values)
+  src_norm <- norm(src_names)
+
+  for (req in required) {
+    candidates <- norm(c(req, aliases[[req]] %||% character()))
+    idx <- match(TRUE, src_norm %in% candidates)
+    if (!is.na(idx)) out[req] <- unname(theta_values[idx])
+  }
+
+  out[is.finite(out)]
+}
+
+#' Extract dose times from a NONMEM .tab-like data frame.
+#'
+#' @param tab data frame containing TIME plus EVID/AMT/DOSE when available
+#' @return numeric vector of unique dose times, or NULL when none are detected
+#' @export
+extract_tab_dose_times <- function(tab) {
+  if (is.null(tab) || nrow(tab) == 0L || !"TIME" %in% names(tab)) return(NULL)
+
+  dose_rows <- tab[FALSE, , drop = FALSE]
+  if ("EVID" %in% names(tab)) {
+    dose_rows <- tab[!is.na(tab$EVID) & tab$EVID == 1L, , drop = FALSE]
+  }
+  if (nrow(dose_rows) == 0L && "AMT" %in% names(tab)) {
+    dose_rows <- tab[!is.na(tab$AMT) & tab$AMT > 0, , drop = FALSE]
+  }
+  if (nrow(dose_rows) == 0L && "DOSE" %in% names(tab)) {
+    dose_rows <- tab[!is.na(tab$DOSE) & tab$DOSE > 0, , drop = FALSE]
+  }
+  if (nrow(dose_rows) == 0L) return(NULL)
+
+  out <- sort(unique(dose_rows$TIME[is.finite(dose_rows$TIME)]))
+  if (length(out) == 0L) NULL else out
+}
+
 
 # Internal: simulate the template at a dense grid spanning the tab's TIME range.
 .simulate_template <- function(tab, tmpl, theta_values) {
@@ -101,9 +164,8 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
   if (!is.finite(t_max) || t_max <= 0) return(NULL)
   times <- seq(0, t_max, length.out = 300L)
 
-  # Extract dose + dose times from tab's EVID=1 rows (or DOSE column if no EVID)
   dose_val <- 100
-  dose_t   <- 0
+  dose_t   <- extract_tab_dose_times(tab) %||% 0
   if (nrow(tab) > 0L) {
     if ("EVID" %in% names(tab)) {
       dose_rows <- tab[!is.na(tab$EVID) & tab$EVID == 1L, , drop = FALSE]
@@ -123,9 +185,6 @@ pick_smooth_curve_engine <- function(tab, ctl_lines = NULL,
         amt_vals <- amt_vals[!is.na(amt_vals) & amt_vals > 0]
         if (length(amt_vals) > 0L) dose_val <- amt_vals[1L]
       }
-      t_vals <- dose_rows$TIME
-      t_vals <- sort(unique(t_vals[is.finite(t_vals)]))
-      if (length(t_vals) > 0L) dose_t <- t_vals
     }
   }
 

@@ -42,6 +42,22 @@ test_that("classical: many IDs, no TSTRAT", {
   expect_equal(detect_tab_pattern(tab), "classical")
 })
 
+test_that("stratified: STRAT columns are detected before generic classical", {
+  tab <- make_classical_tab(n_ids = 10)
+  tab$STRAT <- rep(c(1L, 2L), length.out = nrow(tab))
+  expect_equal(detect_tab_pattern(tab), "stratified")
+})
+
+test_that("discrete: NMIN/NMAX or DISCRETE control stream flags are detected", {
+  tab <- make_classical_tab(n_ids = 10)
+  tab$NMIN <- 1L
+  expect_equal(detect_tab_pattern(tab), "discrete")
+
+  tab$NMIN <- NULL
+  expect_equal(detect_tab_pattern(tab, "$DESIGN DISCRETE NMIN=1 NMAX=3"),
+               "discrete")
+})
+
 test_that("unknown: empty tab", {
   expect_equal(detect_tab_pattern(tibble::tibble()), "unknown")
   expect_equal(detect_tab_pattern(NULL), "unknown")
@@ -71,4 +87,26 @@ test_that("pick_smooth_curve_engine downgrades to dots when ADVAN unknown", {
     mrgsolve_available = FALSE
   )
   expect_equal(res$tier, "dots")
+})
+
+test_that("pick_smooth_curve_engine maps common theta label aliases", {
+  tab <- load_tab("app/examples/example2/warfarin2.tab")
+  ctl <- load_ctl_lines("app/examples/example2/warfarin2.ctl")
+  res <- pick_smooth_curve_engine(
+    tab = tab, ctl_lines = ctl,
+    theta_values = c(Clearance = 0.15, Vc = 8.0, Kabs = 1.0),
+    mrgsolve_available = FALSE
+  )
+  expect_equal(res$tier, "template")
+})
+
+test_that("extract_tab_dose_times falls back to .tab dose rows without mrgsolve", {
+  tab <- tibble::tibble(
+    ID = c(1, 1, 1, 1),
+    TIME = c(0, 1, 12, 24),
+    EVID = c(1, 0, 0, 1),
+    AMT = c(100, 0, 0, 100),
+    IPRED = c(0, 1, 2, 0)
+  )
+  expect_equal(extract_tab_dose_times(tab), c(0, 24))
 })
