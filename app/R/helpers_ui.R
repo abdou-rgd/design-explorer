@@ -53,6 +53,46 @@ extract_design_files <- function(files, tmp_prefix = "design") {
   paths
 }
 
+# -- Shared app data helpers --------------------------------------------------
+parse_mapping_text <- function(raw) {
+  raw <- trimws(raw %||% "")
+  if (raw == "") return(NULL)
+
+  out <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
+    dplyr::filter(stringr::str_detect(raw, "=")) |>
+    tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
+    dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
+    dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
+    tibble::deframe()
+
+  if (length(out) == 0L) NULL else out
+}
+
+resolve_true_values <- function(shared_true_vals, shared_ctl_lines) {
+  sv <- shared_true_vals()
+  if (!is.null(sv) && length(sv) > 0L) return(sv)
+
+  cl <- shared_ctl_lines()
+  if (is.null(cl)) return(NULL)
+
+  vals <- read_true_values(cl)
+  if (length(vals) == 0L) NULL else vals
+}
+
+new_design_run <- function(name = "Primary", ext_data = NULL, shk_data = NULL,
+                           coi_data = NULL, clt_data = NULL, tab_data = NULL,
+                           cpu_data = NA_real_) {
+  list(
+    name = name,
+    ext_data = ext_data,
+    shk_data = shk_data,
+    coi_data = coi_data,
+    clt_data = clt_data,
+    tab_data = tab_data,
+    cpu_data = cpu_data %||% NA_real_
+  )
+}
+
 # -- Seuils qualite RSE / RELATIVEINF (utilises par rse_badge / ri_badge) ---
 RSE_THRESHOLDS    <- c(20, 50, 100) # <20% bon, 20-50% modere, 50-100% mauvais, >100% tres mauvais
 RELINF_THRESHOLDS <- c(20, 50)   # >=50% bon, 20-50% modere, <20% mauvais

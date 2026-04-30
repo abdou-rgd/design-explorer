@@ -92,6 +92,63 @@ body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--t
   padding: 20px 24px;
 }
 
+.global-run-context {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 34px;
+  padding: 4px 24px;
+  background: #f1f5f9;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.global-run-context__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+.global-run-context__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+.global-run-context__label,
+.global-run-context .control-label {
+  margin: 0;
+  font-size: .67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+.global-run-context__control .form-group {
+  margin: 0;
+}
+.global-run-context .form-control {
+  height: 26px;
+  padding: 2px 8px;
+  font-size: .8rem;
+}
+.global-run-context .selectize-control {
+  margin: 0;
+}
+.global-run-context .selectize-input {
+  min-height: 26px;
+  height: 26px;
+  padding: 2px 24px 2px 8px;
+  line-height: 20px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+.global-run-context .selectize-input > input {
+  height: 20px !important;
+}
+.global-run-context .selectize-control.single .selectize-input::after {
+  right: 8px;
+}
+
 /* ── Cards (legacy .metric-card removed — use .metric-card-v5) ─────── */
 
 /* ── Surface wrappers ──────────────────────────────────────────────────── */

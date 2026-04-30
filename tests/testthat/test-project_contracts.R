@@ -18,12 +18,18 @@ PROJECT_ROOT <- project_root
 test_that("SSE validation server exposes and app passes selected tbl_no", {
   mod_file <- file.path(PROJECT_ROOT, "app", "R", "mod_sse_validation.R")
   app_file <- file.path(PROJECT_ROOT, "app", "app.R")
+  power_file <- file.path(PROJECT_ROOT, "app", "R", "mod_power.R")
   mod_txt <- paste(readLines(mod_file, warn = FALSE), collapse = "\n")
   app_txt <- paste(readLines(app_file, warn = FALSE), collapse = "\n")
+  power_txt <- paste(readLines(power_file, warn = FALSE), collapse = "\n")
 
   expect_match(mod_txt, "tbl_no\\s*=\\s*reactive\\(NULL\\)")
   expect_match(mod_txt, "selected_tbl <- tbl_no\\(\\)")
+  expect_match(app_txt, "selectInput\\(\"global_table_no\", NULL")
+  expect_match(app_txt, "selected_table_no <- reactiveVal\\(NULL\\)")
   expect_match(app_txt, "tbl_no\\s*=\\s*tbl_no")
+  expect_match(power_txt, "tbl_no = reactive\\(NULL\\)")
+  expect_false(grepl('selectInput\\(ns\\("table_no"\\)', power_txt))
 })
 
 test_that("upload UI only accepts archive formats that extract_design_files parses", {
@@ -45,4 +51,19 @@ test_that("robust times plot has explicit days conversion contract", {
   expect_match(times_txt, "time_divisor <- if \\(identical\\(time_unit, \"days\"\\)\\) 24 else 1")
   expect_match(times_txt, "TIME_DISPLAY = TIME / time_divisor")
   expect_match(times_txt, "Time \\(days\\)")
+})
+
+test_that("architecture helpers centralize source order and shared app parsing", {
+  source_core_txt <- paste(readLines(file.path(PROJECT_ROOT, "R", "source_core.R"),
+                                     warn = FALSE), collapse = "\n")
+  app_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "app.R"),
+                             warn = FALSE), collapse = "\n")
+  helpers_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "helpers_ui.R"),
+                                 warn = FALSE), collapse = "\n")
+
+  expect_match(source_core_txt, "source_core <- function")
+  expect_match(app_txt, "source_core\\(\"\\.\\.\"\\)")
+  expect_match(helpers_txt, "parse_mapping_text <- function")
+  expect_match(helpers_txt, "resolve_true_values <- function")
+  expect_match(helpers_txt, "new_design_run <- function")
 })

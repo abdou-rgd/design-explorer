@@ -285,6 +285,25 @@ read_sse_summary <- function(file) {
 # read_sse_raw() — Read and filter PsN raw_results CSV
 # =============================================================================
 
+.read_sse_raw_base <- function(file) {
+  if (!file.exists(file)) stop("Fichier SSE introuvable : ", file)
+
+  # Prefer readr::read_csv -- quote-aware (handles OMEGA(1,1) commas) and
+  # robust type inference. Fall back to read.csv if readr unavailable.
+  if (requireNamespace("readr", quietly = TRUE)) {
+    raw <- suppressWarnings(suppressMessages(
+      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
+                      guess_max = 10000)
+    ))
+    raw <- as.data.frame(raw, check.names = FALSE)
+  } else {
+    raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
+  }
+
+  names(raw) <- .normalize_psn_cols(names(raw))
+  raw
+}
+
 #' Read a PsN SSE raw results CSV file (one row per run).
 #'
 #' Filters runs with minimization_successful == 1 (if column exists).
@@ -297,23 +316,8 @@ read_sse_summary <- function(file) {
 #'         Attributes: n_total, n_success, pre_filtered
 #' @export
 read_sse_raw <- function(file) {
-  if (!file.exists(file)) stop("Fichier SSE introuvable : ", file)
-
-  # Prefer readr::read_csv — quote-aware (handles OMEGA(1,1) commas) and
-  # robust type inference. Fall back to read.csv if readr unavailable.
-  if (requireNamespace("readr", quietly = TRUE)) {
-    raw <- suppressWarnings(suppressMessages(
-      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
-                      guess_max = 10000)
-    ))
-    raw <- as.data.frame(raw, check.names = FALSE)
-  } else {
-    raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
-  }
+  raw <- .read_sse_raw_base(file)
   n_total <- nrow(raw)
-
-  # Normalize column names
-  names(raw) <- .normalize_psn_cols(names(raw))
 
   # Filter successful minimizations (if column exists)
   # If the column is absent, the user likely already filtered via PsN

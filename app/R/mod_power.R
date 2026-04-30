@@ -9,49 +9,28 @@
 mod_power_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    # Design-level controls that feed FIM/Power/NSN computations downstream.
-    # Owned here because GROUPSIZE and TABLE NO. only have a visible effect
-    # on power/NSN and robust-design block selection -- neither belongs in
-    # the Parameters tab, whose tables are run-comparison views.
     settings_bar(
-      selectInput(ns("table_no"), "TABLE NO.",
-                  choices = "1", selected = "1", width = "120px"),
       numericInput(ns("groupsize"), "GROUPSIZE",
-                   value = 1L, min = 1L, step = 1L, width = "110px")
+                    value = 1L, min = 1L, step = 1L, width = "110px")
     ),
     tags$div(
       class = "settings-help",
-      HTML("<b>TABLE NO.</b> = which $DESIGN block to read. Most runs have one (=1). Chained algorithms (RS&rarr;STGR&rarr;NELDER) produce one block per phase &mdash; pick the final one for the optimised design. Robust designs give one block per replicate.")
+      HTML("<b>GROUPSIZE</b> controls Power / NSN scaling. <b>TABLE NO.</b> is selected globally in the run context bar.")
     ),
     uiOutput(ns("content"))
   )
 }
 
 mod_power_server <- function(id, ext_data, param_labels,
+                             tbl_no = reactive(NULL),
                              suggested_groupsize = reactive(1L),
-                             table_no_range = reactive(NULL),
                              reset_trigger = reactive(0L),
                              all_runs = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- Design-level reactives owned by this module --------------------------
-    tbl_no <- reactive({ as.integer(input$table_no) })
+    # -- Design-level reactives -----------------------------------------------
     groupsize_r <- reactive({ as.integer(input$groupsize %||% 1L) })
-
-    # Update TABLE NO choices when ext_data changes
-    observe({
-      ext <- ext_data(); req(ext)
-      tabs <- sort(unique(ext$table_no))
-      tnr  <- table_no_range()
-      if (!is.null(tnr) && length(tnr) == 2L) {
-        tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
-        if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
-      }
-      updateSelectInput(session, "table_no",
-        choices  = setNames(as.character(tabs), paste("Bloc", tabs)),
-        selected = as.character(max(tabs)))
-    })
 
     # Auto-fill groupsize from .ctl when upload/example suggests one
     observeEvent(suggested_groupsize(), {
@@ -61,7 +40,6 @@ mod_power_server <- function(id, ext_data, param_labels,
 
     # Reset handler
     observeEvent(reset_trigger(), {
-      updateSelectInput(session, "table_no", choices = "1", selected = "1")
       updateNumericInput(session, "groupsize", value = 1L)
     }, ignoreInit = TRUE)
 

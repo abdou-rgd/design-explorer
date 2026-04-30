@@ -23,22 +23,8 @@
 #'         Attributes: n_total, n_success, pre_filtered
 #' @export
 read_sse_raw_all <- function(file) {
-  if (!file.exists(file)) stop("SSE file not found: ", file)
-
-  # Use readr::read_csv — quote-aware (handles OMEGA(1,1) commas) and robust
-  # type inference that doesn't mistype all-leading-NA columns as logical.
-  # Fall back to read.csv if readr is unavailable.
-  if (requireNamespace("readr", quietly = TRUE)) {
-    raw <- suppressWarnings(suppressMessages(
-      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
-                      guess_max = 10000)
-    ))
-    raw <- as.data.frame(raw, check.names = FALSE)
-  } else {
-    raw <- read.csv(file, stringsAsFactors = FALSE, check.names = FALSE)
-  }
+  raw <- .read_sse_raw_base(file)
   n_total <- nrow(raw)
-  names(raw) <- .normalize_psn_cols(names(raw))
 
   pre_filtered <- FALSE
   if ("minimization_successful" %in% names(raw)) {

@@ -452,14 +452,7 @@ mod_sse_validation_server <- function(id, ext_data,
 
     # --- True values from .ctl (Home tab) ---
     true_vals <- reactive({
-      sv <- shared_true_vals()
-      if (!is.null(sv) && length(sv) > 0L) return(sv)
-
-      cl <- shared_ctl_lines()
-      if (is.null(cl)) return(NULL)
-      vals <- read_true_values(cl)
-      if (length(vals) == 0L) return(NULL)
-      vals
+      resolve_true_values(shared_true_vals, shared_ctl_lines)
     })
 
     # --- Compute SSE metrics ---

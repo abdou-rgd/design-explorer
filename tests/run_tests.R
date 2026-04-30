@@ -15,6 +15,9 @@ Sys.setenv(DESIGN_EXPLORER_ROOT = PROJECT_ROOT)
 cat("Project root:", PROJECT_ROOT, "\n")
 cat("Running tests...\n\n")
 
+source(file.path(PROJECT_ROOT, "R", "source_core.R"))
+source_core(PROJECT_ROOT)
+
 has_test_failures <- FALSE
 
 run_testthat_file <- function(rel_path) {

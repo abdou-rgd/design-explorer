@@ -48,19 +48,8 @@ log_info("App demarree — R ", R.version.string,
          ", dplyr ", packageVersion("dplyr"),
          ", shiny ", packageVersion("shiny"))
 
-source("../R/design_utils.R",   local = TRUE)
-source("../R/design_io.R",      local = TRUE)
-source("../R/design_metrics.R", local = TRUE)
-source("../R/design_summary.R", local = TRUE)
-source("../R/ctl_parsers.R",    local = TRUE)
-source("../R/report_design.R",        local = TRUE)
-source("../R/fim_metrics.R",          local = TRUE)
-source("../R/sse_metrics.R",          local = TRUE)
-source("../R/sse_diagnostics.R",      local = TRUE)
-source("../R/sse_comparison.R",       local = TRUE)
-source("../R/mrgsolve_bridge.R",      local = TRUE)
-source("../R/pk_templates.R",         local = TRUE)
-source("../R/tab_dispatch.R",         local = TRUE)
+source("../R/source_core.R", local = TRUE)
+source_core("..")
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
   source(f, local = TRUE)
@@ -88,6 +77,17 @@ ui <- navbarPage(
       textInput("primary_run_name", NULL, value = "Primary"),
       textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
       textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
+    ),
+    div(class = "global-run-context",
+      div(class = "global-run-context__item",
+        span(class = "global-run-context__label", "Run"),
+        textOutput("global_run_label", inline = TRUE)
+      ),
+      div(class = "global-run-context__control",
+        span(class = "global-run-context__label", "Table"),
+        selectInput("global_table_no", NULL,
+                    choices = "1", selected = "1", width = "74px")
+      )
     )
   ),
 
@@ -171,6 +171,9 @@ server <- function(input, output, session) {
 
   # -- Suggested groupsize (set by upload/examples, consumed by mod_params) ---
   suggested_gs <- reactiveVal(1L)
+
+  # -- Shared design table selection ------------------------------------------
+  selected_table_no <- reactiveVal(NULL)
 
   # -- Upload module ----------------------------------------------------------
   upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
@@ -297,18 +300,59 @@ server <- function(input, output, session) {
   merged_ctl_lines <- reactive({ example_ctl_lines() %||% upload$ctl_lines() })
   merged_ext_lines <- reactive({ example_ext_lines() %||% upload$ext_lines() })
   merged_true_vals <- reactive({
-    cl <- merged_ctl_lines()
-    if (is.null(cl)) return(NULL)
-    tryCatch(read_true_values(cl), error = function(e) NULL)
+    tryCatch(
+      resolve_true_values(
+        shared_true_vals = reactive(NULL),
+        shared_ctl_lines = merged_ctl_lines
+      ),
+      error = function(e) NULL
+    )
   })
+
+  output$global_run_label <- renderText({
+    primary_name()
+  })
+
+  observe({
+    ext <- merged_ext()
+    if (is.null(ext) || !"table_no" %in% names(ext)) {
+      updateSelectInput(session, "global_table_no",
+                        choices = "1", selected = "1")
+      selected_table_no(NULL)
+      return()
+    }
+
+    tabs <- sort(unique(ext$table_no))
+    tnr  <- examples$table_no_range()
+    if (!is.null(tnr) && length(tnr) == 2L) {
+      tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
+      if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
+    }
+
+    current <- isolate(selected_table_no())
+    selected <- if (!is.null(current) && current %in% tabs) current else max(tabs)
+    updateSelectInput(session, "global_table_no",
+      choices  = setNames(as.character(tabs), as.character(tabs)),
+      selected = as.character(selected))
+    selected_table_no(selected)
+  })
+
+  observeEvent(input$global_table_no, {
+    val <- as.integer(input$global_table_no)
+    if (!is.na(val)) selected_table_no(val)
+  }, ignoreInit = TRUE)
 
   # -- all_runs ---------------------------------------------------------------
   primary_name <- reactive({ input$primary_run_name %||% "Primary" })
 
   all_runs <- reactive({
-    primary <- list(
-      name = primary_name(), ext_data = merged_ext(), shk_data = merged_shk(),
-      coi_data = merged_coi(), clt_data = merged_clt(), tab_data = merged_tab(),
+    primary <- new_design_run(
+      name = primary_name(),
+      ext_data = merged_ext(),
+      shk_data = merged_shk(),
+      coi_data = merged_coi(),
+      clt_data = merged_clt(),
+      tab_data = merged_tab(),
       cpu_data = merged_cpu()
     )
     runs <- list(primary = primary)
@@ -318,10 +362,14 @@ server <- function(input, output, session) {
     comp <- compare$comp_runs()
     for (rid in names(comp)) {
       r <- comp[[rid]]
-      runs[[rid]] <- list(
-        name = r$name, ext_data = r$ext_data, shk_data = r$shk_data,
-        coi_data = r$coi_data, clt_data = r$clt_data, tab_data = r$tab_data,
-        cpu_data = r$cpu_data %||% NA_real_
+      runs[[rid]] <- new_design_run(
+        name = r$name,
+        ext_data = r$ext_data,
+        shk_data = r$shk_data,
+        coi_data = r$coi_data,
+        clt_data = r$clt_data,
+        tab_data = r$tab_data,
+        cpu_data = r$cpu_data
       )
     }
     # Deduplicate run names (e.g. two runs with same $DESIGN args)
@@ -338,52 +386,30 @@ server <- function(input, output, session) {
   })
 
   # -- Shared reactives -------------------------------------------------------
-  # tbl_no and groupsize are now owned by mod_params (returned as reactives)
-  param_labels_r <- reactive({
-    raw <- trimws(input$param_labels)
-    if (raw == "") return(NULL)
-    lbl <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
-      dplyr::filter(stringr::str_detect(raw, "=")) |>
-      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
-      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
-      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
-      tibble::deframe()
-    if (length(lbl) == 0L) return(NULL)
-    lbl
-  })
-  cmt_labels_r <- reactive({
-    raw <- trimws(input$cmt_labels)
-    if (raw == "") return(NULL)
-    lbl <- tibble::tibble(raw = strsplit(raw, "\n")[[1]]) |>
-      dplyr::filter(stringr::str_detect(raw, "=")) |>
-      tidyr::separate(raw, into = c("key", "val"), sep = "=", extra = "merge") |>
-      dplyr::mutate(dplyr::across(dplyr::everything(), trimws)) |>
-      dplyr::filter(nchar(key) > 0, nchar(val) > 0) |>
-      tibble::deframe()
-    if (length(lbl) == 0L) return(NULL)
-    lbl
-  })
+  # tbl_no is app/run context; groupsize remains exposed by mod_power.
+  tbl_no <- reactive(selected_table_no())
+  param_labels_r <- reactive(parse_mapping_text(input$param_labels))
+  cmt_labels_r   <- reactive(parse_mapping_text(input$cmt_labels))
   # -- Reset handler (triggered by mod_home) -----------------------------------
   observeEvent(reset_trigger(), {
     updateTextAreaInput(session, "param_labels", value = "")
     updateTextAreaInput(session, "cmt_labels",   value = "")
     updateTextInput(session, "primary_run_name", value = "Primary")
+    selected_table_no(NULL)
     suggested_gs(1L)
   }, ignoreInit = TRUE)
 
   # -- Module servers ---------------------------------------------------------
-  # mod_power now owns table_no + groupsize (they only affect FIM/Power/NSN
-  # computations and robust-block selection, so they live in Decision > Power).
-  # Call first so sibling modules can consume the exposed reactives.
+  # mod_power renders the TABLE NO. / GROUPSIZE controls. TABLE NO. is stored
+  # in app-level run context so sibling modules consume a neutral reactive.
   power_out <- mod_power_server("power",
     ext_data            = merged_ext,
     param_labels        = param_labels_r,
+    tbl_no              = tbl_no,
     suggested_groupsize = suggested_gs,
-    table_no_range      = examples$table_no_range,
     reset_trigger       = reset_trigger,
     all_runs            = all_runs)
 
-  tbl_no      <- power_out$tbl_no
   groupsize_r <- power_out$groupsize
 
   mod_params_server("params",
