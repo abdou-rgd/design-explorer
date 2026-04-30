@@ -14,7 +14,7 @@ mod_compare_ui <- function(id) {
   )
 }
 
-mod_compare_server <- function(id) {
+mod_compare_server <- function(id, reset_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -77,6 +77,16 @@ mod_compare_server <- function(id) {
 
     # Track which run IDs have had observers created
     observed_ids <- reactiveVal(character())
+
+    if (!is.null(reset_trigger)) {
+      observeEvent(reset_trigger(), {
+        for (rid in run_ids()) {
+          run_data[[rid]] <- NULL
+          run_names[[rid]] <- NULL
+        }
+        run_ids(character())
+      }, ignoreInit = TRUE)
+    }
 
     observe({
       current <- run_ids()

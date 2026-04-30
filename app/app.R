@@ -177,7 +177,7 @@ server <- function(input, output, session) {
 
   # -- Upload module ----------------------------------------------------------
   upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
-  compare  <- mod_compare_server("compare")
+  compare  <- mod_compare_server("compare", reset_trigger = reset_trigger)
   examples <- mod_examples_server("examples", reset_trigger = reset_trigger)
 
   # -- Example data loading --------------------------------------------------
@@ -279,16 +279,19 @@ server <- function(input, output, session) {
   })
 
   # -- Merged reactives -------------------------------------------------------
-  merged_ext     <- reactive({ example_ext() %||% upload$ext_data() })
-  merged_shk     <- reactive({ example_shk() %||% upload$shk_data() })
-  merged_coi     <- reactive({ example_coi() %||% upload$coi_data() })
-  merged_clt     <- reactive({ example_clt() %||% upload$clt_data() })
-  merged_tab     <- reactive({ example_tab() %||% upload$tab_data() })
-  merged_ctl     <- reactive({ example_ctl() %||% upload$ctl_data() })
+  upload_has <- function(slot) {
+    fps <- upload$file_paths()
+    !is.null(fps[[slot]])
+  }
+  merged_ext     <- reactive({ if (upload_has("ext")) upload$ext_data() else example_ext() })
+  merged_shk     <- reactive({ if (upload_has("shk")) upload$shk_data() else example_shk() })
+  merged_coi     <- reactive({ if (upload_has("coi")) upload$coi_data() else example_coi() })
+  merged_clt     <- reactive({ if (upload_has("clt")) upload$clt_data() else example_clt() })
+  merged_tab     <- reactive({ if (upload_has("tab")) upload$tab_data() else example_tab() })
+  merged_ctl     <- reactive({ if (upload_has("ctl")) upload$ctl_data() else example_ctl() })
   merged_cpu     <- reactive({
-    val <- example_cpu()
-    if (!is.na(val)) return(val)
-    upload$cpu_data()
+    if (upload_has("cpu")) return(upload$cpu_data())
+    example_cpu()
   })
   # Robust summary: built-in example (pre-computed) or computed from uploaded .tab
   upload_summary <- reactive({
@@ -296,9 +299,9 @@ server <- function(input, output, session) {
     if (is.null(tab)) return(NULL)
     compute_robust_summary(tab)
   })
-  merged_summary   <- reactive({ examples$summary_data() %||% upload_summary() })
-  merged_ctl_lines <- reactive({ example_ctl_lines() %||% upload$ctl_lines() })
-  merged_ext_lines <- reactive({ example_ext_lines() %||% upload$ext_lines() })
+  merged_summary   <- reactive({ if (upload_has("tab")) upload_summary() else examples$summary_data() })
+  merged_ctl_lines <- reactive({ if (upload_has("ctl")) upload$ctl_lines() else example_ctl_lines() })
+  merged_ext_lines <- reactive({ if (upload_has("ext")) upload$ext_lines() else example_ext_lines() })
   merged_true_vals <- reactive({
     tryCatch(
       resolve_true_values(
