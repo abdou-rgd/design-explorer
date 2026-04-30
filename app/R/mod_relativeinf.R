@@ -4,13 +4,15 @@
 
 mod_relativeinf_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    div(class = "plot-card",
-      p(class = "section-title",
-        "Relative information of design per ETA",
-        tags$small(style = "color:#6b7280; font-weight:400; font-size:.8rem; margin-left:8px;",
-                   "(TYPE 11 from .shk file)")
-      ),
+  page_shell(
+    page_header(
+      "RELATIVEINF",
+      "Relative information per ETA from TYPE 11 records in the .shk file.",
+      eyebrow = "Results"
+    ),
+    plot_panel(
+      "Relative information of design per ETA",
+      subtitle = "TYPE 11 from .shk file.",
       plotOutput(ns("plot"), height = "380px"),
       plot_export_ui(ns, "ri_export", default_fname = "relativeinf_plot")
     )

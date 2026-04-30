@@ -4,13 +4,21 @@
 
 mod_convergence_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    div(class = "plot-card",
-      settings_bar(
+  page_shell(
+    page_header(
+      "Convergence",
+      "Iteration history, final OFV distribution, or optimization-step summary for the loaded run set.",
+      eyebrow = "Diagnostic"
+    ),
+    page_section(
+      "Display controls",
+      control_panel(
         checkboxInput(ns("log_conv"), "Log X axis", FALSE),
         uiOutput(ns("toggle_ui"))
-      ),
-      p(class = "section-title", "Optimality criterion convergence (OFV)"),
+      )
+    ),
+    plot_panel(
+      "Optimality criterion convergence (OFV)",
       plotOutput(ns("plot"), height = "420px"),
       plot_export_ui(ns, "conv_export", default_fname = "convergence_plot")
     )
@@ -40,11 +48,9 @@ mod_convergence_server <- function(id, ext_data,
 
     output$toggle_ui <- renderUI({
       if (!show_toggle()) return(NULL)
-      div(style = "text-align: right; margin-bottom: 6px;",
-        radioButtons(ns("conv_view"), NULL,
-          choices = c("Detail" = "detail", "Resume" = "summary"),
-          selected = "detail", inline = TRUE)
-      )
+      radioButtons(ns("conv_view"), NULL,
+        choices = c("Detail" = "detail", "Resume" = "summary"),
+        selected = "detail", inline = TRUE)
     })
 
     # Current view mode (default = detail)

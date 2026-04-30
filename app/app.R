@@ -72,7 +72,18 @@ ui <- navbarPage(
   collapsible = TRUE,
 
   header = tagList(
-    tags$head(google_fonts_link(), includeCSS("www/styles.css")),
+    tags$head(
+      google_fonts_link(),
+      includeCSS("www/styles.css"),
+      tags$script(HTML("
+        Shiny.addCustomMessageHandler('scroll-doc-section', function(id) {
+          setTimeout(function() {
+            var el = document.getElementById('doc-' + id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 160);
+        });
+      "))
+    ),
     div(style = "display:none;",
       textInput("primary_run_name", NULL, value = "Primary"),
       textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
@@ -111,6 +122,11 @@ ui <- navbarPage(
         mod_home_ui("home")
       )
     )
+  ),
+
+  # -- Documentation ---------------------------------------------------------
+  tabPanel("Documentation", value = "documentation",
+    mod_documentation_ui("documentation")
   ),
 
   # -- Results (dropdown) ----------------------------------------------------
@@ -174,6 +190,11 @@ server <- function(input, output, session) {
 
   # -- Shared design table selection ------------------------------------------
   selected_table_no <- reactiveVal(NULL)
+
+  observeEvent(input$open_doc_section, {
+    updateNavbarPage(session, "navbar", selected = "documentation")
+    session$sendCustomMessage("scroll-doc-section", input$open_doc_section)
+  }, ignoreInit = TRUE)
 
   # -- Upload module ----------------------------------------------------------
   upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
@@ -489,13 +510,23 @@ server <- function(input, output, session) {
 
   mod_home_server("home",
     merged_ext   = merged_ext,
+    merged_shk   = merged_shk,
+    merged_coi   = merged_coi,
+    merged_clt   = merged_clt,
     merged_cpu   = merged_cpu,
     merged_tab   = merged_tab,
+    merged_ctl_lines = merged_ctl_lines,
+    merged_true_vals = merged_true_vals,
     ext_lines    = merged_ext_lines,
     primary_name = primary_name,
     tbl_no       = tbl_no,
     param_labels = param_labels_r,
     groupsize    = groupsize_r,
+    all_runs     = all_runs,
+    sse_a_data   = sse_upload$sse_a_data,
+    sse_b_data   = sse_upload$sse_b_data,
+    sse_name_a   = sse_upload$name_a,
+    sse_name_b   = sse_upload$name_b,
     reset_trigger = reset_trigger)
 }
 

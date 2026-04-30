@@ -4,15 +4,23 @@
 
 mod_rse_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    div(class = "plot-card",
-      settings_bar(
+  page_shell(
+    page_header(
+      "RSE / SE",
+      "FIM-predicted relative standard errors or absolute standard errors by parameter.",
+      eyebrow = "Results"
+    ),
+    page_section(
+      "Display controls",
+      control_panel(
         radioButtons(ns("se_mode"), "Mode",
                      choices = c("RSE (%)", "Absolute SE"),
                      selected = "RSE (%)", inline = TRUE),
         uiOutput(ns("plot_controls_ui"))
-      ),
-      p(class = "section-title", "RSE / SE predicted by FIM — per parameter"),
+      )
+    ),
+    plot_panel(
+      "RSE / SE predicted by FIM - per parameter",
       plotOutput(ns("plot"), height = "420px"),
       plot_export_ui(ns, "rse_export", default_fname = "rse_plot")
     )

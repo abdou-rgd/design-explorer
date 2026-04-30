@@ -124,43 +124,66 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       fim <- fim_matrix()
 
       if (is.null(ext)) {
-        return(div(class = "alert alert-info",
-                   "Load a .ext file to see FIM criteria."))
+        return(page_shell(
+          page_header(
+            "FIM & Criteria",
+            "Optimality criteria, matrix diagnostics, and multi-run FIM comparison.",
+            eyebrow = "Design"
+          ),
+          empty_state("Load a .ext file", "FIM criteria are available after the primary .ext file is loaded.", "chart-bar")
+        ))
       }
 
-      popkin_tabs(ns,
-        tabPanel("Criteria Summary",
-          robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no()),
-          br(),
-          if (length(all_runs()) > 1) {
-            div(class = "surface-card",
-              p(class = "section-title", "FIM multi-run comparison"),
-              DTOutput(ns("compare_table"))
-            )
-          }
+      page_shell(
+        page_header(
+          "FIM & Criteria",
+          "Optimality criteria, matrix diagnostics, and multi-run FIM comparison.",
+          eyebrow = "Design"
         ),
-        tabPanel("Eigenvalues",
-          div(class = "plot-card", style = "margin-top:12px;",
-            p(class = "section-title", "Correlation matrix eigenvalues"),
-            DTOutput(ns("eigen_table"))
-          )
+        status_panel(
+          "Criterion definitions",
+          tags$p("D-criterion, robust D, determinant, and conditioning notes are collected in Documentation."),
+          doc_link("fim", "Open FIM documentation"),
+          tone = "info",
+          icon_name = "book-open"
         ),
-        tabPanel("Correlation Heatmap",
-          div(class = "plot-card", style = "margin-top:12px;",
-            p(class = "section-title", "Correlation matrix (FIM)"),
-            uiOutput(ns("heatmap_run_selector")),
-            if (!is.null(fim)) {
-              tagList(
-                plotOutput(ns("heatmap"), height = "400px"),
-                plot_export_ui(ns, "heatmap_export", default_fname = "fim_heatmap")
+        popkin_tabs(ns,
+          tabPanel("Criteria Summary",
+            robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no()),
+            if (length(all_runs()) > 1) {
+              table_panel(
+                "FIM multi-run comparison",
+                DTOutput(ns("compare_table"))
               )
-            } else {
-              div(class = "alert alert-warning", style = "margin-top:10px;",
-                  ".coi or .clt file required for the correlation heatmap.")
             }
-          )
-        ),
-        id = "fim_tabs"
+          ),
+          tabPanel("Eigenvalues",
+            table_panel(
+              "Correlation matrix eigenvalues",
+              DTOutput(ns("eigen_table"))
+            )
+          ),
+          tabPanel("Correlation Heatmap",
+            plot_panel(
+              "Correlation matrix (FIM)",
+              uiOutput(ns("heatmap_run_selector")),
+              if (!is.null(fim)) {
+                tagList(
+                  plotOutput(ns("heatmap"), height = "400px"),
+                  plot_export_ui(ns, "heatmap_export", default_fname = "fim_heatmap")
+                )
+              } else {
+                status_panel(
+                  "Matrix source missing",
+                  tags$p(".coi or .clt file required for the correlation heatmap."),
+                  tone = "warning",
+                  icon_name = "exclamation-triangle"
+                )
+              }
+            )
+          ),
+          id = "fim_tabs"
+        )
       )
     })
 

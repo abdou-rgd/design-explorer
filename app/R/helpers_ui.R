@@ -270,6 +270,130 @@ section_header <- function(title, subtitle = NULL) {
   )
 }
 
+# -- Page shell/header ---------------------------------------------------------
+page_shell <- function(...) {
+  tags$div(class = "page-shell", ...)
+}
+
+page_header <- function(title, subtitle = NULL, eyebrow = NULL) {
+  tags$div(
+    class = "page-header-v6",
+    if (!is.null(eyebrow)) tags$div(class = "page-eyebrow", eyebrow),
+    tags$h3(title),
+    if (!is.null(subtitle)) tags$p(subtitle)
+  )
+}
+
+page_section <- function(title = NULL, ..., subtitle = NULL, class = NULL) {
+  tags$section(
+    class = paste(c("page-section", class), collapse = " "),
+    if (!is.null(title)) section_header(title, subtitle),
+    ...
+  )
+}
+
+control_panel <- function(..., label = NULL) {
+  tags$div(
+    class = "control-panel",
+    if (!is.null(label)) tags$div(class = "control-panel__label", label),
+    tags$div(class = "control-panel__body", ...)
+  )
+}
+
+science_note <- function(title, ..., open = FALSE) {
+  tags$details(
+    class = "science-note",
+    if (isTRUE(open)) open = NA,
+    tags$summary(title),
+    tags$div(class = "science-note__body", ...)
+  )
+}
+
+analysis_workspace <- function(title, ..., subtitle = NULL, actions = NULL,
+                               class = NULL) {
+  tags$div(
+    class = paste(c("analysis-workspace", class), collapse = " "),
+    tags$div(
+      class = "analysis-workspace__header",
+      tags$div(
+        tags$h4(title),
+        if (!is.null(subtitle)) tags$p(subtitle)
+      ),
+      if (!is.null(actions)) tags$div(class = "analysis-workspace__actions", actions)
+    ),
+    tags$div(class = "analysis-workspace__body", ...)
+  )
+}
+
+empty_state <- function(title, body, icon_name = "circle-info") {
+  tags$div(
+    class = "empty-state",
+    tags$div(class = "empty-state__icon", icon(icon_name)),
+    tags$h4(title),
+    tags$p(body)
+  )
+}
+
+status_panel <- function(title, ..., tone = "neutral", icon_name = NULL,
+                         class = NULL) {
+  tone <- tone %||% "neutral"
+  tags$div(
+    class = paste(c("status-panel", paste0("status-panel--", tone), class),
+                  collapse = " "),
+    if (!is.null(icon_name)) tags$div(class = "status-panel__icon", icon(icon_name)),
+    tags$div(
+      class = "status-panel__body",
+      tags$strong(title),
+      tags$div(class = "status-panel__content", ...)
+    )
+  )
+}
+
+plot_panel <- function(title, ..., subtitle = NULL, actions = NULL,
+                       class = NULL) {
+  analysis_workspace(
+    title = title,
+    subtitle = subtitle,
+    actions = actions,
+    class = paste(c("plot-panel", class), collapse = " "),
+    ...
+  )
+}
+
+table_panel <- function(title, ..., subtitle = NULL, actions = NULL,
+                        class = NULL) {
+  analysis_workspace(
+    title = title,
+    subtitle = subtitle,
+    actions = actions,
+    class = paste(c("table-panel", class), collapse = " "),
+    ...
+  )
+}
+
+doc_link <- function(section, label = "See Documentation") {
+  tags$a(
+    href = "#",
+    class = "doc-link",
+    onclick = sprintf(
+      "Shiny.setInputValue('open_doc_section', '%s', {priority:'event'}); return false;",
+      section
+    ),
+    icon("book-open"),
+    span(label)
+  )
+}
+
+documentation_section <- function(id, title, ..., eyebrow = NULL) {
+  tags$section(
+    id = paste0("doc-", id),
+    class = "documentation-section",
+    if (!is.null(eyebrow)) tags$div(class = "documentation-section__eyebrow", eyebrow),
+    tags$h3(title),
+    tags$div(class = "documentation-section__body", ...)
+  )
+}
+
 # -- Popkin-style tabs (underline style tabsetPanel wrapper) -------------------
 popkin_tabs <- function(ns, ..., id = "sub_tabs") {
   tags$div(
@@ -286,27 +410,21 @@ popkin_tabs <- function(ns, ..., id = "sub_tabs") {
 ctl_status_banner <- function(true_vals) {
   has_ctl <- !is.null(true_vals) && length(true_vals) > 0L
   if (has_ctl) {
-    div(
-      style = paste0(
-        "padding:10px 14px; border-radius:8px; margin-top:6px;",
-        " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
-      ),
-      icon("check-circle"),
-      tags$strong(sprintf(" True values loaded (%d params)", length(true_vals))),
-      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
-        "From control stream uploaded in the Home tab.")
+    status_panel(
+      sprintf("True values loaded (%d params)", length(true_vals)),
+      tags$p("From control stream uploaded in the Home tab."),
+      tone = "success",
+      icon_name = "check-circle"
     )
   } else {
-    div(
-      style = paste0(
-        "padding:10px 14px; border-radius:8px; margin-top:6px;",
-        " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
-      ),
-      icon("exclamation-triangle"),
-      tags$strong(" No control stream loaded"),
-      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+    status_panel(
+      "No control stream loaded",
+      tags$p(
         "Upload a .ctl/.mod/.con file in the ",
-        tags$strong("Home"), " tab to extract true parameter values.")
+        tags$strong("Home"), " tab to extract true parameter values."
+      ),
+      tone = "warning",
+      icon_name = "exclamation-triangle"
     )
   }
 }
@@ -317,26 +435,21 @@ sse_status_banner <- function(data, label = "SSE data") {
   if (has_data) {
     n_total   <- attr(data, "n_total") %||% nrow(data)
     n_success <- attr(data, "n_success") %||% sum(data$converged)
-    div(
-      style = paste0(
-        "padding:10px 14px; border-radius:8px; margin-top:6px;",
-        " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
-      ),
-      icon("check-circle"),
-      tags$strong(sprintf(" %s loaded (%d runs, %d converged)",
-                          label, n_total, n_success))
+    status_panel(
+      sprintf("%s loaded", label),
+      tags$p(sprintf("%d runs, %d converged", n_total, n_success)),
+      tone = "success",
+      icon_name = "check-circle"
     )
   } else {
-    div(
-      style = paste0(
-        "padding:10px 14px; border-radius:8px; margin-top:6px;",
-        " background:#fefce8; border:1px solid #fde68a; color:#854d0e;"
-      ),
-      icon("exclamation-triangle"),
-      tags$strong(sprintf(" No %s loaded", label)),
-      tags$p(style = "margin:4px 0 0; font-size:0.82em; color:#555;",
+    status_panel(
+      sprintf("No %s loaded", label),
+      tags$p(
         "Upload a PsN raw_results CSV in the ",
-        tags$strong("SSE Upload"), " tab.")
+        tags$strong("SSE Upload"), " tab."
+      ),
+      tone = "warning",
+      icon_name = "exclamation-triangle"
     )
   }
 }
@@ -370,6 +483,14 @@ health_pill_bg <- function(stage_name, pct) {
   else "#fee2e2"
 }
 
+health_pill_tone <- function(stage_name, pct) {
+  th <- SSE_HEALTH_THRESHOLDS[[stage_name]]
+  if (is.null(th)) th <- c(green = 80, amber = 60, red = 0)
+  if (pct >= th[["green"]]) "success"
+  else if (pct >= th[["amber"]]) "warning"
+  else "danger"
+}
+
 # Build a row of run-health pills from a compute_run_health() result.
 # @param health  Result of compute_run_health() (list with $stages data.frame)
 # @param label   Optional label displayed before the pills
@@ -380,21 +501,14 @@ make_health_pills <- function(health, label = NULL) {
   pills <- lapply(seq_len(nrow(stages)), function(i) {
     s <- stages[i, ]
     tags$span(
-      style = sprintf(
-        paste0(
-          "display:inline-block; padding:3px 8px; border-radius:6px;",
-          " margin:2px 3px; font-size:0.82em; font-weight:600;",
-          " background:%s; color:%s;"
-        ),
-        health_pill_bg(s$stage, s$pct),
-        health_pill_color(s$stage, s$pct)
-      ),
+      class = paste("health-pill",
+                    paste0("health-pill--", health_pill_tone(s$stage, s$pct))),
       sprintf("%s: %d/%d (%.0f%%)", s$stage, s$n, s$denom, s$pct)
     )
   })
-  div(style = "margin-bottom:4px;",
-    if (!is.null(label)) tags$strong(label, style = "font-size:0.9em; margin-right:8px;"),
-    div(style = "display:inline-flex; flex-wrap:wrap; gap:2px;", pills)
+  div(class = "run-health-pills",
+    if (!is.null(label)) tags$strong(class = "run-health-pills__label", label),
+    div(class = "run-health-pills__items", pills)
   )
 }
 
