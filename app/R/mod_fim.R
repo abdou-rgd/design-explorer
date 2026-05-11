@@ -137,7 +137,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
         ),
         popkin_tabs(ns,
           tabPanel("Criteria Summary",
-            robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no()),
+            uiOutput(ns("cards")),
             if (length(all_runs()) > 1) {
               table_panel(
                 "FIM multi-run comparison",
@@ -173,6 +173,13 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
           id = "fim_tabs"
         )
       )
+    })
+
+    # Metric cards FIM — synchronisees avec le run selectionne
+    output$cards <- renderUI({
+      ext <- selected_ext()
+      if (is.null(ext)) return(NULL)
+      robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no())
     })
 
     # Multi-run comparison table

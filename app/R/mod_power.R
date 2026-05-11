@@ -47,7 +47,7 @@ mod_power_server <- function(id, ext_data, param_labels,
     # -- Local N reactive (from module input) ----------------------------------
     n_total_r <- reactive({
       val <- input$n_total
-      if (is.null(val) || is.na(val) || val < 1L) 1L else as.integer(val)
+      if (is.null(val) || is.na(val) || val < 1L) groupsize_r() else as.integer(val)
     })
 
     # -- RSE table reactive (from primary run) ---------------------------------
@@ -93,21 +93,32 @@ mod_power_server <- function(id, ext_data, param_labels,
                    "Load a .ext file to compute power."))
       }
 
+      current_num <- function(value, default) {
+        if (is.null(value) || is.na(value)) default else value
+      }
+      groupsize_value <- isolate(groupsize_r())
+      n_total_value <- isolate(n_total_r())
+      h0_value <- isolate(current_num(input$h0, 0))
+      alpha_value <- isolate(current_num(input$alpha, 0.05))
+      power_target_value <- isolate(current_num(input$power_target, 0.80))
+      two_sided_value <- isolate(input$two_sided %||% TRUE)
+      delta_l_value <- isolate(current_num(input$delta_L, 0.2))
+
       tagList(
         # Settings bar
         settings_bar(
           numericInput(ns("groupsize"), "GROUPSIZE source",
-                       value = 1L, min = 1L, step = 1L, width = "120px"),
+                       value = groupsize_value, min = 1L, step = 1L, width = "120px"),
           numericInput(ns("n_total"), "N (what-if)",
-                       value = groupsize_r() %||% 1L,
+                       value = n_total_value,
                        min = 1L, step = 1L, width = "120px"),
-          numericInput(ns("h0"), "H0", value = 0,
+          numericInput(ns("h0"), "H0", value = h0_value,
                        step = 0.1, width = "90px"),
-          numericInput(ns("alpha"), "Alpha", value = 0.05,
+          numericInput(ns("alpha"), "Alpha", value = alpha_value,
                        min = 0.001, max = 0.20, step = 0.005, width = "80px"),
-          numericInput(ns("power_target"), "Target power", value = 0.80,
+          numericInput(ns("power_target"), "Target power", value = power_target_value,
                        min = 0.50, max = 0.99, step = 0.05, width = "90px"),
-          checkboxInput(ns("two_sided"), "Two-sided Wald", value = TRUE)
+          checkboxInput(ns("two_sided"), "Two-sided Wald", value = two_sided_value)
         ),
         tags$div(
           class = "settings-help",
@@ -174,7 +185,7 @@ mod_power_server <- function(id, ext_data, param_labels,
               fluidRow(
                 column(3,
                   numericInput(ns("delta_L"), "Delta (symmetric margin)",
-                               value = 0.2, min = 0.001, step = 0.05, width = "100%")
+                               value = delta_l_value, min = 0.001, step = 0.05, width = "100%")
                 ),
                 column(9,
                   tags$p(style = "font-size:.85rem; color:#475569; margin-top:28px;",

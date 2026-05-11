@@ -1014,6 +1014,23 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
     if (!is.null(dose_times)) dose_times$TIME <- dose_times$TIME / 24
   }
 
+  # Apply labels before ggplot captures obs in p$data.
+  if (has_multi_id && !is.null(arm_labels)) {
+    obs$id_label <- ifelse(
+      as.character(obs$ID) %in% names(arm_labels),
+      arm_labels[as.character(obs$ID)],
+      obs$id_label
+    )
+  }
+
+  if (has_cmt && !is.null(cmt_labels)) {
+    obs$response <- ifelse(
+      as.character(obs$CMT) %in% names(cmt_labels),
+      cmt_labels[as.character(obs$CMT)],
+      obs$response
+    )
+  }
+
   p <- ggplot(obs, aes(x = TIME, y = y_val))
 
   if (has_cmt) {
@@ -1065,24 +1082,6 @@ plot_model_prediction <- function(tab_data, group_col = "TSTRAT", title = NULL,
       geom_vline(data = dose_df, aes(xintercept = TIME),
                  linetype = "dotted", color = "firebrick3",
                  size = 0.3, alpha = 0.6)
-  }
-
-  # --- Arm labels (rename ID facets) ---
-  if (has_multi_id && !is.null(arm_labels)) {
-    obs$id_label <- ifelse(
-      as.character(obs$ID) %in% names(arm_labels),
-      arm_labels[as.character(obs$ID)],
-      obs$id_label
-    )
-  }
-
-  # --- CMT labels ---
-  if (has_cmt && !is.null(cmt_labels)) {
-    obs$response <- ifelse(
-      as.character(obs$CMT) %in% names(cmt_labels),
-      cmt_labels[as.character(obs$CMT)],
-      obs$response
-    )
   }
 
   # Secondary x-axis with exact sampling times (cap at 15 to avoid axis clutter)

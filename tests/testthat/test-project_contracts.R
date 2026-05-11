@@ -219,6 +219,49 @@ test_that("power settings keep GROUPSIZE and N what-if in one control bar", {
   expect_false(grepl("GROUPSIZE controls Power / NSN scaling", power_txt, fixed = TRUE))
 })
 
+test_that("power settings preserve GROUPSIZE across content rerenders", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("DT")
+
+  suppressWarnings(library(shiny))
+  suppressWarnings(library(DT))
+
+  source(file.path(PROJECT_ROOT, "app", "R", "helpers_ui.R"), local = TRUE)
+  source(file.path(PROJECT_ROOT, "app", "R", "mod_power.R"), local = TRUE)
+
+  ext_r <- shiny::reactiveVal(data.frame(
+    table_no = 1L,
+    type = "final",
+    OBJ = 1,
+    stringsAsFactors = FALSE
+  ))
+
+  shiny::testServer(
+    mod_power_server,
+    args = list(
+      ext_data = ext_r,
+      param_labels = shiny::reactive(NULL),
+      tbl_no = shiny::reactive(1L),
+      suggested_groupsize = shiny::reactive(1L),
+      reset_trigger = shiny::reactiveVal(0L),
+      all_runs = shiny::reactive(list())
+    ),
+    {
+      invisible(output$content)
+      session$setInputs(groupsize = 7L)
+      session$flushReact()
+      ext_r(data.frame(table_no = 1L, type = "final", OBJ = 2,
+                       stringsAsFactors = FALSE))
+      session$flushReact()
+
+      html <- paste(as.character(output$content), collapse = "")
+
+      expect_match(html, 'id="[^"]+-groupsize"[^>]+value="7"')
+      expect_match(html, 'id="[^"]+-n_total"[^>]+value="7"')
+    }
+  )
+})
+
 test_that("power tab keeps long method education in documentation", {
   power_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_power.R"),
                                warn = FALSE), collapse = "\n")
