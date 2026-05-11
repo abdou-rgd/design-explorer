@@ -60,6 +60,24 @@ test_that("power_wald: H0 = theta gives power = alpha", {
   expect_equal(p, 0.05, tolerance = 0.01)
 })
 
+test_that("power_wald: matches PopED Wald equation for two-sided test", {
+  theta <- 1.5
+  rse <- 25
+  h0 <- 0.3
+  alpha <- 0.05
+
+  se <- abs(theta) * rse / 100
+  wald_stat <- (h0 - theta) / se
+  norm_val <- abs(qnorm(alpha / 2))
+  expected <- 1 - pnorm(wald_stat + norm_val) + pnorm(wald_stat - norm_val)
+
+  expect_equal(
+    compute_power_wald(theta, rse, h0 = h0, alpha = alpha, two_sided = TRUE),
+    expected,
+    tolerance = 1e-12
+  )
+})
+
 test_that("power_wald: one-sided H1 theta > h0 respects direction", {
   p_above <- compute_power_wald(2, 20, h0 = 0, alpha = 0.05,
                                 two_sided = FALSE)
@@ -141,6 +159,26 @@ test_that("n_needed: scaling is consistent with power", {
   rse_at_n_needed <- 30 * sqrt(50 / res$n_needed)
   p <- compute_power_wald(2, rse_at_n_needed, h0 = 0, alpha = 0.05)
   expect_gte(p, 0.80 - 0.01)  # tolerance for ceiling
+})
+
+test_that("n_needed: matches PopED needed SE plus FIM scaling", {
+  theta <- 1.5
+  rse <- 35
+  n0 <- 40L
+  h0 <- 0.3
+  alpha <- 0.05
+  target <- 0.80
+
+  norm_val <- abs(qnorm(alpha / 2))
+  need_se <- abs(h0 - theta) / (norm_val - qnorm(1 - target))
+  need_rse <- need_se / abs(theta) * 100
+  expected_n <- ceiling((rse / need_rse)^2 * n0)
+
+  res <- compute_n_needed(theta, rse, n0, h0 = h0, alpha = alpha,
+                          power_target = target, two_sided = TRUE)
+
+  expect_equal(res$rse_needed, need_rse, tolerance = 1e-12)
+  expect_equal(res$n_needed, as.integer(expected_n))
 })
 
 test_that("n_needed: one-sided H1 theta > h0 is impossible when theta <= h0", {
@@ -273,6 +311,44 @@ test_that("tost: small deviation + tight SE gives high power", {
   expect_gt(p, 0.90)
 })
 
+test_that("tost: matches PFIM equation 4 for negative branch", {
+  theta <- 0.8
+  h0 <- 1
+  rse <- 20
+  delta_L <- 0.6
+  alpha <- 0.05
+
+  beta1 <- theta - h0
+  se <- abs(theta) * rse / 100
+  z_alpha <- qnorm(1 - alpha)
+  expected <- 1 - pnorm(z_alpha - (beta1 + delta_L) / se)
+
+  expect_equal(
+    compute_power_tost(theta, rse, delta_L = delta_L, h0 = h0, alpha = alpha),
+    expected,
+    tolerance = 1e-12
+  )
+})
+
+test_that("tost: matches PFIM equation 5 for positive branch", {
+  theta <- 1.2
+  h0 <- 1
+  rse <- 20
+  delta_L <- 0.6
+  alpha <- 0.05
+
+  beta1 <- theta - h0
+  se <- abs(theta) * rse / 100
+  z_alpha <- qnorm(1 - alpha)
+  expected <- pnorm(-z_alpha - (beta1 - delta_L) / se)
+
+  expect_equal(
+    compute_power_tost(theta, rse, delta_L = delta_L, h0 = h0, alpha = alpha),
+    expected,
+    tolerance = 1e-12
+  )
+})
+
 test_that("tost: outside margin returns 0", {
   # theta=0.5, delta_L=0.2 => beta1=0.5 > 0.2
   p <- compute_power_tost(0.5, 10, delta_L = 0.2, h0 = 0)
@@ -346,6 +422,37 @@ test_that("nsn_tost: consistency — power at n_needed >= target", {
   rse_at_n <- 30 * sqrt(50 / res$n_needed)
   p <- compute_power_tost(1, rse_at_n, delta_L = 2, h0 = 0, alpha = 0.05)
   expect_gte(p, 0.80 - 0.01)  # tolerance for ceiling
+})
+
+test_that("nsn_tost: matches PFIM equations 6 and 7 plus FIM scaling", {
+  n0 <- 50L
+  rse <- 30
+  delta_L <- 0.6
+  alpha <- 0.05
+  target <- 0.80
+  z_alpha <- qnorm(1 - alpha)
+
+  theta_neg <- 0.8
+  beta_neg <- theta_neg - 1
+  nse_neg <- (-beta_neg - delta_L) / (-z_alpha + qnorm(1 - target))
+  rse_needed_neg <- nse_neg / abs(theta_neg) * 100
+  n_needed_neg <- ceiling((rse / rse_needed_neg)^2 * n0)
+
+  res_neg <- compute_nsn_tost(theta_neg, rse, n0, delta_L = delta_L,
+                              h0 = 1, alpha = alpha, power_target = target)
+  expect_equal(res_neg$rse_needed, rse_needed_neg, tolerance = 1e-12)
+  expect_equal(res_neg$n_needed, as.integer(n_needed_neg))
+
+  theta_pos <- 1.2
+  beta_pos <- theta_pos - 1
+  nse_pos <- (-beta_pos + delta_L) / (z_alpha + qnorm(target))
+  rse_needed_pos <- nse_pos / abs(theta_pos) * 100
+  n_needed_pos <- ceiling((rse / rse_needed_pos)^2 * n0)
+
+  res_pos <- compute_nsn_tost(theta_pos, rse, n0, delta_L = delta_L,
+                              h0 = 1, alpha = alpha, power_target = target)
+  expect_equal(res_pos$rse_needed, rse_needed_pos, tolerance = 1e-12)
+  expect_equal(res_pos$n_needed, as.integer(n_needed_pos))
 })
 
 test_that("nsn_tost: higher power_target needs more subjects", {

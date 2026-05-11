@@ -4,15 +4,22 @@
 
 mod_raw_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    div(class = "surface-card",
-      fluidRow(
-        column(8, p(class = "section-title", "Full .ext file content")),
-        column(2, uiOutput(ns("run_selector"))),
-        column(2, downloadButton(ns("export_csv"), "Download CSV",
-                                 class = "btn btn-sm btn-default",
-                                 style = "margin-top:22px; width:100%;"))
-      ),
+  page_shell(
+    page_header(
+      "Raw Data",
+      "Raw parsed .ext content for diagnostics and export.",
+      eyebrow = "Diagnostic"
+    ),
+    page_section(
+      "Raw data controls",
+      control_panel(
+        uiOutput(ns("run_selector")),
+        downloadButton(ns("export_csv"), "Download CSV",
+                       class = "btn btn-sm btn-default")
+      )
+    ),
+    table_panel(
+      "Full .ext file content",
       DTOutput(ns("raw_ext"))
     )
   )

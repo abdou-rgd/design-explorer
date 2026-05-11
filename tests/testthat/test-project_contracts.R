@@ -172,3 +172,90 @@ test_that("universal reset reaches state owners", {
   expect_match(compare_txt, "observeEvent\\(reset_trigger\\(\\)")
   expect_match(compare_txt, "run_ids\\(character\\(\\)\\)")
 })
+
+test_that("legacy metric card calls are absent from app modules", {
+  app_r_dir <- file.path(PROJECT_ROOT, "app", "R")
+  app_files <- list.files(app_r_dir, pattern = "\\.R$", full.names = TRUE)
+  app_files <- app_files[basename(app_files) != "helpers_ui.R"]
+  calls <- vapply(app_files, function(path) {
+    txt <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    matches <- gregexpr("\\bmetric_card_v5\\s*\\(", txt, perl = TRUE)[[1]]
+    if (length(matches) == 1L && matches[1] == -1L) 0L else length(matches)
+  }, integer(1))
+  calls <- calls[calls > 0L]
+
+  expect_length(calls, 0L)
+})
+
+test_that("plot workspaces do not use legacy plot-card containers", {
+  app_r_dir <- file.path(PROJECT_ROOT, "app", "R")
+  app_files <- list.files(app_r_dir, pattern = "\\.R$", full.names = TRUE)
+  offenders <- vapply(app_files, function(path) {
+    txt <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    grepl('class\\s*=\\s*"plot-card"', txt)
+  }, logical(1))
+
+  expect_length(app_files[offenders], 0L)
+})
+
+test_that("power and mrgsolve panels use V7 workspace helpers", {
+  checked_files <- file.path(PROJECT_ROOT, "app", "R",
+                             c("mod_power.R", "mod_mrgsolve.R"))
+  offenders <- vapply(checked_files, function(path) {
+    txt <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    grepl('class\\s*=\\s*"surface-card"', txt)
+  }, logical(1))
+
+  expect_length(checked_files[offenders], 0L)
+})
+
+test_that("power settings keep GROUPSIZE and N what-if in one control bar", {
+  power_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_power.R"),
+                               warn = FALSE), collapse = "\n")
+
+  expect_equal(length(gregexpr("\\bsettings_bar\\s*\\(", power_txt, perl = TRUE)[[1]]), 1L)
+  expect_match(power_txt, "GROUPSIZE source")
+  expect_match(power_txt, "N \\(what-if\\).*initialized from GROUPSIZE")
+  expect_false(grepl("GROUPSIZE controls Power / NSN scaling", power_txt, fixed = TRUE))
+})
+
+test_that("power tab keeps long method education in documentation", {
+  power_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_power.R"),
+                               warn = FALSE), collapse = "\n")
+  doc_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_documentation.R"),
+                             warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("Ref.:", power_txt, fixed = TRUE))
+  expect_false(grepl("What is the TOST test?", power_txt, fixed = TRUE))
+  expect_false(grepl("How to read this table?", power_txt, fixed = TRUE))
+  expect_match(power_txt, "Open Power/TOST documentation")
+  expect_match(power_txt, "Directional H1: theta > H0")
+
+  expect_match(doc_txt, "Wald test")
+  expect_match(doc_txt, "N = N<sub>0</sub>")
+  expect_match(doc_txt, "TOST")
+  expect_match(doc_txt, "one-sided alpha")
+  expect_match(doc_txt, "app-specific directional mode")
+  expect_match(doc_txt, "PopED twoSided = FALSE")
+})
+
+test_that("SSE parameter filters stay compact and action-oriented", {
+  helpers_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "helpers_ui.R"),
+                                 warn = FALSE), collapse = "\n")
+  validation_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_sse_validation.R"),
+                                    warn = FALSE), collapse = "\n")
+  analysis_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_sse_analysis.R"),
+                                  warn = FALSE), collapse = "\n")
+  css_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "www", "styles.css"),
+                             warn = FALSE), collapse = "\n")
+
+  expect_match(helpers_txt, "compact_param_filter_ui <- function")
+  expect_match(helpers_txt, "param-filter-summary")
+  expect_match(helpers_txt, "Quick select")
+  expect_match(validation_txt, "compact_param_filter_ui\\(")
+  expect_match(validation_txt, "selected of")
+  expect_match(analysis_txt, "compact_param_filter_ui\\(")
+  expect_match(analysis_txt, "diagnostic_param_group")
+  expect_match(analysis_txt, "updateCheckboxGroupInput\\(session, \"selected_params\"")
+  expect_match(css_txt, "param-filter")
+})

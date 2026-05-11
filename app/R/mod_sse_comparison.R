@@ -9,111 +9,44 @@
 
 mod_sse_comparison_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    # --- Info banner ---
-    div(class = "alert alert-info", style = "border-radius:10px; margin-bottom:12px;",
-      tags$strong("Two-SSE Comparison"),
-      tags$p(style = "margin:6px 0 0; font-size:0.9em;",
-        "Compare an original design SSE with an optimized design SSE. ",
-        "Upload two PsN raw_results CSVs in the SSE Upload tab. ",
-        "True parameter values are extracted from the .ctl loaded in the Home tab."
-      )
+  page_shell(
+    page_header(
+      "SSE Comparison",
+      "Compare Design A and Design B SSE results side by side using empirical precision and distribution diagnostics.",
+      eyebrow = "Validation"
     ),
-
-    # --- SSE + .ctl status banners ---
     fluidRow(
       column(4, uiOutput(ns("sse_a_status"))),
       column(4, uiOutput(ns("sse_b_status"))),
       column(4, uiOutput(ns("ctl_status")))
     ),
-
-    # --- Status banner ---
     uiOutput(ns("status_banner")),
-
-    # --- Run health side-by-side ---
     uiOutput(ns("run_health_banner")),
-
-    # --- Controls ---
-    fluidRow(
-      column(4,
+    doc_callout(
+      "sse-comparison",
+      "Upload Design A and Design B in SSE Upload. True values come from the loaded control stream.",
+      "Open SSE comparison documentation"
+    ),
+    page_section(
+      "Comparison workspace",
+      subtitle = "Choose one active view; filters and exports stay tied to that view.",
+      control_panel(
         checkboxInput(ns("show_failed"), "Include failed runs in plots",
-                      value = FALSE)
-      ),
-      column(8,
-        div(style = paste0(
-          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
-          " background:#fafafa;"
+                      value = FALSE),
+        radioButtons(
+          ns("active_view"), "Active view",
+          choices = c(
+            "RSE comparison plot" = "rse",
+            "Distribution overlay" = "distributions",
+            "RSE comparison table" = "table"
+          ),
+          selected = "rse",
+          inline = TRUE
         ),
-          div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
-            tags$strong("Sections:", style = "white-space:nowrap;"),
-            checkboxGroupInput(
-              ns("visible_sections"), label = NULL,
-              choices = c("RSE Comparison" = "rse",
-                          "Distributions" = "distributions"),
-              selected = c("rse", "distributions"),
-              inline = TRUE
-            )
-          )
-        )
-      )
-    ),
-
-    # --- Parameter filter ---
-    fluidRow(column(12, uiOutput(ns("param_filter_ui")))),
-
-    # --- RSE Comparison ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('rse') > -1", ns("visible_sections")
+        uiOutput(ns("param_filter_ui"))
       ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Empirical RSE Comparison"),
-            plotOutput(ns("rse_plot"), height = "500px"),
-            plot_export_ui(ns, "rse_export",
-                           default_fname = "sse_rse_comparison")
-          )
-        )
-      ),
-      br(),
-      fluidRow(
-        column(12,
-          div(class = "param-table-wrap",
-            div(style = paste0(
-              "display:flex; justify-content:space-between;",
-              " align-items:center;"
-            ),
-              p(class = "section-title", style = "margin:0;",
-                "RSE Comparison Table"),
-              downloadButton(ns("export_csv"), "Export CSV",
-                             class = "btn-sm btn-default")
-            ),
-            DTOutput(ns("rse_table"))
-          )
-        )
-      ),
-      br()
-    ),
-
-    # --- Distribution overlay ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('distributions') > -1", ns("visible_sections")
-      ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Parameter Distributions Overlay"),
-            plotOutput(ns("dist_plot"), height = "600px"),
-            plot_export_ui(ns, "dist_export",
-                           default_fname = "sse_distributions_overlay")
-          )
-        )
-      ),
-      br()
-    ),
-
+      uiOutput(ns("active_view_ui"))
+    )
   )
 }
 
@@ -155,9 +88,11 @@ mod_sse_comparison_server <- function(id,
       tv   <- true_vals()
 
       if (is.null(orig) && is.null(opti)) {
-        return(div(class = "alert alert-warning",
-                   style = "border-radius:8px; margin-bottom:10px;",
-          tags$strong("Upload two SSE CSV files in the SSE Upload tab to begin.")
+        return(status_panel(
+          "Upload SSE CSV files",
+          tags$p("Upload Design A and Design B in the SSE Upload tab to begin."),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
         ))
       }
 
@@ -183,13 +118,15 @@ mod_sse_comparison_server <- function(id,
 
       cls <- if (length(missing) == 0L) "alert-success" else "alert-info"
 
-      div(class = paste("alert", cls),
-          style = "border-radius:8px; margin-bottom:10px; padding:8px 14px;",
-        tags$strong(paste(parts, collapse = " | ")),
+      status_panel(
+        "Comparison readiness",
+        tags$p(paste(parts, collapse = " | ")),
         if (length(missing) > 0L) {
-          tags$span(style = "margin-left:12px; color:#666;",
+          tags$p(class = "status-panel__muted",
             paste("Still needed:", paste(missing, collapse = ", ")))
-        }
+        },
+        tone = if (length(missing) == 0L) "success" else "info",
+        icon_name = "clipboard-check"
       )
     })
 
@@ -210,16 +147,12 @@ mod_sse_comparison_server <- function(id,
       hp <- tryCatch(health_opti(), error = function(e) NULL)
       if (is.null(ho) && is.null(hp)) return(NULL)
 
-      div(class = "alert",
-          style = paste0(
-            "border-radius:10px; margin-bottom:12px; padding:10px 14px;",
-            " background:#f8fafc; border:1px solid #e2e8f0;"
-          ),
-        tags$strong("Run Health Comparison", style = "font-size:1em;"),
-        div(style = "margin-top:6px;",
-          make_health_pills(ho, name_orig()),
-          make_health_pills(hp, name_opti())
-        )
+      status_panel(
+        "Run Health Comparison",
+        make_health_pills(ho, name_orig()),
+        make_health_pills(hp, name_opti()),
+        tone = "neutral",
+        icon_name = "heartbeat"
       )
     })
 
@@ -257,18 +190,36 @@ mod_sse_comparison_server <- function(id,
       default_sel <- all_params[is.na(rse_max) | rse_max <= 100]
       if (length(default_sel) == 0L) default_sel <- all_params
 
-      div(style = paste0(
-        "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
-        " margin-bottom:10px; background:#fafafa;"
-      ),
-        div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
-          tags$strong("Parameters:", style = "white-space:nowrap;"),
-          checkboxGroupInput(
-            session$ns("selected_params"), label = NULL,
-            choices = all_params, selected = default_sel,
-            inline = TRUE
-          )
-        )
+      checkboxGroupInput(
+        session$ns("selected_params"), label = "Parameters",
+        choices = all_params, selected = default_sel,
+        inline = TRUE
+      )
+    })
+
+    output$active_view_ui <- renderUI({
+      active <- input$active_view %||% "rse"
+      if (active == "distributions") {
+        return(plot_panel(
+          "Parameter distributions overlay",
+          plotOutput(session$ns("dist_plot"), height = "600px"),
+          plot_export_ui(session$ns, "dist_export",
+                         default_fname = "sse_distributions_overlay")
+        ))
+      }
+      if (active == "table") {
+        return(table_panel(
+          "RSE comparison table",
+          DTOutput(session$ns("rse_table")),
+          actions = downloadButton(session$ns("export_csv"), "Export CSV",
+                                   class = "btn-sm btn-default")
+        ))
+      }
+      plot_panel(
+        "Empirical RSE comparison",
+        plotOutput(session$ns("rse_plot"), height = "500px"),
+        plot_export_ui(session$ns, "rse_export",
+                       default_fname = "sse_rse_comparison")
       )
     })
 

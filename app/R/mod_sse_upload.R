@@ -9,74 +9,40 @@
 
 mod_sse_upload_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    # --- Info banner ---
-    div(class = "alert alert-info", style = "border-radius:10px; margin-bottom:12px;",
-      tags$strong("SSE Upload"),
-      tags$p(style = "margin:6px 0 0; font-size:0.9em;",
-        "Upload your PsN SSE results (raw_results_*.csv) here. ",
-        "All SSE tabs (Validation, Analysis, Comparison) will consume this data. ",
-        "Design A is required; Design B is optional (enables side-by-side comparison)."
-      ),
-      tags$p(style = "margin:4px 0 0; font-size:0.85em; color:#854d0e;",
-        tags$strong("Recommended:"),
-        " load your NONMEM outputs (.ext, .ctl, ...) in the Home tab first, ",
-        "then upload SSE results here. This ensures true parameter values ",
-        "and FIM RSE are available for all SSE diagnostics."
-      )
+  page_shell(
+    page_header(
+      "SSE Upload",
+      "Central upload point for PsN raw_results CSV files consumed by SSE Validation, Analysis, and Comparison.",
+      eyebrow = "Validation"
     ),
-
-    # --- Typical workflow (collapsible) ---
-    tags$details(
-      style = paste0(
-        "border:1px solid #ccc; border-radius:8px; padding:10px 14px;",
-        " margin-bottom:14px; background:#f9f9fb;"
-      ),
-      tags$summary(style = "cursor:pointer; font-weight:600; font-size:0.95em;",
-        "Typical optimal design workflow"
-      ),
-      div(style = "margin-top:10px; font-size:0.88em; line-height:1.7;",
-        tags$ol(style = "margin:0; padding-left:20px;",
-          tags$li(tags$strong("FIM evaluation"),
-            " of a candidate design (NONMEM $DESIGN, MAXEVAL=0)"),
-          tags$li(tags$strong("SSE"),
-            " to confirm the FIM predictions and analyze estimability"),
-          tags$li(tags$strong("FIM optimization"),
-            " to find better sampling times/doses (MAXEVAL>0)"),
-          tags$li(tags$strong("SSE on the optimized design"),
-            " to confirm the improvement"),
-          tags$li(tags$strong("Compare the two SSEs"),
-            " (original vs optimized) to quantify the gain")
+    doc_callout(
+      "sse-validation",
+      "Load NONMEM outputs in Home first when possible, then upload Design A and optional Design B raw_results CSV files here.",
+      "Open SSE workflow documentation"
+    ),
+    page_section(
+      "SSE data sources",
+      subtitle = "Design A is required. Design B enables side-by-side comparison.",
+      tags$div(class = "sse-upload-grid",
+        tags$div(class = "upload-panel upload-panel--primary",
+          tags$h4("Design A"),
+          fileInput(ns("sse_a"), "SSE results (raw_results_*.csv)",
+                    accept = ".csv", width = "100%"),
+          textInput(ns("name_a"), "Design name", value = "Original",
+                    width = "100%")
         ),
-        tags$p(style = "margin:8px 0 0; color:#555;",
-          "In this app: load the FIM results in the Home tab (step 1 or 3), ",
-          "then upload the corresponding SSE results here (step 2 or 4). ",
-          "Use Design A for the original and Design B for the optimized to ",
-          "enable side-by-side comparison (step 5)."
+        tags$div(class = "upload-panel",
+          tags$h4("Design B"),
+          fileInput(ns("sse_b"), "SSE results (optional)",
+                    accept = ".csv", width = "100%"),
+          textInput(ns("name_b"), "Design name", value = "Optimized",
+                    width = "100%")
+        ),
+        tags$div(class = "upload-panel upload-panel--status",
+          uiOutput(ns("upload_status"))
         )
       )
     ),
-
-    # --- File uploads + design names + status ---
-    fluidRow(
-      column(4,
-        fileInput(ns("sse_a"), "Design A - SSE results (raw_results_*.csv)",
-                  accept = ".csv", width = "100%"),
-        textInput(ns("name_a"), "Design name", value = "Original",
-                  width = "100%")
-      ),
-      column(4,
-        fileInput(ns("sse_b"), "Design B - SSE results (optional)",
-                  accept = ".csv", width = "100%"),
-        textInput(ns("name_b"), "Design name", value = "Optimized",
-                  width = "100%")
-      ),
-      column(4,
-        uiOutput(ns("upload_status"))
-      )
-    ),
-
-    # --- Summary banner ---
     uiOutput(ns("status_banner"))
   )
 }
@@ -156,28 +122,22 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
         if (!is.null(data)) {
           n_total   <- attr(data, "n_total") %||% nrow(data)
           n_success <- attr(data, "n_success") %||% sum(data$converged)
-          div(
-            style = paste0(
-              "padding:8px 12px; border-radius:8px; margin-bottom:6px;",
-              " background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"
-            ),
+          tags$div(
+            class = "upload-status-line upload-status-line--ready",
             icon("check-circle"),
-            tags$strong(sprintf(" %s: %d runs, %d converged", label, n_total, n_success))
+            tags$span(sprintf("%s: %d runs, %d converged", label, n_total, n_success))
           )
         } else {
-          div(
-            style = paste0(
-              "padding:8px 12px; border-radius:8px; margin-bottom:6px;",
-              " background:#f8fafc; border:1px solid #e2e8f0; color:#64748b;"
-            ),
+          tags$div(
+            class = "upload-status-line",
             icon("circle"),
-            sprintf(" %s: not loaded", label)
+            tags$span(sprintf("%s: not loaded", label))
           )
         }
       }
 
       tagList(
-        tags$p(tags$strong("Status"), style = "margin-bottom:6px; margin-top:25px;"),
+        tags$h4("Status"),
         make_line(a, "Design A"),
         make_line(b, "Design B (optional)")
       )
@@ -207,15 +167,11 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
         ))
       }
 
-      div(
-        class = "alert",
-        style = paste0(
-          "border-radius:10px; margin-top:6px; padding:10px 14px;",
-          " background:#f8fafc; border:1px solid #e2e8f0;"
-        ),
-        icon("bar-chart"),
-        tags$strong(" SSE data ready. "),
-        tags$span(paste(msgs, collapse = "  |  "), style = "font-size:0.9em;")
+      status_panel(
+        "SSE data ready",
+        tags$p(paste(msgs, collapse = " | ")),
+        tone = "success",
+        icon_name = "bar-chart"
       )
     })
 

@@ -62,69 +62,97 @@ for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) {
 
 ui <- navbarPage(
   title = span(
-    span("DE$IGN EXPLORER",
-         style = "font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:.04em;"),
-    span(paste0(.APP_VERSION, " \u2014 ", .APP_VERSION_NAME),
-         style = "font-size:.65rem; color:#93c5fd; font-style:italic; margin-left:10px; opacity:0.85;")
+    span(class = "brand-mark", "DE$IGN"),
+    span(class = "brand-wordmark", "Explorer"),
+    span(class = "brand-version", paste0(.APP_VERSION, " / ", .APP_VERSION_NAME))
   ),
   id = "navbar",
   inverse = TRUE,
   collapsible = TRUE,
+  windowTitle = "DE$IGN Explorer",
 
   header = tagList(
-    tags$head(google_fonts_link(), includeCSS("www/styles.css")),
+    tags$head(
+      google_fonts_link(),
+      includeCSS("www/styles.css"),
+      tags$script(HTML("
+        Shiny.addCustomMessageHandler('scroll-doc-section', function(id) {
+          setTimeout(function() {
+            var el = document.getElementById('doc-' + id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 160);
+        });
+      "))
+    ),
     div(style = "display:none;",
       textInput("primary_run_name", NULL, value = "Primary"),
       textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
       textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
     ),
-    div(class = "global-run-context",
-      div(class = "global-run-context__item",
-        span(class = "global-run-context__label", "Run"),
-        textOutput("global_run_label", inline = TRUE)
+    div(class = "app-command-deck",
+      div(class = "command-deck__intro",
+        div(class = "command-deck__eyebrow", "NONMEM $DESIGN workspace"),
+        div(class = "command-deck__title", "Load outputs, inspect the FIM, and validate precision from one run context."),
+        div(class = "global-run-context",
+          div(class = "global-run-context__item",
+            span(class = "global-run-context__label", "Run"),
+            textOutput("global_run_label", inline = TRUE)
+          ),
+          div(class = "global-run-context__control",
+            span(class = "global-run-context__label", "Table"),
+            selectInput("global_table_no", NULL,
+                        choices = "1", selected = "1", width = "82px")
+          )
+        )
       ),
-      div(class = "global-run-context__control",
-        span(class = "global-run-context__label", "Table"),
-        selectInput("global_table_no", NULL,
-                    choices = "1", selected = "1", width = "74px")
+      div(class = "command-deck__panels",
+        div(class = "command-panel command-panel--load",
+          div(class = "command-panel__header",
+            span(class = "command-panel__kicker", "Primary run"),
+            span(class = "command-panel__icon", icon("upload"))
+          ),
+          mod_upload_ui("upload")
+        ),
+        div(class = "command-panel command-panel--examples",
+          div(class = "command-panel__header",
+            span(class = "command-panel__kicker", "Reference cases"),
+            span(class = "command-panel__icon", icon("book-open"))
+          ),
+          mod_examples_ui("examples")
+        ),
+        div(class = "command-panel command-panel--compare",
+          div(class = "command-panel__header",
+            span(class = "command-panel__kicker", "Side-by-side"),
+            span(class = "command-panel__icon", icon("exchange-alt"))
+          ),
+          mod_compare_ui("compare")
+        )
       )
     )
   ),
 
   # -- Home ------------------------------------------------------------------
   tabPanel("Home", value = "home",
-    fluidRow(
-      column(3,
-        tags$div(class = "home-sidebar",
-          tags$div(class = "home-upload-compact",
-            tags$h6(class = "home-section-label", "Load Run"),
-            mod_upload_ui("upload"),
-            tags$hr(style = "margin:8px 0;"),
-            mod_examples_ui("examples")
-          ),
-          tags$div(class = "home-upload-compact", style = "margin-top:12px;",
-            mod_compare_ui("compare")
-          )
-        )
-      ),
-      column(9,
-        mod_home_ui("home")
-      )
-    )
+    mod_home_ui("home")
+  ),
+
+  # -- Documentation ---------------------------------------------------------
+  tabPanel("Documentation", value = "documentation",
+    mod_documentation_ui("documentation")
   ),
 
   # -- Results (dropdown) ----------------------------------------------------
-  navbarMenu("Results",
-    tabPanel("Parameters",  value = "params", mod_params_ui("params")),
-    tabPanel("RSE / SE",    value = "rse",    mod_rse_ui("rse")),
+  navbarMenu("Precision",
+    tabPanel("Parameter Table", value = "params", mod_params_ui("params")),
+    tabPanel("RSE / SE",       value = "rse",    mod_rse_ui("rse")),
     tabPanel("RELATIVEINF", value = "ri",     mod_relativeinf_ui("ri"))
   ),
 
   # -- Design (dropdown) -----------------------------------------------------
   navbarMenu("Design",
-    tabPanel("FIM & Criteria", value = "fim",   mod_fim_ui("fim")),
-    tabPanel("Optimal Times",  value = "times", mod_times_ui("times")),
-    tabPanel("Robust Design",  value = "prior", mod_prior_ui("prior"))
+    tabPanel("FIM Diagnostics", value = "fim",   mod_fim_ui("fim")),
+    tabPanel("Sampling Times",  value = "times", mod_times_ui("times")),
+    tabPanel("Robust Design",   value = "prior", mod_prior_ui("prior"))
   ),
 
   # -- Decision (dropdown) ---------------------------------------------------
@@ -141,10 +169,10 @@ ui <- navbarPage(
 
   # -- Validation (dropdown) -------------------------------------------------
   navbarMenu("Validation",
-    tabPanel("SSE Upload",     value = "sse_upload",    mod_sse_upload_ui("sse_upload")),
-    tabPanel("SSE Validation", value = "sse",           mod_sse_validation_ui("sse")),
-    tabPanel("SSE Analysis",   value = "sse_analysis",  mod_sse_analysis_ui("sse_analysis")),
-    tabPanel("SSE Comparison", value = "sse_comparison", mod_sse_comparison_ui("sse_comparison"))
+    tabPanel("Upload SSE",        value = "sse_upload",    mod_sse_upload_ui("sse_upload")),
+    tabPanel("FIM vs SSE",        value = "sse",           mod_sse_validation_ui("sse")),
+    tabPanel("SSE Diagnostics",   value = "sse_analysis",  mod_sse_analysis_ui("sse_analysis")),
+    tabPanel("Design Comparison", value = "sse_comparison", mod_sse_comparison_ui("sse_comparison"))
   ),
 
 )
@@ -174,6 +202,11 @@ server <- function(input, output, session) {
 
   # -- Shared design table selection ------------------------------------------
   selected_table_no <- reactiveVal(NULL)
+
+  observeEvent(input$open_doc_section, {
+    updateNavbarPage(session, "navbar", selected = "documentation")
+    session$sendCustomMessage("scroll-doc-section", input$open_doc_section)
+  }, ignoreInit = TRUE)
 
   # -- Upload module ----------------------------------------------------------
   upload   <- mod_upload_server("upload",   reset_trigger = reset_trigger)
@@ -489,13 +522,23 @@ server <- function(input, output, session) {
 
   mod_home_server("home",
     merged_ext   = merged_ext,
+    merged_shk   = merged_shk,
+    merged_coi   = merged_coi,
+    merged_clt   = merged_clt,
     merged_cpu   = merged_cpu,
     merged_tab   = merged_tab,
+    merged_ctl_lines = merged_ctl_lines,
+    merged_true_vals = merged_true_vals,
     ext_lines    = merged_ext_lines,
     primary_name = primary_name,
     tbl_no       = tbl_no,
     param_labels = param_labels_r,
     groupsize    = groupsize_r,
+    all_runs     = all_runs,
+    sse_a_data   = sse_upload$sse_a_data,
+    sse_b_data   = sse_upload$sse_b_data,
+    sse_name_a   = sse_upload$name_a,
+    sse_name_b   = sse_upload$name_b,
     reset_trigger = reset_trigger)
 }
 

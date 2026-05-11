@@ -23,29 +23,23 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
     # -- UI: conditional on mrgsolve availability -----------------------------
     output$mrgsolve_panel <- renderUI({
       if (!mrg_status$available) {
-        return(tags$div(
-          class = "surface-card",
-          style = "padding: 12px; margin-bottom: 12px; background: #fffbeb; border-left: 3px solid #f59e0b;",
-          tags$strong("PK simulation unavailable"),
-          tags$p(style = "margin: 4px 0 0 0; font-size: 0.85em; color: #92400e;",
+        return(status_panel(
+          "PK simulation unavailable",
+          tags$p(
             mrg_status$reason,
-            " — Install mrgsolve and Rtools for smooth PK curves."
-          )
+            " - Install mrgsolve and Rtools for smooth PK curves."
+          ),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
         ))
       }
 
-      tags$div(class = "surface-card",
-        style = "padding: 12px; margin-bottom: 12px;",
-
-        # Header with collapse toggle
-        tags$div(
-          style = "display: flex; align-items: center; gap: 8px; cursor: pointer;",
-          onclick = paste0("Shiny.setInputValue('", ns("toggle_panel"), "', Math.random())"),
-          tags$strong("PK simulation (mrgsolve)"),
-          icon("chevron-down", style = "font-size: 0.85em; color: #6b7280;")
-        ),
-
-        # Collapsible body (rendered server-side)
+      control_panel(
+        label = "PK simulation",
+        actionLink(ns("toggle_panel"), label = tagList(
+          icon("chevron-down"),
+          span("mrgsolve")
+        )),
         uiOutput(ns("panel_body"))
       )
     })

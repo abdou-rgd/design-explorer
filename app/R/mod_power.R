@@ -8,17 +8,7 @@
 
 mod_power_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    settings_bar(
-      numericInput(ns("groupsize"), "GROUPSIZE",
-                    value = 1L, min = 1L, step = 1L, width = "110px")
-    ),
-    tags$div(
-      class = "settings-help",
-      HTML("<b>GROUPSIZE</b> controls Power / NSN scaling. <b>TABLE NO.</b> is selected globally in the run context bar.")
-    ),
-    uiOutput(ns("content"))
-  )
+  tagList(uiOutput(ns("content")))
 }
 
 mod_power_server <- function(id, ext_data, param_labels,
@@ -30,7 +20,10 @@ mod_power_server <- function(id, ext_data, param_labels,
     ns <- session$ns
 
     # -- Design-level reactives -----------------------------------------------
-    groupsize_r <- reactive({ as.integer(input$groupsize %||% 1L) })
+    groupsize_r <- reactive({
+      val <- input$groupsize
+      if (is.null(val) || is.na(val) || val < 1L) 1L else as.integer(val)
+    })
 
     # Auto-fill groupsize from .ctl when upload/example suggests one
     observeEvent(suggested_groupsize(), {
@@ -103,76 +96,60 @@ mod_power_server <- function(id, ext_data, param_labels,
       tagList(
         # Settings bar
         settings_bar(
+          numericInput(ns("groupsize"), "GROUPSIZE source",
+                       value = 1L, min = 1L, step = 1L, width = "120px"),
+          numericInput(ns("n_total"), "N (what-if)",
+                       value = groupsize_r() %||% 1L,
+                       min = 1L, step = 1L, width = "120px"),
           numericInput(ns("h0"), "H0", value = 0,
                        step = 0.1, width = "90px"),
           numericInput(ns("alpha"), "Alpha", value = 0.05,
                        min = 0.001, max = 0.20, step = 0.005, width = "80px"),
           numericInput(ns("power_target"), "Target power", value = 0.80,
                        min = 0.50, max = 0.99, step = 0.05, width = "90px"),
-          checkboxInput(ns("two_sided"), "Two-sided", value = TRUE),
-          numericInput(ns("n_total"), "N (what-if)",
-                       value = groupsize_r() %||% 1L,
-                       min = 1L, step = 1L, width = "100px")
+          checkboxInput(ns("two_sided"), "Two-sided Wald", value = TRUE)
         ),
         tags$div(
           class = "settings-help",
-          HTML("<b>N (what-if)</b> seeded from GROUPSIZE &mdash; change to explore power/NSN at a different N without re-running $DESIGN. &nbsp;&middot;&nbsp; Wald statistic: W = (&theta; &minus; H<sub>0</sub>) / SE.")
+          HTML("<b>GROUPSIZE source</b> is the design-scale N detected from the control stream. <b>N (what-if)</b> initialized from GROUPSIZE; change it to explore power/NSN scenarios without re-running $DESIGN. &nbsp;&middot;&nbsp; Wald statistic: W = (&theta; &minus; H<sub>0</sub>) / SE. &nbsp;&middot;&nbsp; Uncheck <b>Two-sided Wald</b> for the app directional policy: Directional H1: theta &gt; H0.")
         ),
 
         # Tabs (popkin-style underline)
         popkin_tabs(ns,
           tabPanel("Power (Wald)",
             br(),
-            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
-                         border-left: 4px solid #2563eb;",
-              HTML(paste0(
-                "<p style='margin:0 0 6px 0; font-weight:600;'>What is the Wald test?</p>",
-                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
-                "The Wald test evaluates whether a parameter is <b>significantly different</b> ",
-                "from a reference value (H<sub>0</sub>, often 0). ",
-                "The statistic W = (&theta;<sub>0</sub> &minus; ",
-                "<span style='text-decoration:overline'>&theta;</span>) / SE follows a normal distribution.<br>",
-                "<b>Power</b> = probability of rejecting H<sub>0</sub> when the effect truly exists. ",
-                "Power &ge; 80% means the design will detect the effect in 80% of cases.<br>",
-                "<b>Usage</b>: \"Does my design have enough subjects to estimate this parameter precisely?\"<br>",
-                "<em>Ref.: Retout et al. 2007, Mentre &amp; Rousseau 2011.</em></p>"
-              ))
+            status_panel(
+              "Wald power quick read",
+              tags$p("Power is the probability of rejecting H0 when the effect exists. Two-sided Wald is the source-locked default. Directional H1: theta > H0 is the app-specific unchecked mode."),
+              doc_link("power", "Open Power/TOST documentation"),
+              tone = "info",
+              icon_name = "chart-bar"
             ),
-            div(class = "surface-card",
-              p(class = "section-title", "Power per parameter"),
+            table_panel(
+              "Power per parameter",
               DTOutput(ns("power_table")),
-              downloadButton(ns("dl_power"), "CSV", class = "btn btn-default btn-sm",
-                             style = "margin-top:8px;")
+              actions = downloadButton(ns("dl_power"), "CSV",
+                                       class = "btn btn-default btn-sm")
             )
           ),
           tabPanel("Sample Size (NSN)",
             br(),
-            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
-                         border-left: 4px solid #059669;",
-              HTML(paste0(
-                "<p style='margin:0 0 6px 0; font-weight:600;'>How to read this table?</p>",
-                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
-                "<b>Target RSE</b> = maximum RSE to achieve target power. ",
-                "Computation: SE<sub>target</sub> = |&theta;<sub>0</sub> &minus; ",
-                "<span style='text-decoration:overline'>&theta;</span>| / (z<sub>&alpha;</sub> + z<sub>&beta;</sub>), ",
-                "then RSE<sub>target</sub> = SE<sub>target</sub> / |",
-                "<span style='text-decoration:overline'>&theta;</span>| &times; 100.<br>",
-                "<b>N needed</b> = number of subjects to reach target RSE, ",
-                "by linear FIM scaling: N = N<sub>0</sub> &times; (RSE / RSE<sub>target</sub>)&sup2;.<br>",
-                "<b>N ratio</b> = N needed / current N. ",
-                "Ratio &le; 1: power already achieved. ",
-                "Ratio &gt; 1: more subjects needed.</p>"
-              ))
+            status_panel(
+              "NSN quick read",
+              tags$p("N needed estimates the sample size required to reach target power under FIM scaling. N ratio <= 1 means the current N is sufficient."),
+              doc_link("power", "Open Power/TOST documentation"),
+              tone = "success",
+              icon_name = "calculator"
             ),
-            div(class = "surface-card",
-              p(class = "section-title", "N needed to reach target power"),
+            table_panel(
+              "N needed to reach target power",
               DTOutput(ns("nsn_table")),
-              downloadButton(ns("dl_nsn"), "CSV", class = "btn btn-default btn-sm",
-                             style = "margin-top:8px;")
+              actions = downloadButton(ns("dl_nsn"), "CSV",
+                                       class = "btn btn-default btn-sm")
             ),
             br(),
-            div(class = "surface-card",
-              p(class = "section-title", "Power curve Power(N)"),
+            plot_panel(
+              "Power curve Power(N)",
               fluidRow(
                 column(4,
                   uiOutput(ns("param_selector"))
@@ -185,25 +162,15 @@ mod_power_server <- function(id, ext_data, param_labels,
           ),
           tabPanel("Equivalence (TOST)",
             br(),
-            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;
-                         border-left: 4px solid #7c3aed;",
-              HTML(paste0(
-                "<p style='margin:0 0 6px 0; font-weight:600;'>What is the TOST test?</p>",
-                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
-                "The TOST (Two One-Sided Tests) evaluates whether a parameter is ",
-                "<b>equivalent</b> to a reference value, i.e. within an ",
-                "equivalence margin [&minus;&delta;, +&delta;].<br>",
-                "Unlike the Wald test (\"is the effect different from zero?\"), ",
-                "TOST answers: \"is the effect <b>close enough</b> to zero ",
-                "to be considered negligible?\"<br>",
-                "<b>Usage</b>: covariate effect, bioequivalence, absence of clinical effect. ",
-                "If the parameter is outside the margin, power is 0 ",
-                "(equivalence cannot be demonstrated).<br>",
-                "<em>Ref.: PFIM user guide (Retout et al.), eq. 4-7. One-sided alpha (not divided).</em></p>"
-              ))
+            status_panel(
+              "TOST quick read",
+              tags$p("TOST checks whether a parameter is close enough to H0 to be considered equivalent. Parameters outside the margin cannot demonstrate equivalence, so power is 0."),
+              doc_link("power", "Open Power/TOST documentation"),
+              tone = "info",
+              icon_name = "balance-scale"
             ),
-            div(class = "surface-card", style = "margin-bottom: 16px;",
-              p(class = "section-title", "Equivalence margin"),
+            control_panel(
+              label = "Equivalence margin",
               fluidRow(
                 column(3,
                   numericInput(ns("delta_L"), "Delta (symmetric margin)",
@@ -223,32 +190,22 @@ mod_power_server <- function(id, ext_data, param_labels,
               )
             ),
             uiOutput(ns("tost_margin_warning")),
-            div(class = "surface-card",
-              p(class = "section-title", "Equivalence power per parameter"),
+            table_panel(
+              "Equivalence power per parameter",
               DTOutput(ns("equiv_table")),
-              downloadButton(ns("dl_equiv"), "CSV", class = "btn btn-default btn-sm",
-                             style = "margin-top:8px;")
+              actions = downloadButton(ns("dl_equiv"), "CSV",
+                                       class = "btn btn-default btn-sm")
             ),
             br(),
-            div(class = "surface-card", style = "margin-bottom:12px; padding:12px 16px;",
-              HTML(paste0(
-                "<p style='margin:0 0 6px 0; font-weight:600;'>How to read this table?</p>",
-                "<p style='font-size:.85rem; color:#475569; margin:0;'>",
-                "<b>Outside margin</b>: if |&theta; &minus; h<sub>0</sub>| &ge; &delta;, ",
-                "equivalence cannot be demonstrated (power = 0).<br>",
-                "<b>N needed</b>: by FIM scaling, same as the Wald test.<br>",
-                "<b>N ratio</b> &le; 1: current design is sufficient.</p>"
-              ))
-            ),
-            div(class = "surface-card",
-              p(class = "section-title", "N needed — equivalence"),
+            table_panel(
+              "N needed - equivalence",
               DTOutput(ns("equiv_nsn_table")),
-              downloadButton(ns("dl_equiv_nsn"), "CSV", class = "btn btn-default btn-sm",
-                             style = "margin-top:8px;")
+              actions = downloadButton(ns("dl_equiv_nsn"), "CSV",
+                                       class = "btn btn-default btn-sm")
             ),
             br(),
-            div(class = "surface-card",
-              p(class = "section-title", "Power curve Power(N) — equivalence"),
+            plot_panel(
+              "Power curve Power(N) - equivalence",
               fluidRow(
                 column(4,
                   uiOutput(ns("equiv_param_selector"))

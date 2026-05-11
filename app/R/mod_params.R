@@ -103,54 +103,33 @@ mod_params_server <- function(id, ext_data, shk_data, ext_lines,
     output$table3_ui <- renderUI({
       runs <- all_runs()
       if (length(runs) == 0L || all(sapply(runs, function(r) is.null(r$ext_data)))) {
-        return(div(class = "alert alert-info", style = "border-radius:10px;",
-                   "Load a .ext file to begin the analysis."))
+        return(page_shell(
+          page_header(
+            "Parameters",
+            "Unified Table 3 style comparison of criteria, precision, shrinkage, and optimal times.",
+            eyebrow = "Results"
+          ),
+          empty_state("Load a .ext file", "Parameters are available after a primary NONMEM .ext file is loaded.", "table")
+        ))
       }
 
-      tagList(
-        tags$details(style = paste0(
-            "margin-bottom:14px; background:#f8fafc; ",
-            "border:1px solid #e2e8f0; border-left:4px solid #2563eb; ",
-            "border-radius:8px; padding:10px 14px;"
-          ),
-          tags$summary(style = "cursor:pointer; font-weight:600; color:#2563eb;",
-                       "About these metrics"),
-          div(style = "padding:10px 2px 2px; font-size:0.88em; color:#475569; line-height:1.55;",
-            tags$p(HTML(paste0(
-              "<strong>OFV</strong> = &minus;log(det(FIM)) for D-optimality designs, ",
-              "or the optimality criterion value returned by NONMEM for other types ",
-              "(A, DS, R, Bayes). <strong>Smaller = more informative design</strong> ",
-              "(in the D case)."
-            ))),
-            tags$p(HTML(paste0(
-              "<strong>ΔOFV vs ref</strong> = OFV<sub>ref</sub> &minus; OFV<sub>run</sub>, ",
-              "on the raw optimality scale. Positive = the run is more informative than ",
-              "the reference; negative = less. Useful to see the absolute gap ",
-              "(<em>D-efficiency</em> only gives the relative ratio)."
-            ))),
-            tags$p(HTML(paste0(
-              "<strong>D-efficiency vs ref</strong> = ",
-              "(det(FIM<sub>run</sub>) / det(FIM<sub>ref</sub>))<sup>1/p</sup> &minus; 1, ",
-              "expressed in %. <strong>p</strong> is the number of estimable parameters ",
-              "from the reference run (THETA + OMEGA + SIGMA elements with a finite RSE). ",
-              "The 1/p exponent normalises the ratio per parameter so designs with ",
-              "different dimensionalities stay comparable. Usage: comparing different ",
-              "sampling schedules, or comparing FIM approximations of the same design ",
-              "(FIMTYPE, APPROX, VARCROSS) as a numerical sanity check. ",
-              "<em>Atkinson &amp; Donev (1992); Mentr&eacute; et al. (1997).</em>"
-            ))),
-            tags$p(HTML(paste0(
-              "<strong>Robust D-criterion [P10-P90]</strong> = geometric mean of ",
-              "det(FIM)<sup>1/p</sup> over n Monte-Carlo realisations of the parameter ",
-              "priors (n = number of $SIM TRUE=PRIOR subproblems). The bracket shows ",
-              "the 10th-90th percentile spread: narrow = design is stable across the ",
-              "prior; wide = design quality is sensitive to the true parameter values."
-            )))
-          )
+      page_shell(
+        page_header(
+          "Parameters",
+          "Unified Table 3 style comparison of criteria, precision, shrinkage, and optimal times.",
+          eyebrow = "Results"
         ),
-        div(class = "param-table-wrap",
-            p(class = "section-title", "Parameters - run comparison"),
-            DTOutput(ns("dt_all"))
+        status_panel(
+          "Metric definitions",
+          tags$p("OFV, D-efficiency, robust D-criterion, RSE, and shrinkage definitions are collected in Documentation."),
+          doc_link("parameters", "Open parameter documentation"),
+          tone = "info",
+          icon_name = "book-open"
+        ),
+        table_panel(
+          "Parameters - run comparison",
+          DTOutput(ns("dt_all")),
+          subtitle = "Rows are grouped by criterion, precision, shrinkage, and time outputs."
         )
       )
     })

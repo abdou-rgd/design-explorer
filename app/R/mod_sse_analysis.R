@@ -10,15 +10,15 @@
 
 mod_sse_analysis_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    # --- Info banner ---
-    div(class = "alert alert-info", style = "border-radius:10px; margin-bottom:12px;",
-      tags$strong("SSE Diagnostics"),
-      tags$p(style = "margin:6px 0 0; font-size:0.9em;",
+  page_shell(
+    page_header(
+      "SSE Diagnostics",
+      tagList(
         "Analyze the SSE results themselves: convergence quality, parameter ",
         "estimability, OFV distribution, and empirical correlations. ",
         "Load SSE data in the SSE Upload tab first."
-      )
+      ),
+      eyebrow = "Validation"
     ),
 
     # --- Design selector (A/B) ---
@@ -27,148 +27,48 @@ mod_sse_analysis_ui <- function(id) {
     # --- Run health banner (always visible) ---
     uiOutput(ns("run_health_banner")),
 
-    # --- Toggle + param filter ---
-    fluidRow(
-      column(6,
+    doc_callout(
+      "sse-analysis",
+      "Run-health, shrinkage, OFV, and parameter-distribution guidance is collected in Documentation.",
+      "Open SSE analysis documentation"
+    ),
+
+    page_section(
+      "Analysis workspace",
+      subtitle = "Choose one diagnostic view at a time. Parameter filters apply to parameter-based views.",
+      control_panel(
         checkboxInput(ns("show_failed"), "Include failed runs in plots",
-                      value = FALSE)
-      ),
-      column(6,
+                      value = FALSE),
         checkboxInput(ns("color_ofv"), "Color OFV by convergence status",
-                      value = TRUE)
-      )
-    ),
-    fluidRow(
-      column(12, uiOutput(ns("param_filter_ui")))
-    ),
-
-    # --- Plot selector ---
-    fluidRow(
-      column(12,
-        div(style = paste0(
-          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
-          " margin-bottom:10px; background:#fafafa;"
+                      value = TRUE),
+        radioButtons(
+          ns("active_view"), "Active view",
+          choices = c(
+            "Parameter distributions" = "distributions",
+            "OFV distribution" = "ofv",
+            "Shrinkage boxplot" = "shrink_box",
+            "Shrinkage vs RSE" = "shrink_scatter",
+            "Shrinkage summary table" = "shrink_table",
+            "Parameter diagnostics table" = "diagnostics"
+          ),
+          selected = "distributions",
+          inline = TRUE
         ),
-          div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
-            tags$strong("Sections to display:", style = "white-space:nowrap;"),
-            checkboxGroupInput(
-              ns("visible_sections"), label = NULL,
-              choices = c("Parameter Distributions" = "distributions",
-                          "OFV Distribution" = "ofv",
-                          "Shrinkage & Identifiability" = "shrinkage",
-                          "Parameter Diagnostics" = "diagnostics"),
-              selected = c("distributions", "ofv", "shrinkage", "diagnostics"),
-              inline = TRUE
-            )
-          )
-        )
-      )
-    ),
-
-    # --- Parameter distributions ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('distributions') > -1", ns("visible_sections")
+        radioButtons(
+          ns("diagnostic_param_group"), "Parameter set",
+          choices = c(
+            "Top issues" = "top",
+            "Fixed effects" = "theta",
+            "Variability" = "omega",
+            "Residual" = "sigma",
+            "All" = "all"
+          ),
+          selected = "top",
+          inline = TRUE
+        ),
+        uiOutput(ns("param_filter_ui"))
       ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Parameter Estimate Distributions"),
-            plotOutput(ns("dist_plot"), height = "600px"),
-            plot_export_ui(ns, "dist_export",
-                           default_fname = "sse_param_distributions")
-          )
-        )
-      ),
-      br()
-    ),
-
-    # --- OFV distribution ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('ofv') > -1", ns("visible_sections")
-      ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "OFV Distribution"),
-            plotOutput(ns("ofv_plot"), height = "350px"),
-            plot_export_ui(ns, "ofv_export",
-                           default_fname = "sse_ofv_distribution")
-          )
-        )
-      ),
-      br()
-    ),
-
-    # --- Shrinkage & Identifiability ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('shrinkage') > -1", ns("visible_sections")
-      ),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Shrinkage Distribution per ETA"),
-            plotOutput(ns("shrink_box"), height = "400px"),
-            plot_export_ui(ns, "shrink_box_export",
-                           default_fname = "sse_shrinkage_boxplot")
-          )
-        )
-      ),
-      br(),
-      fluidRow(
-        column(12,
-          div(class = "plot-card",
-            p(class = "section-title",
-              "Identifiability: Empirical RSE vs Mean Shrinkage"),
-            plotOutput(ns("shrink_scatter"), height = "500px"),
-            plot_export_ui(ns, "shrink_scatter_export",
-                           default_fname = "sse_shrinkage_rse_scatter")
-          )
-        )
-      ),
-      br(),
-      fluidRow(
-        column(12,
-          div(class = "param-table-wrap",
-            div(style = paste0(
-              "display:flex; justify-content:space-between;",
-              " align-items:center;"
-            ),
-              p(class = "section-title", style = "margin:0;",
-                "Shrinkage Summary Table"),
-              downloadButton(ns("export_shrink_csv"),
-                             "Export CSV", class = "btn-sm btn-default")
-            ),
-            DTOutput(ns("shrink_table"))
-          )
-        )
-      ),
-      br()
-    ),
-
-    # --- Per-parameter diagnostics table ---
-    conditionalPanel(
-      condition = sprintf(
-        "input['%s'].indexOf('diagnostics') > -1", ns("visible_sections")
-      ),
-      fluidRow(
-        column(12,
-          div(class = "param-table-wrap",
-            div(style = paste0(
-              "display:flex; justify-content:space-between;",
-              " align-items:center;"
-            ),
-              p(class = "section-title", style = "margin:0;",
-                "Per-Parameter Diagnostics"),
-              downloadButton(ns("export_diag_csv"), "Export CSV",
-                             class = "btn-sm btn-default")
-            ),
-            DTOutput(ns("diag_table"))
-          )
-        )
-      )
+      uiOutput(ns("active_view_ui"))
     )
   )
 }
@@ -191,18 +91,10 @@ mod_sse_analysis_server <- function(id,
       choices <- c("a" = "a", "b" = "b")
       names(choices) <- c(name_a(), name_b())
 
-      div(
-        style = paste0(
-          "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
-          " margin-bottom:10px; background:#fafafa;"
-        ),
-        div(style = "display:flex; align-items:center; gap:12px;",
-          tags$strong("Analyze:", style = "white-space:nowrap;"),
-          div(style = "margin-bottom:-15px;",
-            radioButtons(session$ns("which_design"), label = NULL,
-                         choices = choices, selected = "a", inline = TRUE)
-          )
-        )
+      control_panel(
+        label = "Analyze",
+        radioButtons(session$ns("which_design"), label = NULL,
+                     choices = choices, selected = "a", inline = TRUE)
       )
     })
 
@@ -222,24 +114,21 @@ mod_sse_analysis_server <- function(id,
     })
 
     output$run_health_banner <- renderUI({
-      rh <- run_health()
+      rh <- tryCatch(run_health(), error = function(e) NULL)
       if (is.null(rh)) {
-        return(div(class = "alert alert-warning",
-                   style = "border-radius:8px;",
-          tags$strong("No SSE data loaded."),
-          " Upload a PsN raw_results CSV in the SSE Upload tab."
+        return(status_panel(
+          "No SSE data loaded",
+          tags$p("Upload a PsN raw_results CSV in the SSE Upload tab."),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
         ))
       }
 
-      div(class = "alert",
-          style = paste0(
-            "border-radius:10px; margin-bottom:12px; padding:10px 14px;",
-            " background:#f8fafc; border:1px solid #e2e8f0;"
-          ),
-        tags$strong("Run Health", style = "font-size:1em;"),
-        div(style = "margin-top:6px;",
-          make_health_pills(rh)
-        )
+      status_panel(
+        "Run Health",
+        make_health_pills(rh),
+        tone = "neutral",
+        icon_name = "heartbeat"
       )
     })
 
@@ -251,23 +140,101 @@ mod_sse_analysis_server <- function(id,
       compute_param_distributions(dat, tv, param_labels())
     })
 
+    diagnostic_param_sets <- reactive({
+      dd <- dist_data()
+      req(dd)
+
+      meta <- dd |>
+        dplyr::group_by(param_label, param_type) |>
+        dplyr::summarise(
+          true_value = dplyr::first(true_value),
+          med = stats::median(estimate, na.rm = TRUE),
+          iqr = stats::IQR(estimate, na.rm = TRUE),
+          .groups = "drop"
+        ) |>
+        dplyr::mutate(
+          score = abs(med - true_value) / pmax(abs(true_value), 1e-12) +
+            iqr / pmax(abs(true_value), 1e-12)
+        )
+
+      top <- meta |>
+        dplyr::arrange(dplyr::desc(score)) |>
+        dplyr::slice_head(n = 12) |>
+        dplyr::pull(param_label)
+
+      list(
+        all = unique(dd$param_label),
+        top = top,
+        theta = unique(dd$param_label[dd$param_type == "THETA"]),
+        omega = unique(dd$param_label[grepl("^OMEGA", dd$param_type)]),
+        sigma = unique(dd$param_label[grepl("^SIGMA", dd$param_type)])
+      )
+    })
+
+    selected_diagnostic_group <- reactive({
+      sets <- diagnostic_param_sets()
+      group <- input$diagnostic_param_group %||% "top"
+      selected <- sets[[group]]
+      if (is.null(selected) || length(selected) == 0L) sets$all else selected
+    })
+
+    observeEvent(input$diagnostic_param_group, {
+      updateCheckboxGroupInput(
+        session, "selected_params",
+        selected = selected_diagnostic_group()
+      )
+    }, ignoreInit = TRUE)
+
+    observeEvent(input$params_all, {
+      sets <- diagnostic_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$all)
+    })
+    observeEvent(input$params_none, {
+      updateCheckboxGroupInput(session, "selected_params", selected = character())
+    })
+    observeEvent(input$params_top, {
+      updateRadioButtons(session, "diagnostic_param_group", selected = "top")
+      sets <- diagnostic_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$top)
+    })
+    observeEvent(input$params_theta, {
+      updateRadioButtons(session, "diagnostic_param_group", selected = "theta")
+      sets <- diagnostic_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$theta)
+    })
+    observeEvent(input$params_omega, {
+      updateRadioButtons(session, "diagnostic_param_group", selected = "omega")
+      sets <- diagnostic_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$omega)
+    })
+    observeEvent(input$params_sigma, {
+      updateRadioButtons(session, "diagnostic_param_group", selected = "sigma")
+      sets <- diagnostic_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$sigma)
+    })
+
     # --- Param filter UI ---
     output$param_filter_ui <- renderUI({
       dd <- dist_data()
       if (is.null(dd) || nrow(dd) == 0L) return(NULL)
 
       all_params <- unique(dd$param_label)
-      div(style = paste0(
-        "border:1px solid #ddd; border-radius:8px; padding:8px 12px;",
-        " margin-bottom:10px; background:#fafafa;"
-      ),
-        div(style = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;",
-          tags$strong("Parameters:", style = "white-space:nowrap;"),
-          checkboxGroupInput(
-            session$ns("selected_params"), label = NULL,
-            choices = all_params, selected = all_params,
-            inline = TRUE
-          )
+      selected <- input$selected_params %||% selected_diagnostic_group()
+      summary <- sprintf("%d selected of %d", length(selected), length(all_params))
+
+      compact_param_filter_ui(
+        session$ns, "selected_params",
+        choices = all_params,
+        selected = selected,
+        summary = summary,
+        note = "Use Parameter set for readable defaults, then expand this filter for hand-picked plots.",
+        quick_actions = c(
+          params_top = "Top issues",
+          params_theta = "Fixed",
+          params_omega = "IIV",
+          params_sigma = "Residual",
+          params_all = "All",
+          params_none = "None"
         )
       )
     })
@@ -277,8 +244,15 @@ mod_sse_analysis_server <- function(id,
       dd <- dist_data()
       if (is.null(dd)) return(NULL)
       sel <- input$selected_params
-      if (is.null(sel) || length(sel) == 0L) return(dd)
+      if (is.null(sel)) sel <- selected_diagnostic_group()
+      if (length(sel) == 0L) return(dd[0, ])
       dd[dd$param_label %in% sel, ]
+    })
+
+    dist_plot_height <- reactive({
+      dd <- dist_data_filtered()
+      n_params <- if (is.null(dd) || nrow(dd) == 0L) 1L else length(unique(dd$param_label))
+      paste0(max(520L, min(980L, 260L * ceiling(n_params / 3))), "px")
     })
 
     # --- Distribution plot ---
@@ -293,6 +267,58 @@ mod_sse_analysis_server <- function(id,
     })
     output$dist_plot <- renderPlot({ dist_plot_fn() }, res = 110)
     plot_export_server(input, output, session, "dist_export", dist_plot_fn)
+
+    output$active_view_ui <- renderUI({
+      active <- input$active_view %||% "distributions"
+
+      if (active == "ofv") {
+        return(analysis_workspace(
+          "OFV distribution",
+          plotOutput(session$ns("ofv_plot"), height = "420px"),
+          plot_export_ui(session$ns, "ofv_export",
+                         default_fname = "sse_ofv_distribution")
+        ))
+      }
+      if (active == "shrink_box") {
+        return(analysis_workspace(
+          "Shrinkage distribution per ETA",
+          plotOutput(session$ns("shrink_box"), height = "460px"),
+          plot_export_ui(session$ns, "shrink_box_export",
+                         default_fname = "sse_shrinkage_boxplot")
+        ))
+      }
+      if (active == "shrink_scatter") {
+        return(analysis_workspace(
+          "Identifiability: empirical RSE vs mean shrinkage",
+          plotOutput(session$ns("shrink_scatter"), height = "560px"),
+          plot_export_ui(session$ns, "shrink_scatter_export",
+                         default_fname = "sse_shrinkage_rse_scatter")
+        ))
+      }
+      if (active == "shrink_table") {
+        return(analysis_workspace(
+          "Shrinkage summary table",
+          DTOutput(session$ns("shrink_table")),
+          actions = downloadButton(session$ns("export_shrink_csv"),
+                                   "Export CSV", class = "btn-sm btn-default")
+        ))
+      }
+      if (active == "diagnostics") {
+        return(analysis_workspace(
+          "Per-parameter diagnostics",
+          DTOutput(session$ns("diag_table")),
+          actions = downloadButton(session$ns("export_diag_csv"),
+                                   "Export CSV", class = "btn-sm btn-default")
+        ))
+      }
+
+      analysis_workspace(
+        "Parameter estimate distributions",
+        plotOutput(session$ns("dist_plot"), height = dist_plot_height()),
+        plot_export_ui(session$ns, "dist_export",
+                       default_fname = "sse_param_distributions")
+      )
+    })
 
     # --- OFV plot ---
     ofv_plot_fn <- reactive({

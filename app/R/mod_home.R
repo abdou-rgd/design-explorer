@@ -8,15 +8,26 @@
 
 mod_home_ui <- function(id) {
   ns <- NS(id)
-  tagList(
+  page_shell(
     uiOutput(ns("run_info")),
     uiOutput(ns("reset_btn"))
   )
 }
 
-mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
+mod_home_server <- function(id, merged_ext,
+                            merged_shk = reactive(NULL),
+                            merged_coi = reactive(NULL),
+                            merged_clt = reactive(NULL),
+                            merged_cpu, merged_tab,
+                            merged_ctl_lines = reactive(NULL),
+                            merged_true_vals = reactive(NULL),
                             ext_lines, primary_name, tbl_no,
                             param_labels, groupsize,
+                            all_runs = reactive(list()),
+                            sse_a_data = reactive(NULL),
+                            sse_b_data = reactive(NULL),
+                            sse_name_a = reactive("Design A"),
+                            sse_name_b = reactive("Design B"),
                             reset_trigger) {
   moduleServer(id, function(input, output, session) {
 
@@ -24,10 +35,17 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
       ext <- merged_ext()
       if (is.null(ext)) {
         return(tags$div(
-          class = "surface-card",
-          style = "text-align:center; padding:40px 20px; color:var(--text-muted);",
-          tags$h4("No run loaded", class = "section-title"),
-          tags$p("Upload NONMEM output files or load a built-in example to get started.")
+          class = "home-dashboard home-dashboard--empty",
+          page_header(
+            "NONMEM DESIGN Explorer",
+            "Load a primary NONMEM run, then add comparison runs when you want side-by-side scientific outputs.",
+            eyebrow = "Run workspace"
+          ),
+          empty_state(
+            "No primary run loaded",
+            "Upload NONMEM output files in the left panel or load a built-in example to start exploring parameters, design criteria, optimal times, and validation diagnostics.",
+            icon_name = "folder-open"
+          )
         ))
       }
 
@@ -72,15 +90,103 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
       # GROUPSIZE
       gs <- groupsize()
 
-      tagList(
-        section_header("Run Summary"),
-        tags$div(class = "home-cards-grid",
-          metric_card_v5("Method",       method_info$method, "flask",    "#2563eb", sub = method_sub),
-          metric_card_v5("Criterion",    criterion,   "bullseye",       "#7c3aed"),
-          metric_card_v5("OFV",          ofv_val,     "chart-line",     "#16a34a", sub = "-log(det(FIM))"),
-          metric_card_v5("Parameters",   n_params,    "list-ol",        "#d97706", sub = "estimated"),
-          metric_card_v5("Sample Size",  gs,          "users",          "#dc2626", sub = "GROUPSIZE"),
-          metric_card_v5("CPU Time",     cpu_txt,     "clock",          "#0891b2")
+      file_tile <- function(label, loaded, detail = NULL) {
+        tags$div(
+          class = paste("run-file-tile",
+                        if (isTRUE(loaded)) "run-file-tile--loaded"
+                        else "run-file-tile--missing"),
+          tags$span(class = "run-file-tile__name", label),
+          tags$strong(if (isTRUE(loaded)) "Loaded" else "Missing"),
+          if (!is.null(detail)) tags$small(detail)
+        )
+      }
+
+      runs <- all_runs()
+      comp_runs <- if (length(runs) > 1L) runs[-1] else list()
+      true_vals <- merged_true_vals()
+      ctl_loaded <- !is.null(merged_ctl_lines()) && length(merged_ctl_lines()) > 0L
+      sse_a <- sse_a_data()
+      sse_b <- sse_b_data()
+      sse_tile <- function(label, data) {
+        if (is.null(data)) {
+          return(tags$div(class = "run-state-card run-state-card--missing",
+            tags$span(label),
+            tags$strong("Not loaded"),
+            tags$small("Upload in SSE Upload")
+          ))
+        }
+        n_total <- attr(data, "n_total") %||% nrow(data)
+        n_success <- attr(data, "n_success") %||% sum(data$converged)
+        tags$div(class = "run-state-card run-state-card--ready",
+          tags$span(label),
+          tags$strong(sprintf("%d/%d converged", n_success, n_total)),
+          tags$small("raw_results CSV")
+        )
+      }
+
+      tags$div(
+        class = "home-dashboard",
+        page_header(
+          primary_name() %||% "Primary run",
+          "Primary run overview, loaded file context, comparison runs, and validation readiness.",
+          eyebrow = "Run workspace"
+        ),
+        page_section(
+          "Primary run",
+          subtitle = "Key metadata for the selected TABLE NO.",
+          fact_strip(
+            fact_item("Method", method_info$method, method_sub, "primary"),
+            fact_item("Criterion", criterion),
+            fact_item("OFV", ofv_val, "-log(det(FIM))"),
+            fact_item("Parameters", n_params, "estimated")
+          ),
+          tags$div(class = "run-meta-line",
+            tags$span(tags$strong("Sample size"), gs, "GROUPSIZE"),
+            tags$span(tags$strong("CPU time"), cpu_txt)
+          )
+        ),
+        page_section(
+          "Loaded files",
+          subtitle = "Operational data sources available to downstream tabs.",
+          tags$div(class = "run-file-grid",
+            file_tile(".ext", !is.null(merged_ext()), "criteria, RSE, convergence"),
+            file_tile(".shk", !is.null(merged_shk()), "shrinkage, RELATIVEINF"),
+            file_tile(".coi", !is.null(merged_coi()), "FIM matrix"),
+            file_tile(".clt", !is.null(merged_clt()), "FIM fallback"),
+            file_tile(".tab", !is.null(merged_tab()), "optimal times"),
+            file_tile(".ctl/.mod", ctl_loaded,
+                      if (!is.null(true_vals)) sprintf("%d true values", length(true_vals))
+                      else "true values, GROUPSIZE")
+          )
+        ),
+        page_section(
+          "Comparison and validation state",
+          subtitle = "Secondary design runs and SSE data are first-class analysis inputs.",
+          tags$div(class = "run-state-grid",
+            tags$div(class = "run-state-card",
+              tags$span("Comparison runs"),
+              tags$strong(length(comp_runs)),
+              if (length(comp_runs) > 0L) {
+                tags$small(paste(vapply(comp_runs, function(r) r$name %||% "Run",
+                                        character(1)), collapse = ", "))
+              } else {
+                tags$small("Add runs in the left panel")
+              }
+            ),
+            sse_tile(sse_name_a(), sse_a),
+            sse_tile(sse_name_b(), sse_b)
+          )
+        ),
+        page_section(
+          "Suggested checks",
+          subtitle = "Follow this order when reviewing a loaded run.",
+          tags$ol(class = "run-check-list",
+            tags$li(tags$strong("Parameters"), " - inspect OFV, RSE, shrinkage, and comparison rows."),
+            tags$li(tags$strong("FIM & Criteria"), " - review D-criterion and matrix diagnostics."),
+            tags$li(tags$strong("Optimal Times"), " - check sampling schedules when .tab is available."),
+            tags$li(tags$strong("Validation"), " - upload SSE outputs to compare empirical and FIM precision."),
+            tags$li(tags$strong("Documentation"), " - ", doc_link("overview", "open methods and references"))
+          )
         )
       )
     })
@@ -88,7 +194,7 @@ mod_home_server <- function(id, merged_ext, merged_cpu, merged_tab,
     output$reset_btn <- renderUI({
       if (is.null(merged_ext())) return(NULL)
       tags$div(
-        style = "margin-top: 8px;",
+        class = "home-actions",
         actionButton(session$ns("reset_run"), "Remove run",
           icon  = icon("times"),
           class = "btn-sm btn-danger")

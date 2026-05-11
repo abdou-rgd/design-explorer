@@ -4,16 +4,28 @@
 
 mod_times_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    settings_bar(
-      radioButtons(ns("time_unit"), "Time unit",
-        choices = c("Hours" = "hours", "Days" = "days"),
-        selected = "hours", inline = TRUE),
-      tags$div(style = "display:inline-flex; gap:12px; margin-left:16px;",
+  page_shell(
+    page_header(
+      "Optimal Times",
+      "Sampling-time summaries and prediction overlays from the loaded .tab file.",
+      eyebrow = "Design"
+    ),
+    page_section(
+      "Display controls",
+      control_panel(
+        radioButtons(ns("time_unit"), "Time unit",
+          choices = c("Hours" = "hours", "Days" = "days"),
+          selected = "hours", inline = TRUE),
         checkboxInput(ns("show_ctp"),   "CTP",   TRUE),
         checkboxInput(ns("show_doses"), "Doses", TRUE)
-        # Rug toggle deferred — geom_rug not yet wired into plot_pk_profile
       )
+    ),
+    status_panel(
+      "Optimal time interpretation",
+      tags$p("Robust distributions and model-curve behavior are documented separately from the operational workspace."),
+      doc_link("times", "Open optimal-times documentation"),
+      tone = "info",
+      icon_name = "book-open"
     ),
     mod_mrgsolve_ui(ns("mrgsolve")),
     uiOutput(ns("tier_badge")),
@@ -298,16 +310,16 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
           robust_banner,
           fluidRow(
             column(8,
-              div(class = "plot-card",
-                p(class = "section-title",
-                  "Optimal times distribution by stratum (robust design)"),
+              plot_panel(
+                "Optimal times distribution by stratum",
                 plotOutput(ns("prediction"), height = "420px"),
                 plot_export_ui(ns, "pred_export", default_fname = "robust_times_dist")
               )
             ),
             column(4,
-              div(class = "param-table-wrap",
-                p(class = "section-title", "Summary statistics (P10 / median / P90)"),
+              table_panel(
+                "Summary statistics",
+                subtitle = "P10, median, and P90 by stratum.",
                 DTOutput(ns("times_table"))
               )
             )
@@ -318,16 +330,16 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
       # Elementary / focei_repl / pkpd_multi / dose_time_opt / other
       tagList(
         fluidRow(column(12,
-          div(class = "plot-card",
-            p(class = "section-title", "Predicted curve and sampling points"),
+          plot_panel(
+            "Predicted curve and sampling points",
             plotOutput(ns("prediction"), height = "420px"),
             plot_export_ui(ns, "pred_export", default_fname = "prediction_plot")
           )
         )),
         br(),
         fluidRow(column(12,
-          div(class = "param-table-wrap",
-            p(class = "section-title", "Optimal times data"),
+          table_panel(
+            "Optimal times data",
             DTOutput(ns("times_table"))
           )
         ))
