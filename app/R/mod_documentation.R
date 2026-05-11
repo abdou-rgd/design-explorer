@@ -157,6 +157,23 @@ mod_documentation_ui <- function(id) {
             "The raw variance-covariance determinant is scale-dependent. The Validation ",
             "tab also reports the determinant of the empirical correlation matrix to ",
             "separate unit-scale artifacts from structural near-collinearity."
+          ),
+          tags$p(
+            "Upload ", tags$code("raw_results_*.csv"),
+            " from the PsN SSE output directory, not ",
+            tags$code("sse_results.csv"), ". The raw results contain one row per ",
+            "simulated data set and support empirical precision metrics and run filtering."
+          ),
+          tags$pre(paste0(
+            "# Syntax: wrapsn <ncpu> sse <model> [options]\n",
+            "wrapsn 10 sse model.mod -samples=200 -seed=12345 -shrinkage\n",
+            "# Quick smoke test before a full run\n",
+            "wrapsn 10 sse model.mod -samples=20 -seed=12345 -shrinkage"
+          )),
+          tags$p(
+            "Use ", tags$code("-seed"), " for reproducibility. This app filters on ",
+            tags$code("minimization_successful = 1"), "; you do not need to add ",
+            tags$code("-out_filter"), " for the app metrics."
           )
         ),
 
@@ -169,8 +186,18 @@ mod_documentation_ui <- function(id) {
           ),
           tags$p(
             "Shrinkage views require non-empty ", tags$code("shrinkage_eta*(%)"),
-            " columns in the PsN raw results. PsN writes these only when NONMEM computes ",
-            "post-hoc ETAs and PsN is not run with ", tags$code("-no_shrinkage"), "."
+            " columns in the PsN raw results. Use PsN option ",
+            tags$code("-shrinkage"), ". PsN writes these columns only when NONMEM ",
+            "computes post-hoc ETAs and PsN is not run with ",
+            tags$code("-no_shrinkage"), "."
+          ),
+          tags$p(
+            "Individual PK parameters are not stored in ",
+            tags$code("raw_results.csv"), ". Add the needed variables to a NONMEM ",
+            tags$code("$TABLE"), " and run SSE with ", tags$code("-keep_tables"),
+            " if you need one output row per subject or record. Combine ",
+            tags$code("-shrinkage -keep_tables"), " when you need both SSE ",
+            "shrinkage plots and individual PK table files."
           )
         ),
 

@@ -43,6 +43,40 @@ mod_sse_upload_ui <- function(id) {
         )
       )
     ),
+    science_note(
+      "PsN SSE command for shrinkage",
+      tags$p(
+        "Upload ", tags$code("raw_results_*.csv"),
+        " here. The SSE shrinkage plots use the ",
+        tags$code("shrinkage_eta*(%)"),
+        " columns from that file; ", tags$code("sse_results.csv"),
+        " is not enough for these diagnostics."
+      ),
+      tags$pre(
+        paste0(
+          "# Full diagnostic run\n",
+          "wrapsn 10 sse model.mod -samples=200 -seed=12345 -shrinkage\n",
+          "# Quick smoke test\n",
+          "wrapsn 10 sse model.mod -samples=20 -seed=12345 -shrinkage\n",
+          "# Also keep NONMEM $TABLE files for individual PK outputs\n",
+          "wrapsn 10 sse model.mod -samples=20 -seed=12345 -shrinkage -keep_tables"
+        )
+      ),
+      tags$ul(
+        tags$li(
+          "If ", tags$code("shrinkage_eta*(%)"),
+          " columns are present but all ", tags$code("NA"),
+          ", check that the estimation model computes post-hoc ETAs ",
+          "(", tags$code("POSTHOC"), ", no ", tags$code("MAXEVAL=0"),
+          ") and that PsN was not run with ", tags$code("-no_shrinkage"), "."
+        ),
+        tags$li(
+          tags$code("-keep_tables"),
+          " is only needed for subject/record-level NONMEM ",
+          tags$code("$TABLE"), " outputs, not for the SSE shrinkage plots."
+        )
+      )
+    ),
     uiOutput(ns("status_banner"))
   )
 }
