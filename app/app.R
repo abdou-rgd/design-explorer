@@ -16,6 +16,8 @@ library(stringr)
 library(purrr)
 library(readr)
 
+options(shiny.maxRequestSize = 100 * 1024 * 1024)
+
 # =============================================================================
 # Version info — affichée dans le sidebar
 # =============================================================================

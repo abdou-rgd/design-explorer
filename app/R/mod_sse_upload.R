@@ -57,7 +57,8 @@ mod_sse_upload_ui <- function(id) {
             "Recommended NONMEM convention: ",
             tags$code("FILE=pk_individuals.tab"),
             ". The app also accepts legacy PsN names like ",
-            tags$code("patab1.tab"), "."
+            tags$code("patab1.tab"),
+            ". Maximum upload size: 100 MB."
           )
         ),
         uiOutput(ns("patab_status"))

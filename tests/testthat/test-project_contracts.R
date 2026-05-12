@@ -114,6 +114,17 @@ test_that("SSE raw_results upload is centralized and injected into consumers", {
   expect_match(app_txt, "sse_orig\\s*=\\s*sse_upload\\$sse_a_data")
 })
 
+test_that("SSE archive uploads support realistic PsN keep_tables zip sizes", {
+  app_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "app.R"),
+                             warn = FALSE), collapse = "\n")
+  upload_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "R", "mod_sse_upload.R"),
+                                warn = FALSE), collapse = "\n")
+
+  expect_match(app_txt, "shiny\\.maxRequestSize")
+  expect_match(app_txt, "100\\s*\\*\\s*1024\\s*\\*\\s*1024")
+  expect_match(upload_txt, "100 MB")
+})
+
 test_that("SSE consumers use injected control-stream derived true values", {
   sse_files <- c(
     file.path(PROJECT_ROOT, "app", "R", "mod_sse_validation.R"),
