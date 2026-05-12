@@ -577,3 +577,30 @@ make_health_pills <- function(health, label = NULL) {
   )
 }
 
+# Build a compact funnel view from a compute_run_health() result.
+make_health_funnel <- function(health, label = NULL) {
+  if (is.null(health)) return(NULL)
+  stages <- health$stages
+  keep <- stages$stage %in% c(
+    "Total runs", "Minimization OK", "No boundary estimates", "Covariance OK"
+  )
+  stages <- stages[keep, , drop = FALSE]
+
+  steps <- lapply(seq_len(nrow(stages)), function(i) {
+    s <- stages[i, ]
+    tone <- health_pill_tone(s$stage, s$pct)
+    tags$div(
+      class = paste("health-funnel__step", paste0("health-funnel__step--", tone)),
+      tags$span(class = "health-funnel__label", s$stage),
+      tags$strong(sprintf("%d/%d", s$n, s$denom)),
+      tags$span(class = "health-funnel__pct", sprintf("%.0f%%", s$pct))
+    )
+  })
+
+  tags$div(
+    class = "health-funnel",
+    if (!is.null(label)) tags$strong(class = "health-funnel__title", label),
+    tags$div(class = "health-funnel__steps", steps)
+  )
+}
+

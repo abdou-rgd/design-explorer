@@ -168,7 +168,9 @@ mod_documentation_ui <- function(id) {
             "# Syntax: wrapsn <ncpu> sse <model> [options]\n",
             "wrapsn 10 sse model.mod -samples=200 -seed=12345 -shrinkage\n",
             "# Quick smoke test before a full run\n",
-            "wrapsn 10 sse model.mod -samples=20 -seed=12345 -shrinkage"
+            "wrapsn 10 sse model.mod -samples=20 -seed=12345 -shrinkage\n",
+            "# Keep NONMEM $TABLE files when individual PK outputs are needed\n",
+            "wrapsn 10 sse model.mod -samples=200 -seed=12345 -shrinkage -keep_tables"
           )),
           tags$p(
             "Use ", tags$code("-seed"), " for reproducibility. This app filters on ",
@@ -181,8 +183,8 @@ mod_documentation_ui <- function(id) {
           "sse-analysis", "SSE Analysis",
           tags$p(
             "SSE Analysis examines the simulation-estimation run set itself: run health, ",
-            "parameter distributions, OFV distribution, shrinkage views, and per-parameter ",
-            "diagnostic tables."
+            "parameter distributions, OFV distribution, shrinkage views, the SSE ",
+            "Reliability Map, and per-parameter diagnostic tables."
           ),
           tags$p(
             "Shrinkage views require non-empty ", tags$code("shrinkage_eta*(%)"),
@@ -195,9 +197,33 @@ mod_documentation_ui <- function(id) {
             "Individual PK parameters are not stored in ",
             tags$code("raw_results.csv"), ". Add the needed variables to a NONMEM ",
             tags$code("$TABLE"), " and run SSE with ", tags$code("-keep_tables"),
-            " if you need one output row per subject or record. Combine ",
+            " if you need one output row per subject or record. PsN keeps those ",
+            "outputs as separate table files in the SSE run directory, not as ",
+            "extra columns in ", tags$code("raw_results.csv"), ". Combine ",
             tags$code("-shrinkage -keep_tables"), " when you need both SSE ",
             "shrinkage plots and individual PK table files."
+          ),
+          tags$p(
+            "Naming convention: for new runs, use ",
+            tags$code("FILE=pk_individuals.tab"), " for the individual PK ",
+            tags$code("$TABLE"), ". This is the app's recommended contract: ",
+            "after PsN ", tags$code("-keep_tables"), ", the archive should ",
+            "contain ", tags$code("pk_individuals.tab-1"), " and ",
+            tags$code("pk_individuals.tab-sim-1"), " style files. Existing ",
+            "PsN-style names such as ", tags$code("patab1.tab"), " remain ",
+            "accepted for backwards compatibility."
+          ),
+          tags$pre(
+            "$TABLE ID TIME CL VC Q VP KA F1 IPRED ETA(1) ETA(2) ETA(3) ETA(4) ETA(5) ETA(6) FILE=pk_individuals.tab NOPRINT ONEHEADER"
+          ),
+          tags$p(
+            "Upload the zipped PsN output directory in SSE Upload to read ",
+            tags$code("pk_individuals.tab-*"), ", ",
+            tags$code("pk_individuals.tab-sim-*"), ", ",
+            tags$code("patab*.tab-*"), " or ",
+            tags$code("patab*.tab-sim-*"), ". The Individual PK views compare ",
+            "estimated subject-level values against the corresponding simulated ",
+            "values by table, sample, and ID."
           )
         ),
 

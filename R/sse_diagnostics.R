@@ -352,6 +352,187 @@ compute_param_diagnostics <- function(sse_all, true_values,
 
 
 # =============================================================================
+# detect_individual_pk_columns() — Identify subject/record-level PK outputs
+# =============================================================================
+
+#' Detect individual PK output columns in an uploaded SSE table.
+#'
+#' PsN `raw_results_*.csv` stores one row per simulated estimation run and
+#' contains run-level population estimates. Individual PK variables only appear
+#' when the NONMEM model writes them in `$TABLE` files and PsN keeps those table
+#' outputs.
+#'
+#' @param data Data frame or tibble with uploaded SSE columns.
+#' @return Character vector of detected individual PK-style column names.
+#' @export
+detect_individual_pk_columns <- function(data) {
+  if (is.null(data) || length(names(data)) == 0L) return(character())
+
+  nms <- names(data)
+  canonical <- c(
+    "ID", "TIME", "TAD", "DV", "PRED", "IPRED", "IRES", "IWRES",
+    "CL", "VC", "V", "V1", "Q", "VP", "V2", "KA", "F1",
+    "ETACL", "ETAVC", "ETAQ", "ETAVP", "ETAKA", "ETAF1"
+  )
+  eta_like <- "^ETA\\d+$"
+
+  nms[nms %in% canonical | grepl(eta_like, nms)]
+}
+
+
+# =============================================================================
+# compute_sse_reliability_map() — Combined precision / diagnostics map
+# =============================================================================
+
+#' Combine SSE empirical precision, diagnostics, and shrinkage into one table.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()` with a `converged` column.
+#' @param true_values Named numeric vector from `read_true_values()`.
+#' @param param_labels Optional named character vector for display labels.
+#' @return Tibble with parameter-level reliability diagnostics.
+#' @export
+compute_sse_reliability_map <- function(sse_all, true_values,
+                                        param_labels = NULL) {
+  empty <- tibble::tibble(
+    param = character(), param_label = character(), param_type = character(),
+    rse_empirical = numeric(), relative_bias = numeric(),
+    pct_se_na = numeric(), pct_rse_over_100 = numeric(),
+    mean_shrinkage = numeric(), risk_score = numeric()
+  )
+  if (is.null(sse_all) || nrow(sse_all) == 0L ||
+      is.null(true_values) || length(true_values) == 0L) {
+    return(empty)
+  }
+
+  if (!"converged" %in% names(sse_all)) {
+    sse_all$converged <- TRUE
+  }
+
+  converged <- sse_all[sse_all$converged, , drop = FALSE]
+  metrics <- compute_sse_metrics(converged, true_values, param_labels)
+  if (nrow(metrics) == 0L) return(empty)
+
+  diag <- compute_param_diagnostics(sse_all, true_values, param_labels)
+  shrink <- compute_shrinkage_summary(sse_all, param_labels,
+                                      only_converged = TRUE)
+  shrink_lookup <- if (nrow(shrink) > 0L) {
+    shrink |>
+      dplyr::select(param = omega, mean_shrinkage = mean_shrink)
+  } else {
+    tibble::tibble(param = character(), mean_shrinkage = numeric())
+  }
+
+  out <- metrics |>
+    dplyr::select(param, param_label, param_type,
+                  rse_empirical, relative_bias) |>
+    dplyr::left_join(
+      diag |>
+        dplyr::select(param, pct_se_na, pct_rse_over_100),
+      by = "param"
+    ) |>
+    dplyr::left_join(shrink_lookup, by = "param")
+
+  safe_abs <- function(x) ifelse(is.na(x), 0, abs(x))
+  safe_val <- function(x) ifelse(is.na(x), 0, x)
+  out$risk_score <- safe_abs(out$relative_bias) +
+    safe_val(out$rse_empirical) +
+    safe_val(out$pct_se_na) +
+    safe_val(out$pct_rse_over_100) +
+    safe_val(out$mean_shrinkage)
+
+  out |>
+    dplyr::arrange(dplyr::desc(risk_score))
+}
+
+
+# =============================================================================
+# plot_sse_reliability_map() — Bias / RSE reliability plot
+# =============================================================================
+
+#' Plot SSE reliability across parameters.
+#'
+#' x = relative bias, y = empirical RSE. Point size reflects unstable SE/RSE
+#' diagnostics, and facets separate THETA/OMEGA/SIGMA families.
+#'
+#' @param reliability_df Tibble from `compute_sse_reliability_map()`.
+#' @return ggplot object.
+#' @export
+plot_sse_reliability_map <- function(reliability_df) {
+  if (is.null(reliability_df) || nrow(reliability_df) == 0L) {
+    return(ggplot() +
+      labs(title = "No SSE reliability data available") +
+      .theme_design())
+  }
+
+  df <- reliability_df |>
+    dplyr::filter(!is.na(rse_empirical), !is.na(relative_bias))
+  if (nrow(df) == 0L) {
+    return(ggplot() +
+      labs(title = "No valid bias/RSE values for reliability map") +
+      .theme_design())
+  }
+
+  df$type_group <- dplyr::case_when(
+    grepl("^THETA", df$param_type) ~ "Fixed effects",
+    grepl("^OMEGA", df$param_type) ~ "IIV",
+    grepl("^SIGMA", df$param_type) ~ "Residual",
+    TRUE ~ df$param_type
+  )
+  df$family <- dplyr::case_when(
+    grepl("^THETA", df$param_type) ~ "THETA",
+    grepl("^OMEGA", df$param_type) ~ "OMEGA",
+    grepl("^SIGMA", df$param_type) ~ "SIGMA",
+    TRUE ~ "Other"
+  )
+  df$issue_burden <- pmax(
+    ifelse(is.na(df$pct_se_na), 0, df$pct_se_na),
+    ifelse(is.na(df$pct_rse_over_100), 0, df$pct_rse_over_100)
+  )
+
+  col_fixed <- "#6C2B91"
+  col_iiv   <- "#2B6991"
+  col_resid <- "#E07B39"
+
+  ggplot(df, aes(x = relative_bias, y = rse_empirical)) +
+    annotate("rect", xmin = -20, xmax = 20, ymin = -Inf, ymax = 30,
+             fill = "#16a34a", alpha = 0.06) +
+    geom_hline(yintercept = c(30, 50, 100), linetype = "dashed",
+               color = c("#16a34a", "#d97706", "#dc2626"),
+               linewidth = 0.35) +
+    geom_vline(xintercept = c(-20, 20), linetype = "dotted",
+               color = "#6b7280", linewidth = 0.35) +
+    geom_vline(xintercept = 0, color = "grey55", linewidth = 0.35) +
+    geom_point(aes(color = type_group, size = issue_burden),
+               alpha = 0.82) +
+    geom_text(aes(label = param_label), nudge_y = 3, size = 3,
+              check_overlap = TRUE) +
+    facet_wrap(~ family, scales = "free_y") +
+    scale_color_manual(
+      values = c("Fixed effects" = col_fixed,
+                 "IIV" = col_iiv,
+                 "Residual" = col_resid),
+      name = NULL
+    ) +
+    scale_size_continuous(
+      range = c(2.5, 7),
+      name = "SE/RSE issue burden (%)"
+    ) +
+    labs(
+      title = "SSE Reliability Map",
+      subtitle = "Green zone: |relative bias| <= 20% and empirical RSE < 30%",
+      x = "Relative bias (%)",
+      y = "Empirical RSE (%)"
+    ) +
+    .theme_design() +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 8)
+    )
+}
+
+
+# =============================================================================
 # plot_param_distributions() — Density/violin per parameter
 # =============================================================================
 

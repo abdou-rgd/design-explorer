@@ -2,10 +2,12 @@
 # mod_sse_analysis.R — SSE Intrinsic Analysis Tab
 #
 # Analyzes the SSE results themselves: run health, parameter distributions,
-# OFV distribution, empirical correlations, per-parameter diagnostics.
+# OFV distribution, empirical correlations, individual PK patab outputs,
+# per-parameter diagnostics.
 # Consumes shared SSE data from mod_sse_upload (centralized upload).
 #
-# Inputs: sse_a_shared, sse_b_shared (reactives), name_a, name_b, true_vals, param_labels
+# Inputs: sse_a_shared, sse_b_shared, individual_pk_shared (reactives),
+#         name_a, name_b, true_vals, param_labels
 # =============================================================================
 
 mod_sse_analysis_ui <- function(id) {
@@ -41,13 +43,19 @@ mod_sse_analysis_ui <- function(id) {
                       value = FALSE),
         checkboxInput(ns("color_ofv"), "Color OFV by convergence status",
                       value = TRUE),
+        checkboxInput(ns("pk_log_axes"), "Log scale for Individual PK recovery",
+                      value = FALSE),
         radioButtons(
           ns("active_view"), "Active view",
           choices = c(
             "Parameter distributions" = "distributions",
+            "SSE reliability map" = "reliability",
+            "Individual PK recovery" = "indiv_pk_recovery",
+            "Individual PK errors" = "indiv_pk_errors",
             "OFV distribution" = "ofv",
             "Shrinkage boxplot" = "shrink_box",
             "Shrinkage vs RSE" = "shrink_scatter",
+            "ETA risk ranking" = "eta_risk",
             "Shrinkage summary table" = "shrink_table",
             "Parameter diagnostics table" = "diagnostics"
           ),
@@ -80,7 +88,8 @@ mod_sse_analysis_server <- function(id,
                                     name_a = reactive("Design A"),
                                     name_b = reactive("Design B"),
                                     true_vals,
-                                    param_labels = reactive(NULL)) {
+                                    param_labels = reactive(NULL),
+                                    individual_pk_shared = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
     # --- Design selector (show only when B is loaded) ---
@@ -126,7 +135,7 @@ mod_sse_analysis_server <- function(id,
 
       status_panel(
         "Run Health",
-        make_health_pills(rh),
+        make_health_funnel(rh),
         tone = "neutral",
         icon_name = "heartbeat"
       )
@@ -271,6 +280,30 @@ mod_sse_analysis_server <- function(id,
     output$active_view_ui <- renderUI({
       active <- input$active_view %||% "distributions"
 
+      if (active == "reliability") {
+        return(analysis_workspace(
+          "SSE reliability map",
+          plotOutput(session$ns("reliability_map"), height = "560px"),
+          plot_export_ui(session$ns, "reliability_export",
+                         default_fname = "sse_reliability_map")
+        ))
+      }
+      if (active == "indiv_pk_recovery") {
+        return(analysis_workspace(
+          "Individual PK recovery",
+          plotOutput(session$ns("individual_pk_recovery"), height = "620px"),
+          plot_export_ui(session$ns, "individual_pk_recovery_export",
+                         default_fname = "individual_pk_recovery")
+        ))
+      }
+      if (active == "indiv_pk_errors") {
+        return(analysis_workspace(
+          "Individual PK relative errors",
+          plotOutput(session$ns("individual_pk_errors"), height = "460px"),
+          plot_export_ui(session$ns, "individual_pk_errors_export",
+                         default_fname = "individual_pk_relative_errors")
+        ))
+      }
       if (active == "ofv") {
         return(analysis_workspace(
           "OFV distribution",
@@ -293,6 +326,14 @@ mod_sse_analysis_server <- function(id,
           plotOutput(session$ns("shrink_scatter"), height = "560px"),
           plot_export_ui(session$ns, "shrink_scatter_export",
                          default_fname = "sse_shrinkage_rse_scatter")
+        ))
+      }
+      if (active == "eta_risk") {
+        return(analysis_workspace(
+          "ETA risk ranking",
+          DTOutput(session$ns("eta_risk_table")),
+          actions = downloadButton(session$ns("export_eta_risk_csv"),
+                                   "Export CSV", class = "btn-sm btn-default")
         ))
       }
       if (active == "shrink_table") {
@@ -330,6 +371,58 @@ mod_sse_analysis_server <- function(id,
     })
     output$ofv_plot <- renderPlot({ ofv_plot_fn() }, res = 110)
     plot_export_server(input, output, session, "ofv_export", ofv_plot_fn)
+
+    # --- Reliability map ---
+    reliability_data <- reactive({
+      dat <- sse_all()
+      tv  <- true_vals()
+      req(dat, tv)
+      compute_sse_reliability_map(dat, tv, param_labels())
+    })
+
+    reliability_filtered <- reactive({
+      rel <- reliability_data()
+      if (is.null(rel) || nrow(rel) == 0L) return(rel)
+      sel <- input$selected_params
+      if (is.null(sel)) sel <- selected_diagnostic_group()
+      if (length(sel) == 0L) return(rel[0, ])
+      rel[rel$param_label %in% sel, ]
+    })
+
+    reliability_plot_fn <- reactive({
+      rel <- reliability_filtered()
+      plot_sse_reliability_map(rel)
+    })
+    output$reliability_map <- renderPlot({ reliability_plot_fn() }, res = 110)
+    plot_export_server(input, output, session, "reliability_export",
+                       reliability_plot_fn)
+
+    # --- Individual PK patab outputs ---
+    individual_pk_recovery_data <- reactive({
+      dat <- individual_pk_shared()
+      if (is.null(dat) || nrow(dat) == 0L) return(tibble::tibble())
+      compute_individual_pk_recovery(dat)
+    })
+
+    individual_pk_recovery_plot <- reactive({
+      rec <- individual_pk_recovery_data()
+      plot_individual_pk_recovery(rec, log_axes = isTRUE(input$pk_log_axes))
+    })
+    output$individual_pk_recovery <- renderPlot({
+      individual_pk_recovery_plot()
+    }, res = 110)
+    plot_export_server(input, output, session, "individual_pk_recovery_export",
+                       individual_pk_recovery_plot)
+
+    individual_pk_errors_plot <- reactive({
+      rec <- individual_pk_recovery_data()
+      plot_individual_pk_error_distribution(rec)
+    })
+    output$individual_pk_errors <- renderPlot({
+      individual_pk_errors_plot()
+    }, res = 110)
+    plot_export_server(input, output, session, "individual_pk_errors_export",
+                       individual_pk_errors_plot)
 
     # --- Shrinkage: long-format data per replicate ---
     shrink_long <- reactive({
@@ -413,6 +506,62 @@ mod_sse_analysis_server <- function(id,
         req(ss)
         tryCatch(
           write.csv(ss, file, row.names = FALSE),
+          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+        )
+      }
+    )
+
+    # --- ETA risk ranking table ---
+    eta_risk_data <- reactive({
+      rel <- reliability_data()
+      if (is.null(rel) || nrow(rel) == 0L) return(tibble::tibble())
+      rel |>
+        dplyr::filter(grepl("^OMEGA\\(", param)) |>
+        dplyr::arrange(dplyr::desc(risk_score))
+    })
+
+    output$eta_risk_table <- renderDT({
+      eta <- eta_risk_data()
+      req(eta)
+      if (nrow(eta) == 0L) return(NULL)
+
+      display <- eta |>
+        dplyr::select(
+          Parameter = param_label,
+          Type = param_type,
+          `Empirical RSE (%)` = rse_empirical,
+          `Rel. Bias (%)` = relative_bias,
+          `Mean shrinkage (%)` = mean_shrinkage,
+          `% SE NA` = pct_se_na,
+          `% RSE>100` = pct_rse_over_100,
+          `Risk score` = risk_score
+        ) |>
+        dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2)))
+
+      datatable(display, rownames = FALSE,
+                class = "stripe hover compact",
+                options = list(pageLength = 20, dom = "t",
+                               scrollX = TRUE,
+                               order = list(list(7, "desc")))) |>
+        formatStyle("Mean shrinkage (%)",
+          backgroundColor = styleInterval(
+            c(30, 50), c("#dcfce7", "#fef3c7", "#fee2e2")
+          )) |>
+        formatStyle("Empirical RSE (%)",
+          backgroundColor = styleInterval(
+            c(30, 50, 100), c("#dcfce7", "#fef3c7", "#fed7aa", "#fee2e2")
+          ))
+    })
+
+    output$export_eta_risk_csv <- downloadHandler(
+      filename = function() {
+        paste0("sse_eta_risk_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        eta <- eta_risk_data()
+        req(eta)
+        tryCatch(
+          write.csv(eta, file, row.names = FALSE),
           error = function(e) warning("CSV export failed: ", conditionMessage(e))
         )
       }

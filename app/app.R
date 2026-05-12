@@ -509,7 +509,8 @@ server <- function(input, output, session) {
     name_a       = sse_upload$name_a,
     name_b       = sse_upload$name_b,
     true_vals    = merged_true_vals,
-    param_labels = param_labels_r)
+    param_labels = param_labels_r,
+    individual_pk_shared = sse_upload$individual_pk_data)
 
   mod_sse_comparison_server("sse_comparison",
     sse_orig         = sse_upload$sse_a_data,

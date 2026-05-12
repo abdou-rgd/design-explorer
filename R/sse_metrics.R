@@ -1040,6 +1040,15 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
     grepl("^SIGMA", summ$param_type) ~ "Residual",
     TRUE ~ summ$param_type
   )
+  summ$bias_flag <- dplyr::case_when(
+    abs(summ$rb) > 30 ~ "|RB| > 30%",
+    abs(summ$rb) > 20 ~ "|RB| 20-30%",
+    TRUE ~ "|RB| <= 20%"
+  )
+  summ$bias_flag <- factor(
+    summ$bias_flag,
+    levels = c("|RB| <= 20%", "|RB| 20-30%", "|RB| > 30%")
+  )
 
   col_fixed <- "#6C2B91"
   col_iiv   <- "#2B6991"
@@ -1065,8 +1074,8 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
       stat = "identity", width = 0.6, alpha = 0.7,
       color = "grey30", size = 0.4
     ) +
-    # Relative Bias as black diamond
-    geom_point(aes(y = rb), shape = 18, size = 3, color = "black") +
+    # Relative Bias as diamond, colored by magnitude
+    geom_point(aes(y = rb, color = bias_flag), shape = 18, size = 3) +
     # 95% CI error bar for bias
     geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper),
                   width = 0.2, size = 0.5, color = "black") +
@@ -1075,6 +1084,12 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
                  "IIV" = col_iiv,
                  "Residual" = col_resid),
       name = NULL
+    ) +
+    scale_color_manual(
+      values = c("|RB| <= 20%" = "#111827",
+                 "|RB| 20-30%" = "#d97706",
+                 "|RB| > 30%" = "#dc2626"),
+      name = "Relative bias"
     ) +
     labs(
       title = ttl,
