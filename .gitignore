@@ -1,8 +1,14 @@
-# Markdown — AI/dev only (CLAUDE.md, GEMINI.md, rules, plans)
+# Documentation / notes non vitales pour l'app
+*.md
+docs/
+audits/
+logs/
+.vscode/
+
+# Markdown — AI/dev only
 CLAUDE.md
 GEMINI.md
 .claude/rules/*.md
-docs/plans/*.md
 
 # R
 .Rhistory
@@ -57,47 +63,13 @@ docs/plans/*.md
 !app/www/styles.css
 
 # Dossiers lourds / non essentiels
-docs/inspiration/
-docs/other_softwares/
-docs/books/
-docs/courses/
 autoresearch/
-
-# Travail interne de stage (non pertinent pour les collègues)
-docs/intern_work/
-docs/superpowers/
-docs/reading_list.md
-
-# Outputs d'optimisation (generes, pas du source code)
-docs/results/
-
-# Suivi de stage (personnel, non redistribuable)
-docs/suivi/
-
-# Revues de litterature (personnel, non redistribuable)
-docs/review_*/
-docs/papers/*.md
 
 # Scripts de diagnostic one-off (personnel, pas du code source de l'app)
 scripts/
 
-# Documents non redistribuables
-docs/nonmem/manuel_nonmem.txt
-docs/nonmem/manuel_nonmem.pdf
-docs/nonmem/doc_nonmem_design.pdf
-docs/papers/bauer2021/bauer2021_text.txt
-docs/papers/bauer2021/bauer2021.pdf
-
-# Papiers et code tiers (non redistribuables / volumineux)
-docs/papers/*.zip
-docs/papers/FIM_cov_allocation_scripts/
-
 # Fichiers NONMEM XML
 *.xml
-
-# Pages web sauvegardées
-docs/*.htm
-docs/*_files/
 
 # Temp scripts
 tmp_*.py
