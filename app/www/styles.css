@@ -1212,6 +1212,11 @@ table.dataTable tbody tr.dtrg-group td {
   background: #fffbeb;
   color: #92400e;
 }
+.upload-status-line--processing {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
 
 .run-health-pills {
   display: flex;

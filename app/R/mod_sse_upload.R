@@ -121,6 +121,8 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
     sse_a_raw <- reactiveVal(NULL)
     sse_b_raw <- reactiveVal(NULL)
     individual_pk_raw <- reactiveVal(NULL)
+    patab_state <- reactiveVal("idle")
+    patab_error <- reactiveVal(NULL)
 
     # Reset
     if (!is.null(reset_trigger)) {
@@ -128,6 +130,8 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
         sse_a_raw(NULL)
         sse_b_raw(NULL)
         individual_pk_raw(NULL)
+        patab_state("idle")
+        patab_error(NULL)
         updateTextInput(session, "name_a", value = "Original")
         updateTextInput(session, "name_b", value = "Optimized")
       }, ignoreInit = TRUE)
@@ -185,9 +189,22 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
     # --- Parse optional PsN keep_tables archive ---
     observeEvent(input$patab_zip, {
       req(input$patab_zip)
+      patab_state("parsing")
+      patab_error(NULL)
+      individual_pk_raw(NULL)
       tryCatch({
-        dat <- read_sse_patab_outputs(input$patab_zip$datapath)
+        dat <- withProgress(
+          message = "Reading PsN keep_tables archive",
+          detail = "Extracting estimation and simulation table files...",
+          value = 0.15,
+          {
+            parsed <- read_sse_patab_outputs(input$patab_zip$datapath)
+            incProgress(0.85, detail = "Summarising individual PK outputs...")
+            parsed
+          }
+        )
         if (nrow(dat) == 0L) {
+          patab_state("empty")
           showNotification(
             paste0(
               "No individual PK table files found. Expected files like ",
@@ -200,6 +217,7 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
           return()
         }
         individual_pk_raw(dat)
+        patab_state("ready")
         sumry <- summarize_individual_pk_archive(dat)
         showNotification(
           sprintf("Individual PK tables loaded: %d samples, %d subjects.",
@@ -207,6 +225,8 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
           type = "message", duration = 4
         )
       }, error = function(e) {
+        patab_state("error")
+        patab_error(conditionMessage(e))
         showNotification(paste("patab read error:", conditionMessage(e)),
                          type = "error", duration = 8)
         individual_pk_raw(NULL)
@@ -299,6 +319,35 @@ mod_sse_upload_server <- function(id, reset_trigger = NULL) {
 
     output$patab_status <- renderUI({
       dat <- individual_pk_raw()
+      state <- patab_state()
+      if (identical(state, "parsing")) {
+        return(tags$div(
+          class = "upload-status-line upload-status-line--processing",
+          icon("spinner", class = "fa-spin"),
+          tags$span(
+            "Parsing PsN archive: extracting estimation and simulation tables..."
+          )
+        ))
+      }
+      if (identical(state, "empty")) {
+        return(tags$div(
+          class = "upload-status-line upload-status-line--warning",
+          icon("triangle-exclamation"),
+          tags$span(
+            "Archive parsed, but no individual PK table files were found."
+          )
+        ))
+      }
+      if (identical(state, "error")) {
+        return(tags$div(
+          class = "upload-status-line upload-status-line--warning",
+          icon("triangle-exclamation"),
+          tags$span(
+            "Archive parsing failed: ",
+            patab_error() %||% "unknown error"
+          )
+        ))
+      }
       if (is.null(dat)) {
         return(tags$div(
           class = "upload-status-line",

@@ -123,6 +123,8 @@ test_that("SSE archive uploads support realistic PsN keep_tables zip sizes", {
   expect_match(app_txt, "shiny\\.maxRequestSize")
   expect_match(app_txt, "100\\s*\\*\\s*1024\\s*\\*\\s*1024")
   expect_match(upload_txt, "100 MB")
+  expect_match(upload_txt, "withProgress")
+  expect_match(upload_txt, "upload-status-line--processing")
 })
 
 test_that("SSE consumers use injected control-stream derived true values", {
