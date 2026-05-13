@@ -297,6 +297,7 @@ test_that("plot_sse_reliability_map returns an empty state or a faceted ggplot",
 
   expect_s3_class(p, "ggplot")
   expect_true(inherits(p$facet, "FacetWrap"))
+  expect_s3_class(ggplot2::ggplot_build(p), "ggplot_built")
 })
 
 

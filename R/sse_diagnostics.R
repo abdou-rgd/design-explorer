@@ -492,12 +492,18 @@ plot_sse_reliability_map <- function(reliability_df) {
   col_fixed <- "#6C2B91"
   col_iiv   <- "#2B6991"
   col_resid <- "#E07B39"
+  rse_thresholds <- data.frame(
+    rse_empirical = c(30, 50, 100),
+    threshold_color = c("#16a34a", "#d97706", "#dc2626"),
+    stringsAsFactors = FALSE
+  )
 
   ggplot(df, aes(x = relative_bias, y = rse_empirical)) +
     annotate("rect", xmin = -20, xmax = 20, ymin = -Inf, ymax = 30,
              fill = "#16a34a", alpha = 0.06) +
-    geom_hline(yintercept = c(30, 50, 100), linetype = "dashed",
-               color = c("#16a34a", "#d97706", "#dc2626"),
+    geom_hline(data = rse_thresholds,
+               aes(yintercept = rse_empirical, color = threshold_color),
+               inherit.aes = FALSE, linetype = "dashed",
                linewidth = 0.35) +
     geom_vline(xintercept = c(-20, 20), linetype = "dotted",
                color = "#6b7280", linewidth = 0.35) +
@@ -510,7 +516,11 @@ plot_sse_reliability_map <- function(reliability_df) {
     scale_color_manual(
       values = c("Fixed effects" = col_fixed,
                  "IIV" = col_iiv,
-                 "Residual" = col_resid),
+                 "Residual" = col_resid,
+                 "#16a34a" = "#16a34a",
+                 "#d97706" = "#d97706",
+                 "#dc2626" = "#dc2626"),
+      breaks = c("Fixed effects", "IIV", "Residual"),
       name = NULL
     ) +
     scale_size_continuous(
