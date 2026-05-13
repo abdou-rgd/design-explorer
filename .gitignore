@@ -1,6 +1,6 @@
 # Documentation / notes non vitales pour l'app
 *.md
-docs/
+/docs/
 audits/
 logs/
 .vscode/
