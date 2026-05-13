@@ -194,6 +194,16 @@ mod_documentation_ui <- function(id) {
             tags$code("-no_shrinkage"), "."
           ),
           tags$p(
+            "The RSE-shrinkage map and ETA review ranking are app-derived ",
+            "exploratory diagnostics, not native PsN plots or validated ",
+            "pharmacometric scores. They combine literature-supported signals: ",
+            "empirical SSE precision, parameter recovery diagnostics, run-level ",
+            "standard-error issues, and ETA shrinkage. Savic and Karlsson ",
+            "(2009) motivate interpreting EBE-based diagnostics in light of ",
+            "shrinkage, especially above about 20-30%, but do not propose this ",
+            "exact bivariate plot or the composite ranking score."
+          ),
+          tags$p(
             "Individual PK parameters are not stored in ",
             tags$code("raw_results.csv"), ". Add the needed variables to a NONMEM ",
             tags$code("$TABLE"), " and run SSE with ", tags$code("-keep_tables"),

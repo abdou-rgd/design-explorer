@@ -163,10 +163,13 @@ compute_param_distributions <- function(sse_all, true_values,
 #' the distribution across the K converged replicates. Each ETA(N) is mapped
 #' to its corresponding OMEGA(N,N) diagonal parameter.
 #'
-#' Shrinkage interpretation (Savic & Karlsson 2009):
-#'   < 30 %  : posterior dominated by data (good)
-#'   30-50 % : acceptable
-#'   > 50 %  : posterior dominated by prior (design weakly informative)
+#' Shrinkage interpretation:
+#'   <= 20 % : low shrinkage
+#'   20-30 % : caution range
+#'   > 30 %  : EBE-based diagnostics may be unreliable
+#'
+#' Savic & Karlsson (2009) recommend caution when eta- or epsilon-shrinkage
+#' is substantial, usually greater than about 20-30%.
 #'
 #' @param sse_all      Tibble from read_sse_raw_all()
 #' @param param_labels Named character vector mapping OMEGA(N,N) -> display name
@@ -668,9 +671,9 @@ plot_ofv_distribution <- function(sse_all, color_by_status = FALSE) {
 
 #' Boxplot of per-replicate shrinkage for each ETA.
 #'
-#' Visualises how stable the shrinkage is across SSE replicates. High median
-#' with narrow IQR = structurally weak identifiability; wide IQR = shrinkage
-#' varies sample to sample.
+#' Visualises how stable the shrinkage is across SSE replicates. A high median
+#' indicates that EBE-based diagnostics for this ETA need caution; a wide IQR
+#' indicates that shrinkage varies sample to sample.
 #'
 #' @param shrink_long Tibble from compute_shrinkage_long()
 #' @param title       Plot title (NULL = auto)
@@ -695,20 +698,20 @@ plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
 
   p <- ggplot(df, aes(x = param_label, y = shrinkage)) +
     # Reference zones
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 30,
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 20,
              fill = "#16a34a", alpha = 0.06) +
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 30, ymax = 50,
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 20, ymax = 30,
              fill = "#d97706", alpha = 0.06) +
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 50, ymax = Inf,
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 30, ymax = Inf,
              fill = "#dc2626", alpha = 0.06) +
-    geom_hline(yintercept = c(30, 50), linetype = "dashed",
+    geom_hline(yintercept = c(20, 30), linetype = "dashed",
                color = "grey50", size = 0.3) +
     geom_boxplot(fill = "#2B6991", alpha = 0.7, color = "grey30",
                  width = 0.6, outlier.size = 0.8) +
     labs(
       title = ttl,
       subtitle = sprintf(
-        "N=%d replicates | Green <30%% | Amber 30-50%% | Red >50%% (Savic & Karlsson 2009)",
+        "N=%d replicates | Green <=20%% | Amber 20-30%% | Red >30%%: caution for EBE diagnostics (Savic & Karlsson 2009)",
         n_rep
       ),
       x = NULL, y = "Shrinkage (%)"
@@ -725,18 +728,23 @@ plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
 
 
 # =============================================================================
-# plot_shrinkage_rse_scatter() — RSE vs shrinkage scatter, identifiability tiers
+# plot_shrinkage_rse_scatter() — Exploratory RSE vs shrinkage scatter
 # =============================================================================
 
-#' Scatter plot of empirical RSE vs mean shrinkage for each OMEGA parameter.
+#' Exploratory scatter plot of empirical RSE vs mean shrinkage per OMEGA.
 #'
-#' Classifies each variance parameter into an identifiability tier:
-#'   Green  : RSE < 30 % AND shrinkage < 50 %  (estimable, informative)
-#'   Amber  : one side marginal
-#'   Red    : shrinkage > 80 %  (prior dominates, design not informative)
+#' This app-derived view combines two literature-supported diagnostics:
+#' empirical SSE precision and ETA shrinkage. Savic & Karlsson (2009) motivate
+#' interpreting EBE-based diagnostics in light of shrinkage; they do not propose
+#' this exact RSE-vs-shrinkage plot.
 #'
-#' The shrinkage axis uses Savic & Karlsson (2009) thresholds; the RSE axis
-#' uses the pharmacometrics convention (< 30 % = good precision).
+#' Classifies each variance parameter into a review tier:
+#'   Green  : RSE < 30 % AND shrinkage <= 20 %
+#'   Amber  : RSE >= 30 % OR shrinkage 20-30 %
+#'   Red    : shrinkage > 30 %, where EBE-based diagnostics may be unreliable
+#'
+#' The shrinkage axis marks the Savic & Karlsson (2009) caution range
+#' (>20-30%); the RSE axis uses the local precision target (<30%).
 #'
 #' @param sse_all      Tibble from read_sse_raw_all()
 #' @param true_values  Named numeric vector from read_true_values()
@@ -752,7 +760,7 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
                                        shrink_sum = NULL) {
   if (is.null(sse_all) || nrow(sse_all) == 0L || length(true_values) == 0L) {
     return(ggplot() +
-      labs(title = "Load SSE data and .ctl to see identifiability scatter") +
+      labs(title = "Load SSE data and .ctl to see exploratory RSE-shrinkage map") +
       .theme_design())
   }
 
@@ -787,14 +795,14 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
   }
 
   df$tier <- dplyr::case_when(
-    df$shrinkage > 80 ~ "Red (shrink >80%)",
-    df$rse < 30 & df$shrinkage < 50 ~ "Green (RSE<30% & shrink<50%)",
+    df$shrinkage > 30 ~ "Red (shrink >30%)",
+    df$rse < 30 & df$shrinkage <= 20 ~ "Green (RSE<30% & shrink<=20%)",
     TRUE ~ "Amber (marginal)"
   )
   df$tier <- factor(df$tier, levels = c(
-    "Green (RSE<30% & shrink<50%)",
+    "Green (RSE<30% & shrink<=20%)",
     "Amber (marginal)",
-    "Red (shrink >80%)"
+    "Red (shrink >30%)"
   ))
 
   x_max <- max(100, max(df$shrinkage, na.rm = TRUE) * 1.1)
@@ -802,16 +810,16 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
 
   p <- ggplot(df, aes(x = shrinkage, y = rse)) +
     # Tier rectangles (background)
-    annotate("rect", xmin = -Inf, xmax = 50, ymin = -Inf, ymax = 30,
+    annotate("rect", xmin = -Inf, xmax = 20, ymin = -Inf, ymax = 30,
              fill = "#16a34a", alpha = 0.08) +
-    annotate("rect", xmin = 80, xmax = Inf, ymin = -Inf, ymax = Inf,
+    annotate("rect", xmin = 30, xmax = Inf, ymin = -Inf, ymax = Inf,
              fill = "#dc2626", alpha = 0.08) +
     # Threshold lines
     geom_hline(yintercept = 30, linetype = "dashed",
                color = "#16a34a", size = 0.4) +
-    geom_vline(xintercept = 50, linetype = "dashed",
+    geom_vline(xintercept = 20, linetype = "dashed",
                color = "#d97706", size = 0.4) +
-    geom_vline(xintercept = 80, linetype = "dashed",
+    geom_vline(xintercept = 30, linetype = "dashed",
                color = "#dc2626", size = 0.4) +
     # Points
     geom_point(aes(color = tier), size = 4, alpha = 0.85) +
@@ -819,18 +827,18 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
               size = 3, check_overlap = TRUE) +
     scale_color_manual(
       values = c(
-        "Green (RSE<30% & shrink<50%)" = "#16a34a",
+        "Green (RSE<30% & shrink<=20%)" = "#16a34a",
         "Amber (marginal)"              = "#d97706",
-        "Red (shrink >80%)"             = "#dc2626"
+        "Red (shrink >30%)"             = "#dc2626"
       ),
       drop = FALSE, name = NULL
     ) +
     coord_cartesian(xlim = c(0, x_max), ylim = c(0, y_max)) +
     labs(
-      title = "Identifiability: Empirical RSE vs Mean Shrinkage",
+      title = "Exploratory Precision vs Mean ETA Shrinkage",
       subtitle = paste0(
-        "One point per OMEGA | RSE threshold 30% | Shrinkage thresholds 50/80% ",
-        "(Savic & Karlsson 2009)"
+        "App-derived map: empirical SSE RSE plus shrinkage caution range ",
+        ">20-30% motivated by Savic & Karlsson 2009"
       ),
       x = "Mean shrinkage (%) across SSE replicates",
       y = "Empirical RSE (%)"

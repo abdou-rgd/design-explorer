@@ -54,8 +54,8 @@ mod_sse_analysis_ui <- function(id) {
             "Individual PK errors" = "indiv_pk_errors",
             "OFV distribution" = "ofv",
             "Shrinkage boxplot" = "shrink_box",
-            "Shrinkage vs RSE" = "shrink_scatter",
-            "ETA risk ranking" = "eta_risk",
+            "Exploratory RSE-shrinkage map" = "shrink_scatter",
+            "Heuristic ETA review ranking" = "eta_risk",
             "Shrinkage summary table" = "shrink_table",
             "Parameter diagnostics table" = "diagnostics"
           ),
@@ -355,7 +355,7 @@ mod_sse_analysis_server <- function(id,
       }
       if (active == "shrink_scatter") {
         return(analysis_workspace(
-          "Identifiability: empirical RSE vs mean shrinkage",
+          "Exploratory precision vs shrinkage map",
           plotOutput(session$ns("shrink_scatter"), height = "560px"),
           plot_export_ui(session$ns, "shrink_scatter_export",
                          default_fname = "sse_shrinkage_rse_scatter")
@@ -363,7 +363,7 @@ mod_sse_analysis_server <- function(id,
       }
       if (active == "eta_risk") {
         return(analysis_workspace(
-          "ETA risk ranking",
+          "Heuristic ETA review ranking",
           DTOutput(session$ns("eta_risk_table")),
           actions = downloadButton(session$ns("export_eta_risk_csv"),
                                    "Export CSV", class = "btn-sm btn-default")
@@ -526,7 +526,7 @@ mod_sse_analysis_server <- function(id,
                                scrollX = TRUE)) |>
         formatStyle("Mean (%)",
           backgroundColor = styleInterval(
-            c(30, 50), c("#dcfce7", "#fef3c7", "#fee2e2")
+            c(20, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
           ))
     })
 
@@ -567,7 +567,7 @@ mod_sse_analysis_server <- function(id,
           `Mean shrinkage (%)` = mean_shrinkage,
           `% SE NA` = pct_se_na,
           `% RSE>100` = pct_rse_over_100,
-          `Risk score` = risk_score
+          `Heuristic review score` = risk_score
         )
       numeric_cols <- vapply(display, is.numeric, logical(1))
       display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
@@ -579,7 +579,7 @@ mod_sse_analysis_server <- function(id,
                                order = list(list(7, "desc")))) |>
         formatStyle("Mean shrinkage (%)",
           backgroundColor = styleInterval(
-            c(30, 50), c("#dcfce7", "#fef3c7", "#fee2e2")
+            c(20, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
           )) |>
         formatStyle("Empirical RSE (%)",
           backgroundColor = styleInterval(
