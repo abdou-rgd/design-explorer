@@ -243,15 +243,18 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
   }
 
   df$error_capped <- pmax(pmin(df$relative_error, 100), -100)
-  summary_df <- df |>
-    dplyr::filter(!is.na(relative_error)) |>
-    dplyr::group_by(param) |>
-    dplyr::summarise(
-      median_error = stats::median(relative_error, na.rm = TRUE),
-      iqr_error = stats::IQR(relative_error, na.rm = TRUE),
-      pct_abs20 = mean(abs(relative_error) <= 20, na.rm = TRUE) * 100,
-      .groups = "drop"
+  summary_source <- df[!is.na(df$relative_error), , drop = FALSE]
+  summary_rows <- lapply(split(summary_source, summary_source$param,
+                               drop = TRUE), function(group) {
+    data.frame(
+      param = group$param[[1]],
+      median_error = stats::median(group$relative_error, na.rm = TRUE),
+      iqr_error = stats::IQR(group$relative_error, na.rm = TRUE),
+      pct_abs20 = mean(abs(group$relative_error) <= 20, na.rm = TRUE) * 100,
+      stringsAsFactors = FALSE
     )
+  })
+  summary_df <- tibble::as_tibble(dplyr::bind_rows(summary_rows))
   summary_df$label <- sprintf(
     "median %+0.1f%%\nIQR %.1f%%\n|err|<=20%%: %.0f%%",
     summary_df$median_error, summary_df$iqr_error, summary_df$pct_abs20
@@ -320,12 +323,14 @@ plot_individual_pk_error_distribution <- function(recovery_data) {
       .theme_design())
   }
 
-  summary_df <- df |>
-    dplyr::group_by(param) |>
-    dplyr::summarise(
-      median_abs_error = stats::median(abs(relative_error), na.rm = TRUE),
-      .groups = "drop"
+  summary_rows <- lapply(split(df, df$param, drop = TRUE), function(group) {
+    data.frame(
+      param = group$param[[1]],
+      median_abs_error = stats::median(abs(group$relative_error), na.rm = TRUE),
+      stringsAsFactors = FALSE
     )
+  })
+  summary_df <- tibble::as_tibble(dplyr::bind_rows(summary_rows))
   df <- dplyr::left_join(df, summary_df, by = "param")
   df$param_ordered <- stats::reorder(df$param, df$median_abs_error)
 

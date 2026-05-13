@@ -153,18 +153,23 @@ mod_sse_analysis_server <- function(id,
       dd <- dist_data()
       req(dd)
 
-      meta <- dd |>
-        dplyr::group_by(param_label, param_type) |>
-        dplyr::summarise(
-          true_value = dplyr::first(true_value),
-          med = stats::median(estimate, na.rm = TRUE),
-          iqr = stats::IQR(estimate, na.rm = TRUE),
-          .groups = "drop"
-        ) |>
-        dplyr::mutate(
+      meta_rows <- lapply(split(dd, list(dd$param_label, dd$param_type),
+                                drop = TRUE), function(group) {
+        true_value <- group$true_value[[1]]
+        med <- stats::median(group$estimate, na.rm = TRUE)
+        iqr <- stats::IQR(group$estimate, na.rm = TRUE)
+        data.frame(
+          param_label = group$param_label[[1]],
+          param_type = group$param_type[[1]],
+          true_value = true_value,
+          med = med,
+          iqr = iqr,
           score = abs(med - true_value) / pmax(abs(true_value), 1e-12) +
-            iqr / pmax(abs(true_value), 1e-12)
+            iqr / pmax(abs(true_value), 1e-12),
+          stringsAsFactors = FALSE
         )
+      })
+      meta <- tibble::as_tibble(dplyr::bind_rows(meta_rows))
 
       top <- meta |>
         dplyr::arrange(dplyr::desc(score)) |>
@@ -535,8 +540,9 @@ mod_sse_analysis_server <- function(id,
           `% SE NA` = pct_se_na,
           `% RSE>100` = pct_rse_over_100,
           `Risk score` = risk_score
-        ) |>
-        dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2)))
+        )
+      numeric_cols <- vapply(display, is.numeric, logical(1))
+      display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
 
       datatable(display, rownames = FALSE,
                 class = "stripe hover compact",

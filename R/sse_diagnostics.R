@@ -556,11 +556,17 @@ plot_param_distributions <- function(dist_data, show_failed = FALSE) {
     return(ggplot() + labs(title = "No valid estimates") + .theme_design())
   }
 
-  # Compute medians and true values per parameter
-  summaries <- df |>
-    dplyr::group_by(param_label, true_value) |>
-    dplyr::summarise(median_est = median(estimate, na.rm = TRUE),
-                     .groups = "drop")
+  # Keep this summary in base R for compatibility with dplyr 1.0.x + vctrs 0.6+.
+  summary_rows <- lapply(split(df, list(df$param_label, df$true_value),
+                               drop = TRUE), function(group) {
+    data.frame(
+      param_label = group$param_label[[1]],
+      true_value = group$true_value[[1]],
+      median_est = stats::median(group$estimate, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+  })
+  summaries <- tibble::as_tibble(dplyr::bind_rows(summary_rows))
 
   p <- ggplot(df, aes(x = estimate))
 
