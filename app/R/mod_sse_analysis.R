@@ -69,7 +69,8 @@ mod_sse_analysis_ui <- function(id) {
             "Fixed effects" = "theta",
             "Variability" = "omega",
             "Residual" = "sigma",
-            "All" = "all"
+            "All" = "all",
+            "Custom" = "custom"
           ),
           selected = "top",
           inline = TRUE
@@ -188,43 +189,70 @@ mod_sse_analysis_server <- function(id,
     selected_diagnostic_group <- reactive({
       sets <- diagnostic_param_sets()
       group <- input$diagnostic_param_group %||% "top"
+      if (identical(group, "custom")) {
+        selected <- isolate(input$selected_params)
+        if (is.null(selected)) selected <- sets$top
+        return(selected)
+      }
       selected <- sets[[group]]
       if (is.null(selected) || length(selected) == 0L) sets$all else selected
     })
 
+    updating_param_selection <- reactiveVal(FALSE)
+    set_selected_params <- function(selected) {
+      updating_param_selection(TRUE)
+      on.exit(updating_param_selection(FALSE), add = TRUE)
+      freezeReactiveValue(input, "selected_params")
+      updateCheckboxGroupInput(session, "selected_params", selected = selected)
+    }
+    set_param_group <- function(group) {
+      updating_param_selection(TRUE)
+      on.exit(updating_param_selection(FALSE), add = TRUE)
+      freezeReactiveValue(input, "diagnostic_param_group")
+      updateRadioButtons(session, "diagnostic_param_group", selected = group)
+    }
+
     observeEvent(input$diagnostic_param_group, {
-      updateCheckboxGroupInput(
-        session, "selected_params",
-        selected = selected_diagnostic_group()
-      )
+      if (identical(input$diagnostic_param_group, "custom")) return()
+      set_selected_params(selected_diagnostic_group())
+    }, ignoreInit = TRUE)
+
+    observeEvent(input$selected_params, {
+      if (isTRUE(updating_param_selection())) return()
+      group <- input$diagnostic_param_group %||% "top"
+      if (!identical(group, "custom")) {
+        set_param_group("custom")
+      }
     }, ignoreInit = TRUE)
 
     observeEvent(input$params_all, {
       sets <- diagnostic_param_sets()
-      updateCheckboxGroupInput(session, "selected_params", selected = sets$all)
+      set_param_group("all")
+      set_selected_params(sets$all)
     })
     observeEvent(input$params_none, {
-      updateCheckboxGroupInput(session, "selected_params", selected = character())
+      set_param_group("custom")
+      set_selected_params(character())
     })
     observeEvent(input$params_top, {
-      updateRadioButtons(session, "diagnostic_param_group", selected = "top")
       sets <- diagnostic_param_sets()
-      updateCheckboxGroupInput(session, "selected_params", selected = sets$top)
+      set_param_group("top")
+      set_selected_params(sets$top)
     })
     observeEvent(input$params_theta, {
-      updateRadioButtons(session, "diagnostic_param_group", selected = "theta")
       sets <- diagnostic_param_sets()
-      updateCheckboxGroupInput(session, "selected_params", selected = sets$theta)
+      set_param_group("theta")
+      set_selected_params(sets$theta)
     })
     observeEvent(input$params_omega, {
-      updateRadioButtons(session, "diagnostic_param_group", selected = "omega")
       sets <- diagnostic_param_sets()
-      updateCheckboxGroupInput(session, "selected_params", selected = sets$omega)
+      set_param_group("omega")
+      set_selected_params(sets$omega)
     })
     observeEvent(input$params_sigma, {
-      updateRadioButtons(session, "diagnostic_param_group", selected = "sigma")
       sets <- diagnostic_param_sets()
-      updateCheckboxGroupInput(session, "selected_params", selected = sets$sigma)
+      set_param_group("sigma")
+      set_selected_params(sets$sigma)
     })
 
     # --- Param filter UI ---
@@ -233,7 +261,7 @@ mod_sse_analysis_server <- function(id,
       if (is.null(dd) || nrow(dd) == 0L) return(NULL)
 
       all_params <- unique(dd$param_label)
-      selected <- input$selected_params %||% selected_diagnostic_group()
+      selected <- isolate(input$selected_params) %||% selected_diagnostic_group()
       summary <- sprintf("%d selected of %d", length(selected), length(all_params))
 
       compact_param_filter_ui(
