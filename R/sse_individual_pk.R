@@ -246,11 +246,20 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
   summary_source <- df[!is.na(df$relative_error), , drop = FALSE]
   summary_rows <- lapply(split(summary_source, summary_source$param,
                                drop = TRUE), function(group) {
+    if (isTRUE(log_axes)) {
+      label_x <- min(group$sim[group$sim > 0], na.rm = TRUE)
+      label_y <- max(group$est[group$est > 0], na.rm = TRUE)
+    } else {
+      label_x <- -Inf
+      label_y <- Inf
+    }
     data.frame(
       param = group$param[[1]],
       median_error = stats::median(group$relative_error, na.rm = TRUE),
       iqr_error = stats::IQR(group$relative_error, na.rm = TRUE),
       pct_abs20 = mean(abs(group$relative_error) <= 20, na.rm = TRUE) * 100,
+      label_x = label_x,
+      label_y = label_y,
       stringsAsFactors = FALSE
     )
   })
@@ -266,7 +275,7 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
     geom_point(aes(color = error_capped), alpha = 0.45, size = 1.25) +
     geom_label(
       data = summary_df,
-      aes(x = -Inf, y = Inf, label = label),
+      aes(x = label_x, y = label_y, label = label),
       inherit.aes = FALSE,
       hjust = -0.05, vjust = 1.08,
       linewidth = 0, fill = "white", alpha = 0.82,
@@ -278,6 +287,11 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
       midpoint = 0, limits = c(-100, 100),
       name = "Relative error (%)\ncapped at +/-100"
     ) +
+    guides(color = guide_colorbar(
+      title.position = "top",
+      barheight = grid::unit(52, "pt"),
+      barwidth = grid::unit(14, "pt")
+    )) +
     labs(
       title = "Individual PK Recovery",
       subtitle = "Estimated table values vs simulated values; identity line marks perfect recovery",
@@ -287,6 +301,9 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
     .theme_design() +
     theme(
       legend.position = "right",
+      legend.title = element_text(size = 9),
+      legend.text = element_text(size = 8),
+      plot.margin = margin(5.5, 14, 5.5, 5.5),
       plot.title = element_text(hjust = 0.5),
       plot.subtitle = element_text(hjust = 0.5, size = 8)
     )

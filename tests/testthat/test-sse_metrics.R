@@ -423,5 +423,9 @@ test_that("individual PK plots return ggplot objects", {
   rec <- compute_individual_pk_recovery(patab)
 
   expect_s3_class(plot_individual_pk_recovery(rec), "ggplot")
+  expect_s3_class(
+    ggplot2::ggplot_build(plot_individual_pk_recovery(rec, log_axes = TRUE)),
+    "ggplot_built"
+  )
   expect_s3_class(plot_individual_pk_error_distribution(rec), "ggplot")
 })
