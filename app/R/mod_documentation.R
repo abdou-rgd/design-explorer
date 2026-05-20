@@ -10,8 +10,10 @@ mod_documentation_ui <- function(id) {
       "Operational reference for NONMEM DESIGN Explorer inputs, outputs, design diagnostics, and SSE workflows.",
       eyebrow = "Reference"
     ),
-    tags$div(class = "documentation-layout",
-      tags$nav(class = "documentation-nav",
+    tags$div(
+      class = "documentation-layout",
+      tags$nav(
+        class = "documentation-nav",
         tags$a(href = "#doc-overview", "Overview"),
         tags$a(href = "#doc-inputs", "Input files"),
         tags$a(href = "#doc-parameters", "Parameters / RSE / Shrinkage"),
@@ -24,50 +26,83 @@ mod_documentation_ui <- function(id) {
         tags$a(href = "#doc-robust", "Robust Design"),
         tags$a(href = "#doc-references", "References")
       ),
-      tags$div(class = "documentation-content",
+      tags$div(
+        class = "documentation-content",
         documentation_section(
-          "overview", "Overview",
+          "overview",
+          "Overview",
           tags$p(
             "NONMEM DESIGN Explorer is a post-processing dashboard for NONMEM ",
-            tags$code("$DESIGN"), " outputs. The operational tabs focus on run state, ",
+            tags$code("$DESIGN"),
+            " outputs. The operational tabs focus on run state, ",
             "tables, plots, and exports; this page keeps the longer methodology notes ",
             "and formulas in one place."
           ),
           tags$p(
             "Recommended workflow: load NONMEM design outputs in Home, inspect ",
             "parameters and FIM criteria, review optimal times, then upload PsN SSE ",
-            tags$code("raw_results_*.csv"), " files to validate empirical precision."
+            tags$code("raw_results_*.csv"),
+            " files to validate empirical precision."
           )
         ),
 
         documentation_section(
-          "inputs", "Input Files",
+          "inputs",
+          "Input Files",
           tags$dl(
             tags$dt(tags$code(".ext")),
-            tags$dd("Required for optimality criteria, RSE/SE, convergence, and most design summaries."),
+            tags$dd(
+              "Required for optimality criteria, RSE/SE, convergence, and most design summaries."
+            ),
             tags$dt(tags$code(".shk")),
             tags$dd("Optional shrinkage and RELATIVEINF source."),
             tags$dt(tags$code(".coi"), " / ", tags$code(".clt")),
-            tags$dd("Optional FIM/correlation matrix source for eigenvalues and heatmaps."),
+            tags$dd(
+              "Optional FIM/correlation matrix source for eigenvalues and heatmaps."
+            ),
             tags$dt(tags$code(".tab")),
-            tags$dd("Optional optimal-time table used by the Optimal Times and Robust Design views."),
-            tags$dt(tags$code(".ctl"), " / ", tags$code(".mod"), " / ", tags$code(".con")),
-            tags$dd("Optional control stream used for true values, GROUPSIZE, compartment labels, and robust-prior metadata."),
+            tags$dd(
+              "Optional optimal-time table used by the Optimal Times and Robust Design views."
+            ),
+            tags$dt(
+              tags$code(".ctl"),
+              " / ",
+              tags$code(".mod"),
+              " / ",
+              tags$code(".con")
+            ),
+            tags$dd(
+              "Optional control stream used for true values, GROUPSIZE, compartment labels, and robust-prior metadata."
+            ),
             tags$dt(tags$code("raw_results_*.csv")),
-            tags$dd("PsN SSE raw results. Upload in SSE Upload; Design A is required and Design B enables comparison.")
+            tags$dd(
+              "PsN SSE raw results. Upload in SSE Upload; Design A is ",
+              "required and Design B enables comparison. The app preserves ",
+              tags$code("hypothesis"),
+              ", ",
+              tags$code("sample"),
+              ", convergence, covariance, boundary, rounding, ",
+              tags$code("condition_number"),
+              ", OFV, estimate, and SE columns ",
+              "when PsN provides them."
+            )
           )
         ),
 
         documentation_section(
-          "parameters", "Parameters / RSE / Shrinkage",
+          "parameters",
+          "Parameters / RSE / Shrinkage",
           tags$p(
-            tags$strong("OFV"), " is ", tags$code("-log(det(FIM))"),
+            tags$strong("OFV"),
+            " is ",
+            tags$code("-log(det(FIM))"),
             " for D-optimality designs, or the optimality criterion value returned ",
             "by NONMEM for other criteria. For D-optimality, smaller OFV means a ",
             "more informative design."
           ),
           tags$p(
-            tags$strong("Delta OFV vs ref"), " = OFVref - OFVrun on the raw ",
+            tags$strong("Delta OFV vs ref"),
+            " = OFVref - OFVrun on the raw ",
             "optimality scale. Positive values indicate the comparison run is more ",
             "informative than the reference in the D-optimality case."
           ),
@@ -78,13 +113,15 @@ mod_documentation_ui <- function(id) {
           ))),
           tags$p(
             "Shrinkage and RELATIVEINF are read from the ",
-            tags$code(".shk"), " file when present. Parameters with very high RSE ",
+            tags$code(".shk"),
+            " file when present. Parameters with very high RSE ",
             "may be hidden by default in selected SSE views to keep plots readable."
           )
         ),
 
         documentation_section(
-          "fim", "FIM & Criteria",
+          "fim",
+          "FIM & Criteria",
           tags$p(HTML(paste0(
             "The D-criterion displayed from NONMEM <code>$DESIGN</code> is ",
             "&phi;<sub>D</sub><sup>FIM</sup> = det(FIM)<sup>1/p</sup>. ",
@@ -96,17 +133,20 @@ mod_documentation_ui <- function(id) {
             "summarize the distribution of D-criterion values across prior realizations."
           ),
           tags$p(
-            tags$strong("Robust D-criterion [P10-P90]"), " is the geometric mean of ",
+            tags$strong("Robust D-criterion [P10-P90]"),
+            " is the geometric mean of ",
             "det(FIM)^(1/p) over Monte Carlo prior realizations. Narrow percentile ",
             "spread suggests the design is stable across prior uncertainty."
           )
         ),
 
         documentation_section(
-          "times", "Optimal Times",
+          "times",
+          "Optimal Times",
           tags$p(
             "The Optimal Times tab reads observation times from the loaded ",
-            tags$code(".tab"), " file. For robust designs, times are summarized over ",
+            tags$code(".tab"),
+            " file. For robust designs, times are summarized over ",
             "all prior realizations by stratum with P10, median, and P90 intervals."
           ),
           tags$p(
@@ -117,34 +157,53 @@ mod_documentation_ui <- function(id) {
         ),
 
         documentation_section(
-          "sse-validation", "SSE Validation",
+          "sse-validation",
+          "SSE Validation",
           tags$p(
             "For each model parameter over K successful SSE runs, this app filters on ",
-            tags$code("minimization_successful = 1"), " before computing empirical metrics."
+            tags$code("minimization_successful = 1"),
+            " before computing empirical metrics."
           ),
-          tags$table(class = "documentation-table",
+          tags$table(
+            class = "documentation-table",
             tags$thead(tags$tr(
-              tags$th("Metric"), tags$th("Formula"), tags$th("Interpretation")
+              tags$th("Metric"),
+              tags$th("Formula"),
+              tags$th("Interpretation")
             )),
             tags$tbody(
-              tags$tr(tags$td("REE"),
-                tags$td(HTML("REE<sub>k</sub> = (&hat;x<sub>k</sub> - x*) / x* x 100")),
-                tags$td("Relative Estimation Error for run k")),
-              tags$tr(tags$td("RB (%)"),
+              tags$tr(
+                tags$td("REE"),
+                tags$td(HTML(
+                  "REE<sub>k</sub> = (&hat;x<sub>k</sub> - x*) / x* x 100"
+                )),
+                tags$td("Relative Estimation Error for run k")
+              ),
+              tags$tr(
+                tags$td("RB (%)"),
                 tags$td(HTML("RB = (1/K) sum REE<sub>k</sub>")),
-                tags$td("Relative bias / accuracy")),
-              tags$tr(tags$td("95% CI of RB"),
+                tags$td("Relative bias / accuracy")
+              ),
+              tags$tr(
+                tags$td("95% CI of RB"),
                 tags$td(HTML("RB +/- 1.96 x sd(REE) / sqrt(K)")),
-                tags$td("If the interval excludes 0, bias is significant")),
-              tags$tr(tags$td("RRMSE (%)"),
+                tags$td("If the interval excludes 0, bias is significant")
+              ),
+              tags$tr(
+                tags$td("RRMSE (%)"),
                 tags$td(HTML("sqrt((1/K) sum REE<sub>k</sub><sup>2</sup>)")),
-                tags$td("Precision plus bias")),
-              tags$tr(tags$td("Empirical RSE (%)"),
+                tags$td("Precision plus bias")
+              ),
+              tags$tr(
+                tags$td("Empirical RSE (%)"),
                 tags$td(HTML("100 x sd(&hat;x) / |x*|")),
-                tags$td("Empirical precision compared with FIM-predicted RSE")),
-              tags$tr(tags$td("Empirical generalized variance"),
+                tags$td("Empirical precision compared with FIM-predicted RSE")
+              ),
+              tags$tr(
+                tags$td("Empirical generalized variance"),
                 tags$td(HTML("&phi;<sub>D</sub> = det(VarCov)<sup>1/p</sup>")),
-                tags$td("Global uncertainty summary; lower is better"))
+                tags$td("Global uncertainty summary; lower is better")
+              )
             )
           ),
           tags$p(HTML(paste0(
@@ -159,9 +218,11 @@ mod_documentation_ui <- function(id) {
             "separate unit-scale artifacts from structural near-collinearity."
           ),
           tags$p(
-            "Upload ", tags$code("raw_results_*.csv"),
+            "Upload ",
+            tags$code("raw_results_*.csv"),
             " from the PsN SSE output directory, not ",
-            tags$code("sse_results.csv"), ". The raw results contain one row per ",
+            tags$code("sse_results.csv"),
+            ". The raw results contain one row per ",
             "simulated data set and support empirical precision metrics and run filtering."
           ),
           tags$pre(paste0(
@@ -173,25 +234,96 @@ mod_documentation_ui <- function(id) {
             "wrapsn 10 sse model.mod -samples=200 -seed=12345 -shrinkage -keep_tables"
           )),
           tags$p(
-            "Use ", tags$code("-seed"), " for reproducibility. This app filters on ",
-            tags$code("minimization_successful = 1"), "; you do not need to add ",
-            tags$code("-out_filter"), " for the app metrics."
+            "Use ",
+            tags$code("-seed"),
+            " for reproducibility. This app filters on ",
+            tags$code("minimization_successful = 1"),
+            "; you do not need to add ",
+            tags$code("-out_filter"),
+            " for the app metrics."
           )
         ),
 
         documentation_section(
-          "sse-analysis", "SSE Analysis",
+          "sse-analysis",
+          "SSE Analysis",
           tags$p(
             "SSE Analysis examines the simulation-estimation run set itself: run health, ",
             "parameter distributions, OFV distribution, shrinkage views, the SSE ",
-            "Reliability Map, and per-parameter diagnostic tables."
+            "Reliability Map, individual PK recovery, PsN-oriented run ",
+            "composition, dOFV diagnostics, and per-parameter diagnostic tables."
           ),
           tags$p(
-            "Shrinkage views require non-empty ", tags$code("shrinkage_eta*(%)"),
+            "When PsN writes a ",
+            tags$code("hypothesis"),
+            " column, the ",
+            "PsN hypothesis selector controls which rows feed parameter plots ",
+            "and summaries. ",
+            tags$strong("Auto"),
+            " keeps ",
+            tags$code("mc-alternative_*"),
+            " rows if they exist; otherwise it ",
+            "keeps all rows. Use ",
+            tags$strong("All hypotheses"),
+            " only when you intentionally want to inspect mixed simulation and ",
+            "estimation-model rows together."
+          ),
+          tags$p(
+            tags$strong("Run composition"),
+            " summarizes each hypothesis: total ",
+            "runs, distinct samples, ",
+            tags$code("minimization_successful"),
+            ", ",
+            tags$code("covariance_step_successful"),
+            ", ",
+            tags$code("estimate_near_boundary"),
+            ", ",
+            tags$code("rounding_errors"),
+            ", high ",
+            tags$code("condition_number"),
+            " counts, and OFV quantiles. The ",
+            "default high-condition-number flag uses 1000, matching the common ",
+            "PsN covariance quality threshold."
+          ),
+          tags$p(
+            tags$strong("PsN summary stats"),
+            " reports mean, median, SD, min, ",
+            "max, skewness, kurtosis, RMSE, relative RMSE, bias, relative bias, ",
+            "absolute relative bias, and empirical RSE for each parameter with ",
+            "a true value from the control stream. SE columns can arrive from ",
+            "PsN as ",
+            tags$code("seCL"),
+            ", ",
+            tags$code("seTHETA1"),
+            ", ",
+            tags$code("seOMEGA(1,1)"),
+            " or ",
+            tags$code("seSIGMA(1,1)"),
+            "; the parser normalizes these to the ",
+            tags$code("se_*"),
+            " convention used by the diagnostics."
+          ),
+          tags$p(
+            tags$strong("dOFV diagnostics"),
+            " match rows by ",
+            tags$code("sample"),
+            " and compute ",
+            tags$code("dOFV = OFV(hypothesis) - OFV(reference)"),
+            ". The reference defaults to ",
+            tags$code("simulation"),
+            " when present. This is a consistency and separation diagnostic ",
+            "between PsN hypotheses; interpretation depends on which simulation ",
+            "and alternative models were supplied to the SSE."
+          ),
+          tags$p(
+            "Shrinkage views require non-empty ",
+            tags$code("shrinkage_eta*(%)"),
             " columns in the PsN raw results. Use PsN option ",
-            tags$code("-shrinkage"), ". PsN writes these columns only when NONMEM ",
+            tags$code("-shrinkage"),
+            ". PsN writes these columns only when NONMEM ",
             "computes post-hoc ETAs and PsN is not run with ",
-            tags$code("-no_shrinkage"), "."
+            tags$code("-no_shrinkage"),
+            "."
           ),
           tags$p(
             "The RSE-shrinkage map and ETA review ranking are app-derived ",
@@ -205,40 +337,66 @@ mod_documentation_ui <- function(id) {
           ),
           tags$p(
             "Individual PK parameters are not stored in ",
-            tags$code("raw_results.csv"), ". Add the needed variables to a NONMEM ",
-            tags$code("$TABLE"), " and run SSE with ", tags$code("-keep_tables"),
+            tags$code("raw_results.csv"),
+            ". Add the needed variables to a NONMEM ",
+            tags$code("$TABLE"),
+            " and run SSE with ",
+            tags$code("-keep_tables"),
             " if you need one output row per subject or record. PsN keeps those ",
             "outputs as separate table files in the SSE run directory, not as ",
-            "extra columns in ", tags$code("raw_results.csv"), ". Combine ",
-            tags$code("-shrinkage -keep_tables"), " when you need both SSE ",
+            "extra columns in ",
+            tags$code("raw_results.csv"),
+            ". Combine ",
+            tags$code("-shrinkage -keep_tables"),
+            " when you need both SSE ",
             "shrinkage plots and individual PK table files."
           ),
           tags$p(
             "Naming convention: for new runs, use ",
-            tags$code("FILE=pk_individuals.tab"), " for the individual PK ",
-            tags$code("$TABLE"), ". This is the app's recommended contract: ",
-            "after PsN ", tags$code("-keep_tables"), ", the archive should ",
-            "contain ", tags$code("pk_individuals.tab-1"), " and ",
-            tags$code("pk_individuals.tab-sim-1"), " style files. Existing ",
-            "PsN-style names such as ", tags$code("patab1.tab"), " remain ",
-            "accepted for backwards compatibility."
+            tags$code("FILE=pk_individuals.tab"),
+            " for the individual PK ",
+            tags$code("$TABLE"),
+            ". This is the app's recommended contract: ",
+            "after PsN ",
+            tags$code("-keep_tables"),
+            ", the archive should ",
+            "contain ",
+            tags$code("pk_individuals.tab-1"),
+            " and ",
+            tags$code("pk_individuals.tab-sim-1"),
+            " style files. For ",
+            "alternative models, PsN can write names like ",
+            tags$code("pk_individuals.tab-1-1"),
+            " where the first number is ",
+            "the alternative and the second is the sample. Existing PsN-style ",
+            "names such as ",
+            tags$code("patab1.tab"),
+            " remain accepted for ",
+            "backwards compatibility."
           ),
           tags$pre(
             "$TABLE ID TIME CL VC Q VP KA F1 IPRED ETA(1) ETA(2) ETA(3) ETA(4) ETA(5) ETA(6) FILE=pk_individuals.tab NOPRINT ONEHEADER"
           ),
           tags$p(
             "Upload the zipped PsN output directory in SSE Upload to read ",
-            tags$code("pk_individuals.tab-*"), ", ",
-            tags$code("pk_individuals.tab-sim-*"), ", ",
-            tags$code("patab*.tab-*"), " or ",
-            tags$code("patab*.tab-sim-*"), ". The Individual PK views compare ",
+            tags$code("pk_individuals.tab-*"),
+            ", ",
+            tags$code("pk_individuals.tab-sim-*"),
+            ", ",
+            tags$code("pk_individuals.tab-*-*"),
+            ", ",
+            tags$code("patab*.tab-*"),
+            " or ",
+            tags$code("patab*.tab-sim-*"),
+            ". The Individual PK views compare ",
             "estimated subject-level values against the corresponding simulated ",
             "values by table, sample, and ID."
           )
         ),
 
         documentation_section(
-          "sse-comparison", "SSE Comparison",
+          "sse-comparison",
+          "SSE Comparison",
           tags$p(
             "SSE Comparison treats Design A and Design B as first-class analysis inputs. ",
             "Use it to compare an original and optimized design by empirical RSE, ",
@@ -251,7 +409,8 @@ mod_documentation_ui <- function(id) {
         ),
 
         documentation_section(
-          "power", "Power / NSN / TOST",
+          "power",
+          "Power / NSN / TOST",
           tags$p(HTML(paste0(
             "The Wald test evaluates whether a parameter is significantly different ",
             "from a reference value H<sub>0</sub>. The statistic ",
@@ -295,10 +454,14 @@ mod_documentation_ui <- function(id) {
         ),
 
         documentation_section(
-          "robust", "Robust Design",
+          "robust",
+          "Robust Design",
           tags$p(
-            "Robust design uses ", tags$code("$PRIOR NWPRI"), " and ",
-            tags$code("$SIM TRUE=PRIOR"), " to evaluate or optimize sampling schedules ",
+            "Robust design uses ",
+            tags$code("$PRIOR NWPRI"),
+            " and ",
+            tags$code("$SIM TRUE=PRIOR"),
+            " to evaluate or optimize sampling schedules ",
             "over many parameter sets drawn from the prior distribution."
           ),
           tags$p(
@@ -309,16 +472,31 @@ mod_documentation_ui <- function(id) {
         ),
 
         documentation_section(
-          "references", "References",
+          "references",
+          "References",
           tags$ul(
-            tags$li("Atkinson AC, Donev AN. Optimum Experimental Designs. 1992."),
-            tags$li("Mentre F et al. Population pharmacokinetic and pharmacodynamic experiment design. 1997."),
-            tags$li("Retout S et al. PFIM and power calculation references for FIM-based design."),
-            tags$li("Mentre F, Rousseau A. Theoretical and practical aspects of population pharmacokinetic design. 2011."),
-            tags$li("Aoki Y, Nordgren R, Hooker AC. Preconditioning of the variance-covariance matrix. AAPS J. 2016;18(2):505-515."),
+            tags$li(
+              "Atkinson AC, Donev AN. Optimum Experimental Designs. 1992."
+            ),
+            tags$li(
+              "Mentre F et al. Population pharmacokinetic and pharmacodynamic experiment design. 1997."
+            ),
+            tags$li(
+              "Retout S et al. PFIM and power calculation references for FIM-based design."
+            ),
+            tags$li(
+              "Mentre F, Rousseau A. Theoretical and practical aspects of population pharmacokinetic design. 2011."
+            ),
+            tags$li(
+              "Aoki Y, Nordgren R, Hooker AC. Preconditioning of the variance-covariance matrix. AAPS J. 2016;18(2):505-515."
+            ),
             tags$li("Bauer RJ. NONMEM tutorial and design examples. 2021."),
-            tags$li("Djokoto et al. Stochastic simulation-estimation approach in dose optimization. Research Square preprint. 2024."),
-            tags$li("Fayette L, Brendel K, Mentre F. Advances and Further Comparison of Software Tools for FIM-Based Design Evaluation in Pharmacometrics. Pharm Res. 2026."),
+            tags$li(
+              "Djokoto et al. Stochastic simulation-estimation approach in dose optimization. Research Square preprint. 2024."
+            ),
+            tags$li(
+              "Fayette L, Brendel K, Mentre F. Advances and Further Comparison of Software Tools for FIM-Based Design Evaluation in Pharmacometrics. Pharm Res. 2026."
+            ),
             tags$li("Pantaleo et al. SSE threshold recommendations. 2026."),
             tags$li("PsN SSE User Guide v5.7.0.")
           )

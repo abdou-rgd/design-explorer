@@ -39,6 +39,7 @@ mod_sse_analysis_ui <- function(id) {
       "Analysis workspace",
       subtitle = "Choose one diagnostic view at a time. Parameter filters apply to parameter-based views.",
       control_panel(
+        uiOutput(ns("hypothesis_filter_ui")),
         checkboxInput(
           ns("show_failed"),
           "Include failed runs in plots",
@@ -71,6 +72,9 @@ mod_sse_analysis_ui <- function(id) {
           choices = c(
             "Parameter distributions" = "distributions",
             "SSE reliability map" = "reliability",
+            "Run composition" = "run_composition",
+            "PsN summary stats" = "psn_summary",
+            "dOFV diagnostics" = "dofv",
             "Individual PK recovery" = "indiv_pk_recovery",
             "Individual PK errors" = "indiv_pk_errors",
             "Individual PK intervals" = "indiv_pk_intervals",
@@ -142,11 +146,30 @@ mod_sse_analysis_server <- function(
     })
 
     # --- SSE data (switches between A and B) ---
-    sse_all <- reactive({
+    sse_raw_all <- reactive({
       sel <- input$which_design %||% "a"
       dat <- if (sel == "b") sse_b_shared() else sse_a_shared()
       req(dat)
       dat
+    })
+
+    output$hypothesis_filter_ui <- renderUI({
+      dat <- tryCatch(sse_raw_all(), error = function(e) NULL)
+      if (is.null(dat) || !"hypothesis" %in% names(dat)) {
+        return(NULL)
+      }
+      choices <- sse_hypothesis_choices(dat)
+      selectInput(
+        session$ns("hypothesis_filter"),
+        "PsN hypothesis",
+        choices = stats::setNames(choices$value, choices$label),
+        selected = "auto"
+      )
+    })
+
+    sse_all <- reactive({
+      dat <- sse_raw_all()
+      filter_sse_hypothesis(dat, input$hypothesis_filter %||% "auto")
     })
 
     # --- Run health ---
@@ -154,6 +177,30 @@ mod_sse_analysis_server <- function(
       dat <- sse_all()
       req(dat)
       compute_run_health(dat)
+    })
+
+    run_composition_data <- reactive({
+      dat <- sse_raw_all()
+      req(dat)
+      compute_sse_run_composition(dat)
+    })
+
+    psn_summary_data <- reactive({
+      dat <- sse_all()
+      tv <- true_vals()
+      req(dat, tv)
+      compute_sse_psn_parameter_summary(
+        dat,
+        tv,
+        param_labels(),
+        only_converged = !isTRUE(input$show_failed)
+      )
+    })
+
+    dofv_diagnostics <- reactive({
+      dat <- sse_raw_all()
+      req(dat)
+      compute_sse_dofv_diagnostics(dat)
     })
 
     output$run_health_banner <- renderUI({
@@ -399,6 +446,47 @@ mod_sse_analysis_server <- function(
           )
         ))
       }
+      if (active == "run_composition") {
+        return(analysis_workspace(
+          "Run composition",
+          DTOutput(session$ns("run_composition_table")),
+          actions = downloadButton(
+            session$ns("export_run_composition_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
+        ))
+      }
+      if (active == "psn_summary") {
+        return(analysis_workspace(
+          "PsN summary stats",
+          DTOutput(session$ns("psn_summary_table")),
+          actions = downloadButton(
+            session$ns("export_psn_summary_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
+        ))
+      }
+      if (active == "dofv") {
+        return(analysis_workspace(
+          "dOFV diagnostics",
+          plotOutput(session$ns("dofv_plot"), height = "420px"),
+          DTOutput(session$ns("dofv_table")),
+          actions = tagList(
+            plot_export_ui(
+              session$ns,
+              "dofv_export",
+              default_fname = "sse_dofv_diagnostics"
+            ),
+            downloadButton(
+              session$ns("export_dofv_csv"),
+              "Export CSV",
+              class = "btn-sm btn-default"
+            )
+          )
+        ))
+      }
       if (active == "indiv_pk_recovery") {
         return(analysis_workspace(
           "Individual PK recovery",
@@ -539,6 +627,186 @@ mod_sse_analysis_server <- function(
         )
       )
     })
+
+    # --- PsN-oriented run and hypothesis diagnostics ---
+    output$run_composition_table <- renderDT({
+      comp <- run_composition_data()
+      req(comp)
+      if (nrow(comp) == 0L) {
+        return(NULL)
+      }
+
+      display <- comp |>
+        dplyr::select(
+          Hypothesis = hypothesis,
+          Type = hypothesis_type,
+          `N runs` = n_runs,
+          `N samples` = n_samples,
+          `Minimization OK` = n_minimization_ok,
+          `Covariance OK` = n_covariance_ok,
+          `Near boundary` = n_boundary,
+          `Rounding errors` = n_rounding_errors,
+          `Condition number >1000` = n_high_condition_number,
+          `Median OFV` = ofv_median,
+          `P5 OFV` = ofv_p5,
+          `P95 OFV` = ofv_p95
+        )
+      numeric_cols <- vapply(display, is.numeric, logical(1))
+      display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
+
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 20, dom = "tip", scrollX = TRUE)
+      )
+    })
+
+    output$export_run_composition_csv <- downloadHandler(
+      filename = function() {
+        paste0(
+          "sse_run_composition_",
+          format(Sys.time(), "%Y%m%d_%H%M%S"),
+          ".csv"
+        )
+      },
+      content = function(file) {
+        comp <- run_composition_data()
+        req(comp)
+        tryCatch(
+          write.csv(comp, file, row.names = FALSE),
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
+        )
+      }
+    )
+
+    output$psn_summary_table <- renderDT({
+      psn <- psn_summary_data()
+      req(psn)
+      if (nrow(psn) == 0L) {
+        return(NULL)
+      }
+
+      display <- psn |>
+        dplyr::select(
+          Parameter = param_label,
+          Type = param_type,
+          `True value` = true_value,
+          N = n,
+          Mean = mean_estimate,
+          Median = median_estimate,
+          SD = sd_estimate,
+          Min = min_estimate,
+          Max = max_estimate,
+          Skewness = skewness,
+          Kurtosis = kurtosis,
+          RMSE = rmse,
+          `Rel. RMSE (%)` = relative_rmse,
+          Bias = bias,
+          `Rel. bias (%)` = relative_bias,
+          `Rel. abs. bias (%)` = relative_absolute_bias,
+          `RSE (%)` = rse
+        )
+      numeric_cols <- vapply(display, is.numeric, logical(1))
+      display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 3)
+
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(
+          pageLength = 20,
+          dom = "tip",
+          scrollX = TRUE,
+          order = list(list(12, "desc"))
+        )
+      ) |>
+        formatStyle(
+          "Rel. RMSE (%)",
+          backgroundColor = styleInterval(
+            c(20, 50),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        )
+    })
+
+    output$export_psn_summary_csv <- downloadHandler(
+      filename = function() {
+        paste0("sse_psn_summary_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        psn <- psn_summary_data()
+        req(psn)
+        tryCatch(
+          write.csv(psn, file, row.names = FALSE),
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
+        )
+      }
+    )
+
+    dofv_plot_fn <- reactive({
+      diag <- dofv_diagnostics()
+      plot_sse_dofv_distribution(diag$long)
+    })
+    output$dofv_plot <- renderPlot(
+      {
+        dofv_plot_fn()
+      },
+      res = 110
+    )
+    plot_export_server(input, output, session, "dofv_export", dofv_plot_fn)
+
+    output$dofv_table <- renderDT({
+      diag <- dofv_diagnostics()
+      summary <- diag$summary
+      req(summary)
+      if (nrow(summary) == 0L) {
+        return(NULL)
+      }
+
+      display <- summary |>
+        dplyr::select(
+          Hypothesis = hypothesis,
+          Reference = reference_hypothesis,
+          N = n,
+          `N dOFV < 0` = n_negative,
+          `% dOFV < 0` = pct_negative,
+          `Mean dOFV` = mean_dofv,
+          `Median dOFV` = median_dofv,
+          `P5 dOFV` = p5_dofv,
+          `P95 dOFV` = p95_dofv,
+          `% dOFV > 3.84` = pct_dofv_gt_3_84
+        )
+      numeric_cols <- vapply(display, is.numeric, logical(1))
+      display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
+
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 10, dom = "tip", scrollX = TRUE)
+      )
+    })
+
+    output$export_dofv_csv <- downloadHandler(
+      filename = function() {
+        paste0("sse_dofv_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        diag <- dofv_diagnostics()
+        req(diag$long)
+        tryCatch(
+          write.csv(diag$long, file, row.names = FALSE),
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
+        )
+      }
+    )
 
     # --- OFV plot ---
     ofv_plot_fn <- reactive({

@@ -7,7 +7,6 @@
 # Prereqs: ggplot2, dplyr, tidyr, stringr (already loaded by app.R)
 # =============================================================================
 
-
 # =============================================================================
 # read_sse_raw_all() — Read PsN raw_results CSV WITHOUT filtering
 # =============================================================================
@@ -30,7 +29,7 @@ read_sse_raw_all <- function(file) {
   if ("minimization_successful" %in% names(raw)) {
     raw$minimization_successful <- as.numeric(raw$minimization_successful)
     raw$converged <- !is.na(raw$minimization_successful) &
-                     raw$minimization_successful == 1
+      raw$minimization_successful == 1
   } else {
     pre_filtered <- TRUE
     raw$converged <- TRUE
@@ -42,6 +41,440 @@ read_sse_raw_all <- function(file) {
   attr(result, "n_success") <- n_success
   attr(result, "pre_filtered") <- pre_filtered
   result
+}
+
+
+# =============================================================================
+# PsN hypothesis helpers and summary statistics
+# =============================================================================
+
+.sse_hypothesis_type <- function(hypothesis) {
+  out <- rep("unknown", length(hypothesis))
+  out[is.na(hypothesis) | !nzchar(hypothesis)] <- "unknown"
+  out[grepl("^simulation$", hypothesis, ignore.case = TRUE)] <- "simulation"
+  out[grepl("alternative", hypothesis, ignore.case = TRUE)] <- "alternative"
+  out
+}
+
+.sse_numeric_col <- function(dat, col, default = NA_real_) {
+  if (!col %in% names(dat)) {
+    return(rep(default, nrow(dat)))
+  }
+  suppressWarnings(as.numeric(dat[[col]]))
+}
+
+.sse_safe_quantile <- function(x, prob) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0L) {
+    return(NA_real_)
+  }
+  as.numeric(stats::quantile(x, probs = prob, names = FALSE, na.rm = TRUE))
+}
+
+.sse_safe_mean <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0L) {
+    return(NA_real_)
+  }
+  mean(x)
+}
+
+.sse_safe_sd <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) < 2L) {
+    return(NA_real_)
+  }
+  stats::sd(x)
+}
+
+.sse_safe_min <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0L) {
+    return(NA_real_)
+  }
+  min(x)
+}
+
+.sse_safe_max <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0L) {
+    return(NA_real_)
+  }
+  max(x)
+}
+
+.sse_skewness <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) < 3L) {
+    return(NA_real_)
+  }
+  s <- stats::sd(x)
+  if (!is.finite(s) || s <= 0) {
+    return(NA_real_)
+  }
+  mean(((x - mean(x)) / s)^3)
+}
+
+.sse_kurtosis <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) < 4L) {
+    return(NA_real_)
+  }
+  s <- stats::sd(x)
+  if (!is.finite(s) || s <= 0) {
+    return(NA_real_)
+  }
+  mean(((x - mean(x)) / s)^4) - 3
+}
+
+#' List PsN hypotheses available in an SSE raw results table.
+#'
+#' PsN SSE raw results can contain several hypotheses such as `simulation` and
+#' `mc-alternative_1`. The app exposes these as a filter to avoid silently
+#' mixing simulated-reference rows with alternative estimation rows.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()`.
+#' @return Tibble with `value` and `label` columns for Shiny controls.
+#' @export
+sse_hypothesis_choices <- function(sse_all) {
+  if (
+    is.null(sse_all) || nrow(sse_all) == 0L || !"hypothesis" %in% names(sse_all)
+  ) {
+    return(tibble::tibble(
+      value = c("auto", "all"),
+      label = c("Auto: alternatives if available", "All hypotheses")
+    ))
+  }
+
+  hypotheses <- unique(as.character(sse_all$hypothesis))
+  hypotheses <- hypotheses[!is.na(hypotheses) & nzchar(hypotheses)]
+  labels <- paste0(hypotheses, " (", .sse_hypothesis_type(hypotheses), ")")
+
+  tibble::tibble(
+    value = c("auto", "all", hypotheses),
+    label = c("Auto: alternatives if available", "All hypotheses", labels)
+  )
+}
+
+#' Filter an SSE table to one PsN hypothesis.
+#'
+#' The `auto` setting keeps alternative-model rows when PsN produced them,
+#' otherwise it keeps the full table. This mirrors the common SSE workflow where
+#' `simulation` rows are reference rows and `mc-alternative_*` rows are the
+#' estimation model of interest.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()`.
+#' @param hypothesis One of `auto`, `all`, or a concrete PsN hypothesis value.
+#' @return Filtered tibble.
+#' @export
+filter_sse_hypothesis <- function(sse_all, hypothesis = "auto") {
+  if (
+    is.null(sse_all) || nrow(sse_all) == 0L || !"hypothesis" %in% names(sse_all)
+  ) {
+    return(sse_all)
+  }
+  if (
+    is.null(hypothesis) || length(hypothesis) == 0L || is.na(hypothesis[[1]])
+  ) {
+    hypothesis <- "auto"
+  }
+  if (identical(hypothesis, "all")) {
+    return(sse_all)
+  }
+
+  hyp <- as.character(sse_all$hypothesis)
+  if (identical(hypothesis, "auto")) {
+    alt <- .sse_hypothesis_type(hyp) == "alternative"
+    if (any(alt, na.rm = TRUE)) {
+      return(sse_all[alt, , drop = FALSE])
+    }
+    return(sse_all)
+  }
+
+  sse_all[hyp == hypothesis, , drop = FALSE]
+}
+
+#' Summarise run composition by PsN hypothesis.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()`.
+#' @param condition_number_threshold Condition number threshold used to flag
+#'   numerically fragile covariance matrices. PsN's default is commonly 1000.
+#' @return Tibble with run counts and QC counts per hypothesis.
+#' @export
+compute_sse_run_composition <- function(
+  sse_all,
+  condition_number_threshold = 1000
+) {
+  if (is.null(sse_all) || nrow(sse_all) == 0L) {
+    return(tibble::tibble())
+  }
+
+  dat <- tibble::as_tibble(sse_all)
+  if (!"hypothesis" %in% names(dat)) {
+    dat$hypothesis <- "all"
+  }
+  dat$hypothesis <- as.character(dat$hypothesis)
+  dat$hypothesis_type <- .sse_hypothesis_type(dat$hypothesis)
+
+  dat$minimization_successful_num <- .sse_numeric_col(
+    dat,
+    "minimization_successful"
+  )
+  dat$covariance_step_successful_num <- .sse_numeric_col(
+    dat,
+    "covariance_step_successful"
+  )
+  dat$estimate_near_boundary_num <- .sse_numeric_col(
+    dat,
+    "estimate_near_boundary"
+  )
+  dat$rounding_errors_num <- .sse_numeric_col(dat, "rounding_errors")
+  dat$condition_number_num <- .sse_numeric_col(dat, "condition_number")
+  dat$ofv_num <- .sse_numeric_col(dat, "ofv")
+  has_sample <- "sample" %in% names(dat)
+  has_converged <- "converged" %in% names(dat)
+
+  dat |>
+    dplyr::group_by(hypothesis, hypothesis_type) |>
+    dplyr::summarise(
+      n_runs = dplyr::n(),
+      n_samples = if (has_sample) {
+        dplyr::n_distinct(.data$sample, na.rm = TRUE)
+      } else {
+        NA_integer_
+      },
+      sample_min = if (has_sample) {
+        .sse_safe_min(suppressWarnings(as.numeric(.data$sample)))
+      } else {
+        NA_real_
+      },
+      sample_max = if (has_sample) {
+        .sse_safe_max(suppressWarnings(as.numeric(.data$sample)))
+      } else {
+        NA_real_
+      },
+      n_minimization_ok = sum(minimization_successful_num == 1, na.rm = TRUE),
+      n_covariance_ok = sum(covariance_step_successful_num == 1, na.rm = TRUE),
+      n_boundary = sum(estimate_near_boundary_num == 1, na.rm = TRUE),
+      n_rounding_errors = sum(rounding_errors_num == 1, na.rm = TRUE),
+      n_high_condition_number = sum(
+        condition_number_num > condition_number_threshold,
+        na.rm = TRUE
+      ),
+      n_converged = if (has_converged) {
+        sum(.data$converged, na.rm = TRUE)
+      } else {
+        sum(minimization_successful_num == 1, na.rm = TRUE)
+      },
+      ofv_median = .sse_safe_quantile(ofv_num, 0.50),
+      ofv_p5 = .sse_safe_quantile(ofv_num, 0.05),
+      ofv_p95 = .sse_safe_quantile(ofv_num, 0.95),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(hypothesis_type, hypothesis)
+}
+
+#' Compute PsN-style parameter summary statistics for SSE estimates.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()`.
+#' @param true_values Named numeric vector of true parameter values.
+#' @param param_labels Optional named labels for parameters.
+#' @param only_converged Logical; keep minimization-successful runs only.
+#' @return Long tibble with one row per parameter.
+#' @export
+compute_sse_psn_parameter_summary <- function(
+  sse_all,
+  true_values,
+  param_labels = NULL,
+  only_converged = TRUE
+) {
+  if (
+    is.null(sse_all) ||
+      nrow(sse_all) == 0L ||
+      is.null(true_values) ||
+      length(true_values) == 0L
+  ) {
+    return(tibble::tibble())
+  }
+
+  dat <- tibble::as_tibble(sse_all)
+  if (isTRUE(only_converged) && "converged" %in% names(dat)) {
+    dat <- dat[dat$converged, , drop = FALSE]
+  }
+  available <- intersect(names(true_values), names(dat))
+  if (length(available) == 0L || nrow(dat) == 0L) {
+    return(tibble::tibble())
+  }
+
+  rows <- lapply(available, function(param) {
+    estimates <- suppressWarnings(as.numeric(dat[[param]]))
+    estimates <- estimates[is.finite(estimates)]
+    true_value <- suppressWarnings(as.numeric(true_values[[param]]))
+    if (!is.finite(true_value)) {
+      true_value <- NA_real_
+    }
+    err <- estimates - true_value
+    rel_err <- if (is.finite(true_value) && abs(true_value) > 1e-15) {
+      100 * err / abs(true_value)
+    } else {
+      rep(NA_real_, length(estimates))
+    }
+    label <- if (!is.null(param_labels) && param %in% names(param_labels)) {
+      param_labels[[param]]
+    } else {
+      param
+    }
+
+    data.frame(
+      param = param,
+      param_label = label,
+      param_type = .param_type(param),
+      true_value = true_value,
+      n = length(estimates),
+      mean_estimate = .sse_safe_mean(estimates),
+      median_estimate = .sse_safe_quantile(estimates, 0.50),
+      sd_estimate = .sse_safe_sd(estimates),
+      min_estimate = if (length(estimates) == 0L) NA_real_ else min(estimates),
+      max_estimate = if (length(estimates) == 0L) NA_real_ else max(estimates),
+      p5_estimate = .sse_safe_quantile(estimates, 0.05),
+      p95_estimate = .sse_safe_quantile(estimates, 0.95),
+      skewness = .sse_skewness(estimates),
+      kurtosis = .sse_kurtosis(estimates),
+      rmse = sqrt(.sse_safe_mean(err^2)),
+      relative_rmse = sqrt(.sse_safe_mean(rel_err^2)),
+      bias = .sse_safe_mean(err),
+      relative_bias = .sse_safe_mean(rel_err),
+      relative_absolute_bias = abs(.sse_safe_mean(rel_err)),
+      rse = if (is.finite(true_value) && abs(true_value) > 1e-15) {
+        100 * .sse_safe_sd(estimates) / abs(true_value)
+      } else {
+        NA_real_
+      },
+      stringsAsFactors = FALSE
+    )
+  })
+
+  tibble::as_tibble(dplyr::bind_rows(rows))
+}
+
+#' Compute per-sample dOFV diagnostics between PsN hypotheses.
+#'
+#' @param sse_all Tibble from `read_sse_raw_all()`.
+#' @param reference Reference hypothesis; defaults to `simulation` when present.
+#' @return List with `$long` per-sample dOFV rows and `$summary` by hypothesis.
+#' @export
+compute_sse_dofv_diagnostics <- function(sse_all, reference = NULL) {
+  empty <- list(long = tibble::tibble(), summary = tibble::tibble())
+  if (
+    is.null(sse_all) ||
+      nrow(sse_all) == 0L ||
+      !all(c("hypothesis", "sample", "ofv") %in% names(sse_all))
+  ) {
+    return(empty)
+  }
+
+  dat <- tibble::as_tibble(sse_all)
+  dat$hypothesis <- as.character(dat$hypothesis)
+  dat$ofv <- suppressWarnings(as.numeric(dat$ofv))
+  dat <- dat[is.finite(dat$ofv), , drop = FALSE]
+  if (nrow(dat) == 0L) {
+    return(empty)
+  }
+
+  hypotheses <- unique(dat$hypothesis)
+  hypotheses <- hypotheses[!is.na(hypotheses) & nzchar(hypotheses)]
+  if (is.null(reference) || !reference %in% hypotheses) {
+    reference <- if ("simulation" %in% hypotheses) {
+      "simulation"
+    } else {
+      hypotheses[[1]]
+    }
+  }
+
+  ref <- dat |>
+    dplyr::filter(hypothesis == reference) |>
+    dplyr::select(
+      sample,
+      reference_hypothesis = hypothesis,
+      reference_ofv = ofv,
+      dplyr::any_of("converged")
+    )
+  if ("converged" %in% names(ref)) {
+    names(ref)[names(ref) == "converged"] <- "reference_converged"
+  } else {
+    ref$reference_converged <- NA
+  }
+
+  comp <- dat |>
+    dplyr::filter(hypothesis != reference) |>
+    dplyr::select(sample, hypothesis, ofv, dplyr::any_of("converged"))
+  if (!"converged" %in% names(comp)) {
+    comp$converged <- NA
+  }
+
+  long <- dplyr::inner_join(comp, ref, by = "sample") |>
+    dplyr::mutate(dofv = ofv - reference_ofv) |>
+    dplyr::select(
+      sample,
+      reference_hypothesis,
+      hypothesis,
+      reference_ofv,
+      ofv,
+      dofv,
+      converged,
+      reference_converged
+    ) |>
+    dplyr::arrange(hypothesis, sample)
+
+  if (nrow(long) == 0L) {
+    return(empty)
+  }
+
+  summary <- long |>
+    dplyr::group_by(hypothesis, reference_hypothesis) |>
+    dplyr::summarise(
+      n = dplyr::n(),
+      n_negative = sum(dofv < 0, na.rm = TRUE),
+      pct_negative = round(100 * n_negative / n, 1),
+      mean_dofv = .sse_safe_mean(dofv),
+      median_dofv = .sse_safe_quantile(dofv, 0.50),
+      p5_dofv = .sse_safe_quantile(dofv, 0.05),
+      p95_dofv = .sse_safe_quantile(dofv, 0.95),
+      pct_dofv_gt_3_84 = round(100 * sum(dofv > 3.84, na.rm = TRUE) / n, 1),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(hypothesis)
+
+  list(long = long, summary = summary)
+}
+
+#' Plot dOFV distributions between PsN hypotheses.
+#'
+#' @param dofv_long `$long` from `compute_sse_dofv_diagnostics()`.
+#' @return ggplot object.
+#' @export
+plot_sse_dofv_distribution <- function(dofv_long) {
+  if (is.null(dofv_long) || nrow(dofv_long) == 0L) {
+    return(
+      ggplot() +
+        labs(title = "No dOFV diagnostics available") +
+        .theme_design()
+    )
+  }
+
+  ggplot(dofv_long, aes(x = dofv, fill = hypothesis)) +
+    geom_histogram(bins = 24, alpha = 0.75, color = "white") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "#334155") +
+    geom_vline(xintercept = 3.84, linetype = "dotted", color = "#b45309") +
+    facet_wrap(~hypothesis, scales = "free_y") +
+    scale_fill_brewer(palette = "Set2", guide = "none") +
+    labs(
+      title = "dOFV Diagnostics by PsN Hypothesis",
+      subtitle = "dOFV = OFV(hypothesis) - OFV(reference) matched by sample",
+      x = "dOFV",
+      y = "Number of SSE samples"
+    ) +
+    .theme_design()
 }
 
 
@@ -67,47 +500,69 @@ compute_run_health <- function(sse_all) {
 
   n_min_ok <- if (has_min) {
     sum(as.numeric(sse_all$minimization_successful) == 1, na.rm = TRUE)
-  } else n_total
+  } else {
+    n_total
+  }
 
   # Among minimization OK: no boundary
   min_ok_rows <- if (has_min) {
-    sse_all[!is.na(sse_all$minimization_successful) &
-            as.numeric(sse_all$minimization_successful) == 1, , drop = FALSE]
-  } else sse_all
+    sse_all[
+      !is.na(sse_all$minimization_successful) &
+        as.numeric(sse_all$minimization_successful) == 1,
+      ,
+      drop = FALSE
+    ]
+  } else {
+    sse_all
+  }
 
   n_no_boundary <- if (has_bnd) {
     sum(as.numeric(min_ok_rows$estimate_near_boundary) == 0, na.rm = TRUE)
-  } else n_min_ok
+  } else {
+    n_min_ok
+  }
 
   # Among minimization OK: covariance step OK
   n_cov_ok <- if (has_cov) {
     sum(as.numeric(min_ok_rows$covariance_step_successful) == 1, na.rm = TRUE)
-  } else n_min_ok
+  } else {
+    n_min_ok
+  }
 
   # Among minimization OK: no rounding errors
   n_no_rounding <- if (has_rnd) {
     sum(as.numeric(min_ok_rows$rounding_errors) == 0, na.rm = TRUE)
-  } else n_min_ok
+  } else {
+    n_min_ok
+  }
 
   safe_pct <- function(n, total) {
     if (total == 0L) 0 else round(100 * n / total, 1)
   }
 
   stages <- data.frame(
-    stage = c("Total runs", "Minimization OK", "No boundary estimates",
-              "Covariance OK", "No rounding errors"),
-    n     = c(n_total, n_min_ok, n_no_boundary, n_cov_ok, n_no_rounding),
+    stage = c(
+      "Total runs",
+      "Minimization OK",
+      "No boundary estimates",
+      "Covariance OK",
+      "No rounding errors"
+    ),
+    n = c(n_total, n_min_ok, n_no_boundary, n_cov_ok, n_no_rounding),
     denom = c(n_total, n_total, n_min_ok, n_min_ok, n_min_ok),
-    pct   = c(100, safe_pct(n_min_ok, n_total),
-              safe_pct(n_no_boundary, n_min_ok),
-              safe_pct(n_cov_ok, n_min_ok),
-              safe_pct(n_no_rounding, n_min_ok)),
+    pct = c(
+      100,
+      safe_pct(n_min_ok, n_total),
+      safe_pct(n_no_boundary, n_min_ok),
+      safe_pct(n_cov_ok, n_min_ok),
+      safe_pct(n_no_rounding, n_min_ok)
+    ),
     stringsAsFactors = FALSE
   )
 
   list(
     stages = tibble::as_tibble(stages),
-    total  = n_total,
+    total = n_total,
     n_success = n_min_ok
   )
 }
@@ -125,10 +580,15 @@ compute_run_health <- function(sse_all) {
 #' @return Tibble: param, param_label, param_type, run_id, estimate,
 #'         true_value, converged
 #' @export
-compute_param_distributions <- function(sse_all, true_values,
-                                        param_labels = NULL) {
+compute_param_distributions <- function(
+  sse_all,
+  true_values,
+  param_labels = NULL
+) {
   available <- intersect(names(true_values), names(sse_all))
-  if (length(available) == 0L) return(tibble::tibble())
+  if (length(available) == 0L) {
+    return(tibble::tibble())
+  }
 
   rows <- lapply(available, function(pname) {
     estimates <- as.numeric(sse_all[[pname]])
@@ -138,13 +598,13 @@ compute_param_distributions <- function(sse_all, true_values,
       pname
     }
     data.frame(
-      param       = pname,
+      param = pname,
       param_label = label,
-      param_type  = .param_type(pname),
-      run_id      = seq_along(estimates),
-      estimate    = estimates,
-      true_value  = true_values[[pname]],
-      converged   = sse_all$converged,
+      param_type = .param_type(pname),
+      run_id = seq_along(estimates),
+      estimate = estimates,
+      true_value = true_values[[pname]],
+      converged = sse_all$converged,
       stringsAsFactors = FALSE
     )
   })
@@ -177,20 +637,36 @@ compute_param_distributions <- function(sse_all, true_values,
 #' @return Tibble: eta, omega, param_label, n, mean_shrink, median_shrink,
 #'         sd_shrink, q25, q75, p5, p95
 #' @export
-compute_shrinkage_summary <- function(sse_all,
-                                      param_labels = NULL,
-                                      only_converged = TRUE) {
-  shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
-  if (length(shrink_cols) == 0L) return(tibble::tibble())
+compute_shrinkage_summary <- function(
+  sse_all,
+  param_labels = NULL,
+  only_converged = TRUE
+) {
+  shrink_cols <- grep(
+    "^shrinkage_eta\\d+\\(%\\)$",
+    names(sse_all),
+    value = TRUE
+  )
+  if (length(shrink_cols) == 0L) {
+    return(tibble::tibble())
+  }
 
-  dat <- if (only_converged) sse_all[sse_all$converged, , drop = FALSE] else sse_all
-  if (nrow(dat) == 0L) return(tibble::tibble())
+  dat <- if (only_converged) {
+    sse_all[sse_all$converged, , drop = FALSE]
+  } else {
+    sse_all
+  }
+  if (nrow(dat) == 0L) {
+    return(tibble::tibble())
+  }
 
   rows <- lapply(shrink_cols, function(col) {
     idx <- as.integer(sub("shrinkage_eta(\\d+)\\(%\\)", "\\1", col))
     vals <- as.numeric(dat[[col]])
     vals <- vals[!is.na(vals)]
-    if (length(vals) == 0L) return(NULL)
+    if (length(vals) == 0L) {
+      return(NULL)
+    }
 
     omega <- sprintf("OMEGA(%d,%d)", idx, idx)
     label <- if (!is.null(param_labels) && omega %in% names(param_labels)) {
@@ -206,10 +682,10 @@ compute_shrinkage_summary <- function(sse_all,
       omega = omega,
       param_label = label,
       n = length(vals),
-      mean_shrink   = round(mean(vals), 2),
+      mean_shrink = round(mean(vals), 2),
       median_shrink = round(qs[3], 2),
-      sd_shrink     = round(sd(vals), 2),
-      p5  = round(qs[1], 2),
+      sd_shrink = round(sd(vals), 2),
+      p5 = round(qs[1], 2),
       q25 = round(qs[2], 2),
       q75 = round(qs[4], 2),
       p95 = round(qs[5], 2),
@@ -232,17 +708,27 @@ compute_shrinkage_summary <- function(sse_all,
 #' @param only_converged Logical (default TRUE)
 #' @return Tibble: eta, omega, param_label, run_id, shrinkage
 #' @export
-compute_shrinkage_long <- function(sse_all,
-                                   param_labels = NULL,
-                                   only_converged = TRUE) {
-  shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
+compute_shrinkage_long <- function(
+  sse_all,
+  param_labels = NULL,
+  only_converged = TRUE
+) {
+  shrink_cols <- grep(
+    "^shrinkage_eta\\d+\\(%\\)$",
+    names(sse_all),
+    value = TRUE
+  )
   empty <- tibble::tibble()
   if (length(shrink_cols) == 0L) {
     attr(empty, "status") <- "no_columns"
     return(empty)
   }
 
-  dat <- if (only_converged) sse_all[sse_all$converged, , drop = FALSE] else sse_all
+  dat <- if (only_converged) {
+    sse_all[sse_all$converged, , drop = FALSE]
+  } else {
+    sse_all
+  }
   if (nrow(dat) == 0L) {
     attr(empty, "status") <- "no_rows"
     return(empty)
@@ -298,32 +784,46 @@ compute_shrinkage_long <- function(sse_all,
 #' @return Tibble: param, param_label, param_type, n_se_na, pct_se_na,
 #'         n_rse_over_100, pct_rse_over_100, n_zero_estimate, pct_zero_estimate
 #' @export
-compute_param_diagnostics <- function(sse_all, true_values,
-                                      param_labels = NULL) {
+compute_param_diagnostics <- function(
+  sse_all,
+  true_values,
+  param_labels = NULL
+) {
   available <- intersect(names(true_values), names(sse_all))
-  if (length(available) == 0L) return(tibble::tibble())
+  if (length(available) == 0L) {
+    return(tibble::tibble())
+  }
 
   # Work only on converged runs for SE/RSE diagnostics
 
   dat <- sse_all[sse_all$converged, , drop = FALSE]
   n_runs <- nrow(dat)
-  if (n_runs == 0L) return(tibble::tibble())
+  if (n_runs == 0L) {
+    return(tibble::tibble())
+  }
 
   safe_pct <- function(n) round(100 * n / n_runs, 1)
 
   rows <- lapply(available, function(pname) {
     estimates <- as.numeric(dat[[pname]])
-    true_val  <- true_values[[pname]]
+    true_val <- true_values[[pname]]
 
     # SE column
     se_col <- paste0("se_", pname)
-    se_vals <- if (se_col %in% names(dat)) as.numeric(dat[[se_col]]) else rep(NA, n_runs)
+    se_vals <- if (se_col %in% names(dat)) {
+      as.numeric(dat[[se_col]])
+    } else {
+      rep(NA, n_runs)
+    }
 
     n_se_na <- sum(is.na(se_vals))
 
     # RSE > 100% (among runs with valid SE)
-    rse_vals <- ifelse(!is.na(se_vals) & abs(estimates) > 1e-15,
-                       100 * se_vals / abs(estimates), NA_real_)
+    rse_vals <- ifelse(
+      !is.na(se_vals) & abs(estimates) > 1e-15,
+      100 * se_vals / abs(estimates),
+      NA_real_
+    )
     n_rse_over_100 <- sum(!is.na(rse_vals) & rse_vals > 100)
 
     # Estimate at zero (potential boundary for variances)
@@ -336,13 +836,13 @@ compute_param_diagnostics <- function(sse_all, true_values,
     }
 
     data.frame(
-      param           = pname,
-      param_label     = label,
-      param_type      = .param_type(pname),
-      n_runs          = n_runs,
-      n_se_na         = n_se_na,
-      pct_se_na       = safe_pct(n_se_na),
-      n_rse_over_100  = n_rse_over_100,
+      param = pname,
+      param_label = label,
+      param_type = .param_type(pname),
+      n_runs = n_runs,
+      n_se_na = n_se_na,
+      pct_se_na = safe_pct(n_se_na),
+      n_rse_over_100 = n_rse_over_100,
       pct_rse_over_100 = safe_pct(n_rse_over_100),
       n_zero_estimate = n_zero,
       pct_zero_estimate = safe_pct(n_zero),
@@ -369,13 +869,35 @@ compute_param_diagnostics <- function(sse_all, true_values,
 #' @return Character vector of detected individual PK-style column names.
 #' @export
 detect_individual_pk_columns <- function(data) {
-  if (is.null(data) || length(names(data)) == 0L) return(character())
+  if (is.null(data) || length(names(data)) == 0L) {
+    return(character())
+  }
 
   nms <- names(data)
   canonical <- c(
-    "ID", "TIME", "TAD", "DV", "PRED", "IPRED", "IRES", "IWRES",
-    "CL", "VC", "V", "V1", "Q", "VP", "V2", "KA", "F1",
-    "ETACL", "ETAVC", "ETAQ", "ETAVP", "ETAKA", "ETAF1"
+    "ID",
+    "TIME",
+    "TAD",
+    "DV",
+    "PRED",
+    "IPRED",
+    "IRES",
+    "IWRES",
+    "CL",
+    "VC",
+    "V",
+    "V1",
+    "Q",
+    "VP",
+    "V2",
+    "KA",
+    "F1",
+    "ETACL",
+    "ETAVC",
+    "ETAQ",
+    "ETAVP",
+    "ETAKA",
+    "ETAF1"
   )
   eta_like <- "^ETA\\d+$"
 
@@ -394,16 +916,28 @@ detect_individual_pk_columns <- function(data) {
 #' @param param_labels Optional named character vector for display labels.
 #' @return Tibble with parameter-level reliability diagnostics.
 #' @export
-compute_sse_reliability_map <- function(sse_all, true_values,
-                                        param_labels = NULL) {
+compute_sse_reliability_map <- function(
+  sse_all,
+  true_values,
+  param_labels = NULL
+) {
   empty <- tibble::tibble(
-    param = character(), param_label = character(), param_type = character(),
-    rse_empirical = numeric(), relative_bias = numeric(),
-    pct_se_na = numeric(), pct_rse_over_100 = numeric(),
-    mean_shrinkage = numeric(), risk_score = numeric()
+    param = character(),
+    param_label = character(),
+    param_type = character(),
+    rse_empirical = numeric(),
+    relative_bias = numeric(),
+    pct_se_na = numeric(),
+    pct_rse_over_100 = numeric(),
+    mean_shrinkage = numeric(),
+    risk_score = numeric()
   )
-  if (is.null(sse_all) || nrow(sse_all) == 0L ||
-      is.null(true_values) || length(true_values) == 0L) {
+  if (
+    is.null(sse_all) ||
+      nrow(sse_all) == 0L ||
+      is.null(true_values) ||
+      length(true_values) == 0L
+  ) {
     return(empty)
   }
 
@@ -413,11 +947,16 @@ compute_sse_reliability_map <- function(sse_all, true_values,
 
   converged <- sse_all[sse_all$converged, , drop = FALSE]
   metrics <- compute_sse_metrics(converged, true_values, param_labels)
-  if (nrow(metrics) == 0L) return(empty)
+  if (nrow(metrics) == 0L) {
+    return(empty)
+  }
 
   diag <- compute_param_diagnostics(sse_all, true_values, param_labels)
-  shrink <- compute_shrinkage_summary(sse_all, param_labels,
-                                      only_converged = TRUE)
+  shrink <- compute_shrinkage_summary(
+    sse_all,
+    param_labels,
+    only_converged = TRUE
+  )
   shrink_lookup <- if (nrow(shrink) > 0L) {
     shrink |>
       dplyr::select(param = omega, mean_shrinkage = mean_shrink)
@@ -426,8 +965,13 @@ compute_sse_reliability_map <- function(sse_all, true_values,
   }
 
   out <- metrics |>
-    dplyr::select(param, param_label, param_type,
-                  rse_empirical, relative_bias) |>
+    dplyr::select(
+      param,
+      param_label,
+      param_type,
+      rse_empirical,
+      relative_bias
+    ) |>
     dplyr::left_join(
       diag |>
         dplyr::select(param, pct_se_na, pct_rse_over_100),
@@ -462,17 +1006,21 @@ compute_sse_reliability_map <- function(sse_all, true_values,
 #' @export
 plot_sse_reliability_map <- function(reliability_df) {
   if (is.null(reliability_df) || nrow(reliability_df) == 0L) {
-    return(ggplot() +
-      labs(title = "No SSE reliability data available") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No SSE reliability data available") +
+        .theme_design()
+    )
   }
 
   df <- reliability_df |>
     dplyr::filter(!is.na(rse_empirical), !is.na(relative_bias))
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No valid bias/RSE values for reliability map") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No valid bias/RSE values for reliability map") +
+        .theme_design()
+    )
   }
 
   df$type_group <- dplyr::case_when(
@@ -493,7 +1041,7 @@ plot_sse_reliability_map <- function(reliability_df) {
   )
 
   col_fixed <- "#6C2B91"
-  col_iiv   <- "#2B6991"
+  col_iiv <- "#2B6991"
   col_resid <- "#E07B39"
   rse_thresholds <- data.frame(
     rse_empirical = c(30, 50, 100),
@@ -502,27 +1050,46 @@ plot_sse_reliability_map <- function(reliability_df) {
   )
 
   ggplot(df, aes(x = relative_bias, y = rse_empirical)) +
-    annotate("rect", xmin = -20, xmax = 20, ymin = -Inf, ymax = 30,
-             fill = "#16a34a", alpha = 0.06) +
-    geom_hline(data = rse_thresholds,
-               aes(yintercept = rse_empirical, color = threshold_color),
-               inherit.aes = FALSE, linetype = "dashed",
-               linewidth = 0.35) +
-    geom_vline(xintercept = c(-20, 20), linetype = "dotted",
-               color = "#6b7280", linewidth = 0.35) +
+    annotate(
+      "rect",
+      xmin = -20,
+      xmax = 20,
+      ymin = -Inf,
+      ymax = 30,
+      fill = "#16a34a",
+      alpha = 0.06
+    ) +
+    geom_hline(
+      data = rse_thresholds,
+      aes(yintercept = rse_empirical, color = threshold_color),
+      inherit.aes = FALSE,
+      linetype = "dashed",
+      linewidth = 0.35
+    ) +
+    geom_vline(
+      xintercept = c(-20, 20),
+      linetype = "dotted",
+      color = "#6b7280",
+      linewidth = 0.35
+    ) +
     geom_vline(xintercept = 0, color = "grey55", linewidth = 0.35) +
-    geom_point(aes(color = type_group, size = issue_burden),
-               alpha = 0.82) +
-    geom_text(aes(label = param_label), nudge_y = 3, size = 3,
-              check_overlap = TRUE) +
-    facet_wrap(~ family, scales = "free_y") +
+    geom_point(aes(color = type_group, size = issue_burden), alpha = 0.82) +
+    geom_text(
+      aes(label = param_label),
+      nudge_y = 3,
+      size = 3,
+      check_overlap = TRUE
+    ) +
+    facet_wrap(~family, scales = "free_y") +
     scale_color_manual(
-      values = c("Fixed effects" = col_fixed,
-                 "IIV" = col_iiv,
-                 "Residual" = col_resid,
-                 "#16a34a" = "#16a34a",
-                 "#d97706" = "#d97706",
-                 "#dc2626" = "#dc2626"),
+      values = c(
+        "Fixed effects" = col_fixed,
+        "IIV" = col_iiv,
+        "Residual" = col_resid,
+        "#16a34a" = "#16a34a",
+        "#d97706" = "#d97706",
+        "#dc2626" = "#dc2626"
+      ),
       breaks = c("Fixed effects", "IIV", "Residual"),
       name = NULL
     ) +
@@ -570,44 +1137,67 @@ plot_param_distributions <- function(dist_data, show_failed = FALSE) {
   }
 
   # Keep this summary in base R for compatibility with dplyr 1.0.x + vctrs 0.6+.
-  summary_rows <- lapply(split(df, list(df$param_label, df$true_value),
-                               drop = TRUE), function(group) {
-    data.frame(
-      param_label = group$param_label[[1]],
-      true_value = group$true_value[[1]],
-      median_est = stats::median(group$estimate, na.rm = TRUE),
-      stringsAsFactors = FALSE
-    )
-  })
+  summary_rows <- lapply(
+    split(df, list(df$param_label, df$true_value), drop = TRUE),
+    function(group) {
+      data.frame(
+        param_label = group$param_label[[1]],
+        true_value = group$true_value[[1]],
+        median_est = stats::median(group$estimate, na.rm = TRUE),
+        stringsAsFactors = FALSE
+      )
+    }
+  )
   summaries <- tibble::as_tibble(dplyr::bind_rows(summary_rows))
 
   p <- ggplot(df, aes(x = estimate))
 
   if (show_failed && any(!df$converged)) {
     p <- p +
-      geom_density(data = df[!df$converged, ],
-                   fill = "grey80", alpha = 0.4, color = "grey60") +
-      geom_density(data = df[df$converged, ],
-                   fill = "#3b82f6", alpha = 0.5, color = "#1e40af")
+      geom_density(
+        data = df[!df$converged, ],
+        fill = "grey80",
+        alpha = 0.4,
+        color = "grey60"
+      ) +
+      geom_density(
+        data = df[df$converged, ],
+        fill = "#3b82f6",
+        alpha = 0.5,
+        color = "#1e40af"
+      )
   } else {
     p <- p +
       geom_density(fill = "#3b82f6", alpha = 0.5, color = "#1e40af")
   }
 
   p <- p +
-    geom_vline(data = summaries,
-               aes(xintercept = true_value),
-               color = "#dc2626", linetype = "dashed", size = 0.7) +
-    geom_vline(data = summaries,
-               aes(xintercept = median_est),
-               color = "#1e40af", linetype = "solid", size = 0.7) +
-    facet_wrap(~ param_label, scales = "free", ncol = 3) +
-    labs(title = "Parameter Estimate Distributions (SSE)",
-         subtitle = "Red dashed = true value | Blue solid = median estimate",
-         x = "Estimate", y = "Density") +
+    geom_vline(
+      data = summaries,
+      aes(xintercept = true_value),
+      color = "#dc2626",
+      linetype = "dashed",
+      size = 0.7
+    ) +
+    geom_vline(
+      data = summaries,
+      aes(xintercept = median_est),
+      color = "#1e40af",
+      linetype = "solid",
+      size = 0.7
+    ) +
+    facet_wrap(~param_label, scales = "free", ncol = 3) +
+    labs(
+      title = "Parameter Estimate Distributions (SSE)",
+      subtitle = "Red dashed = true value | Blue solid = median estimate",
+      x = "Estimate",
+      y = "Density"
+    ) +
     .theme_design() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey50"))
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey50")
+    )
 
   p
 }
@@ -639,25 +1229,51 @@ plot_ofv_distribution <- function(sse_all, color_by_status = FALSE) {
   if (color_by_status) {
     df$status <- ifelse(df$converged, "Converged", "Failed")
     p <- ggplot(df, aes(x = ofv, fill = status)) +
-      geom_histogram(bins = 30, alpha = 0.7, position = "identity",
-                     color = "white", size = 0.2) +
-      scale_fill_manual(values = c("Converged" = "#3b82f6",
-                                   "Failed" = "#ef4444"),
-                        name = NULL)
+      geom_histogram(
+        bins = 30,
+        alpha = 0.7,
+        position = "identity",
+        color = "white",
+        size = 0.2
+      ) +
+      scale_fill_manual(
+        values = c("Converged" = "#3b82f6", "Failed" = "#ef4444"),
+        name = NULL
+      )
   } else {
     p <- ggplot(df[df$converged, ], aes(x = ofv)) +
-      geom_histogram(bins = 30, fill = "#3b82f6", alpha = 0.7,
-                     color = "white", size = 0.2)
+      geom_histogram(
+        bins = 30,
+        fill = "#3b82f6",
+        alpha = 0.7,
+        color = "white",
+        size = 0.2
+      )
   }
 
   p <- p +
-    geom_vline(xintercept = median_ofv, color = "#1e40af",
-               linetype = "dashed", size = 0.8) +
-    annotate("text", x = median_ofv, y = Inf, vjust = 2, hjust = -0.1,
-             label = sprintf("Median: %.1f", median_ofv),
-             color = "#1e40af", size = 3.5, fontface = "bold") +
-    labs(title = "OFV Distribution Across SSE Runs",
-         x = "Objective Function Value", y = "Count") +
+    geom_vline(
+      xintercept = median_ofv,
+      color = "#1e40af",
+      linetype = "dashed",
+      size = 0.8
+    ) +
+    annotate(
+      "text",
+      x = median_ofv,
+      y = Inf,
+      vjust = 2,
+      hjust = -0.1,
+      label = sprintf("Median: %.1f", median_ofv),
+      color = "#1e40af",
+      size = 3.5,
+      fontface = "bold"
+    ) +
+    labs(
+      title = "OFV Distribution Across SSE Runs",
+      x = "Objective Function Value",
+      y = "Count"
+    ) +
     .theme_design() +
     theme(plot.title = element_text(hjust = 0.5))
 
@@ -682,11 +1298,13 @@ plot_ofv_distribution <- function(sse_all, color_by_status = FALSE) {
 plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
   if (is.null(shrink_long) || nrow(shrink_long) == 0L) {
     status <- attr(shrink_long, "status") %||% "no_columns"
-    msg <- switch(status,
+    msg <- switch(
+      status,
       no_columns = "No shrinkage_eta*(%) columns in raw_results",
-      all_na     = "Shrinkage columns present but empty (PsN -no_shrinkage?)",
-      no_rows    = "No converged replicates available",
-      "No shrinkage data to display")
+      all_na = "Shrinkage columns present but empty (PsN -no_shrinkage?)",
+      no_rows = "No converged replicates available",
+      "No shrinkage data to display"
+    )
     return(ggplot() + labs(title = msg) + .theme_design())
   }
 
@@ -698,23 +1316,54 @@ plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
 
   p <- ggplot(df, aes(x = param_label, y = shrinkage)) +
     # Reference zones
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 20,
-             fill = "#16a34a", alpha = 0.06) +
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 20, ymax = 30,
-             fill = "#d97706", alpha = 0.06) +
-    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 30, ymax = Inf,
-             fill = "#dc2626", alpha = 0.06) +
-    geom_hline(yintercept = c(20, 30), linetype = "dashed",
-               color = "grey50", size = 0.3) +
-    geom_boxplot(fill = "#2B6991", alpha = 0.7, color = "grey30",
-                 width = 0.6, outlier.size = 0.8) +
+    annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = Inf,
+      ymin = -Inf,
+      ymax = 20,
+      fill = "#16a34a",
+      alpha = 0.06
+    ) +
+    annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = Inf,
+      ymin = 20,
+      ymax = 30,
+      fill = "#d97706",
+      alpha = 0.06
+    ) +
+    annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = Inf,
+      ymin = 30,
+      ymax = Inf,
+      fill = "#dc2626",
+      alpha = 0.06
+    ) +
+    geom_hline(
+      yintercept = c(20, 30),
+      linetype = "dashed",
+      color = "grey50",
+      size = 0.3
+    ) +
+    geom_boxplot(
+      fill = "#2B6991",
+      alpha = 0.7,
+      color = "grey30",
+      width = 0.6,
+      outlier.size = 0.8
+    ) +
     labs(
       title = ttl,
       subtitle = sprintf(
         "N=%d replicates | Green <=20%% | Amber 20-30%% | Red >30%%: caution for EBE diagnostics (Savic & Karlsson 2009)",
         n_rep
       ),
-      x = NULL, y = "Shrinkage (%)"
+      x = NULL,
+      y = "Shrinkage (%)"
     ) +
     .theme_design() +
     theme(
@@ -755,24 +1404,36 @@ plot_shrinkage_boxplot <- function(shrink_long, title = NULL) {
 #'                     (default), shrinkage is recomputed internally.
 #' @return ggplot object
 #' @export
-plot_shrinkage_rse_scatter <- function(sse_all, true_values,
-                                       param_labels = NULL,
-                                       shrink_sum = NULL) {
+plot_shrinkage_rse_scatter <- function(
+  sse_all,
+  true_values,
+  param_labels = NULL,
+  shrink_sum = NULL
+) {
   if (is.null(sse_all) || nrow(sse_all) == 0L || length(true_values) == 0L) {
-    return(ggplot() +
-      labs(title = "Load SSE data and .ctl to see exploratory RSE-shrinkage map") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(
+          title = "Load SSE data and .ctl to see exploratory RSE-shrinkage map"
+        ) +
+        .theme_design()
+    )
   }
 
   if (is.null(shrink_sum)) {
     shrink_sum <- compute_shrinkage_summary(sse_all, param_labels)
   }
   if (nrow(shrink_sum) == 0L) {
-    shrink_cols <- grep("^shrinkage_eta\\d+\\(%\\)$", names(sse_all), value = TRUE)
-    msg <- if (length(shrink_cols) == 0L)
+    shrink_cols <- grep(
+      "^shrinkage_eta\\d+\\(%\\)$",
+      names(sse_all),
+      value = TRUE
+    )
+    msg <- if (length(shrink_cols) == 0L) {
       "No shrinkage_eta*(%) columns in raw_results"
-    else
+    } else {
       "Shrinkage columns present but empty (PsN -no_shrinkage?)"
+    }
     return(ggplot() + labs(title = msg) + .theme_design())
   }
 
@@ -789,9 +1450,13 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
   )
 
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No OMEGA parameters shared between shrinkage and SSE metrics") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(
+          title = "No OMEGA parameters shared between shrinkage and SSE metrics"
+        ) +
+        .theme_design()
+    )
   }
 
   df$tier <- dplyr::case_when(
@@ -799,39 +1464,73 @@ plot_shrinkage_rse_scatter <- function(sse_all, true_values,
     df$rse < 30 & df$shrinkage <= 20 ~ "Green (RSE<30% & shrink<=20%)",
     TRUE ~ "Amber (marginal)"
   )
-  df$tier <- factor(df$tier, levels = c(
-    "Green (RSE<30% & shrink<=20%)",
-    "Amber (marginal)",
-    "Red (shrink >30%)"
-  ))
+  df$tier <- factor(
+    df$tier,
+    levels = c(
+      "Green (RSE<30% & shrink<=20%)",
+      "Amber (marginal)",
+      "Red (shrink >30%)"
+    )
+  )
 
   x_max <- max(100, max(df$shrinkage, na.rm = TRUE) * 1.1)
   y_max <- max(60, max(df$rse, na.rm = TRUE) * 1.1)
 
   p <- ggplot(df, aes(x = shrinkage, y = rse)) +
     # Tier rectangles (background)
-    annotate("rect", xmin = -Inf, xmax = 20, ymin = -Inf, ymax = 30,
-             fill = "#16a34a", alpha = 0.08) +
-    annotate("rect", xmin = 30, xmax = Inf, ymin = -Inf, ymax = Inf,
-             fill = "#dc2626", alpha = 0.08) +
+    annotate(
+      "rect",
+      xmin = -Inf,
+      xmax = 20,
+      ymin = -Inf,
+      ymax = 30,
+      fill = "#16a34a",
+      alpha = 0.08
+    ) +
+    annotate(
+      "rect",
+      xmin = 30,
+      xmax = Inf,
+      ymin = -Inf,
+      ymax = Inf,
+      fill = "#dc2626",
+      alpha = 0.08
+    ) +
     # Threshold lines
-    geom_hline(yintercept = 30, linetype = "dashed",
-               color = "#16a34a", size = 0.4) +
-    geom_vline(xintercept = 20, linetype = "dashed",
-               color = "#d97706", size = 0.4) +
-    geom_vline(xintercept = 30, linetype = "dashed",
-               color = "#dc2626", size = 0.4) +
+    geom_hline(
+      yintercept = 30,
+      linetype = "dashed",
+      color = "#16a34a",
+      size = 0.4
+    ) +
+    geom_vline(
+      xintercept = 20,
+      linetype = "dashed",
+      color = "#d97706",
+      size = 0.4
+    ) +
+    geom_vline(
+      xintercept = 30,
+      linetype = "dashed",
+      color = "#dc2626",
+      size = 0.4
+    ) +
     # Points
     geom_point(aes(color = tier), size = 4, alpha = 0.85) +
-    geom_text(aes(label = param_label), nudge_y = y_max * 0.025,
-              size = 3, check_overlap = TRUE) +
+    geom_text(
+      aes(label = param_label),
+      nudge_y = y_max * 0.025,
+      size = 3,
+      check_overlap = TRUE
+    ) +
     scale_color_manual(
       values = c(
         "Green (RSE<30% & shrink<=20%)" = "#16a34a",
-        "Amber (marginal)"              = "#d97706",
-        "Red (shrink >30%)"             = "#dc2626"
+        "Amber (marginal)" = "#d97706",
+        "Red (shrink >30%)" = "#dc2626"
       ),
-      drop = FALSE, name = NULL
+      drop = FALSE,
+      name = NULL
     ) +
     coord_cartesian(xlim = c(0, x_max), ylim = c(0, y_max)) +
     labs(

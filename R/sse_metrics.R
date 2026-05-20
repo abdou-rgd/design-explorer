@@ -52,7 +52,7 @@ library(tidyr)
 
     # Detect and strip SE prefix
     if (grepl("^se", nm)) {
-      # "se--th1-..." or "seOMEGA..." or "seETA..."
+      # "se--th1-...", "seOMEGA...", "seTHETA1", or "seCL"
       if (grepl("^se--", nm)) {
         se_prefix <- "se_"
         nm <- sub("^se", "", nm)
@@ -65,13 +65,22 @@ library(tidyr)
       } else if (grepl("^se--eps", nm)) {
         se_prefix <- "se_"
         nm <- sub("^se", "", nm)
+      } else if (
+        grepl("^se(THETA\\d+|SIGMA\\(|[A-Za-z][A-Za-z0-9_.()]*)", nm)
+      ) {
+        se_prefix <- "se_"
+        nm <- sub("^se", "", nm)
       }
     }
 
     # THETA numbered: "--th1- CL" -> "THETA1" ; "--th10" -> "THETA10"
     if (grepl("^--th(\\d+)($|[ \\t-])", nm)) {
       idx <- as.integer(sub("^--th(\\d+).*", "\\1", nm))
-      if (nchar(se_prefix)) se_th_counter <- idx else th_counter <- idx
+      if (nchar(se_prefix)) {
+        se_th_counter <- idx
+      } else {
+        th_counter <- idx
+      }
       out[i] <- paste0(se_prefix, "THETA", idx)
       next
     }
@@ -79,9 +88,11 @@ library(tidyr)
     # THETA unnumbered: "--th- COV1" / "--th-_" -> positional from last seen digit
     if (grepl("^--th($|[^0-9])", nm)) {
       idx <- if (nchar(se_prefix)) {
-        se_th_counter <- se_th_counter + 1L; se_th_counter
+        se_th_counter <- se_th_counter + 1L
+        se_th_counter
       } else {
-        th_counter <- th_counter + 1L; th_counter
+        th_counter <- th_counter + 1L
+        th_counter
       }
       out[i] <- paste0(se_prefix, "THETA", idx)
       next
@@ -90,7 +101,11 @@ library(tidyr)
     # SIGMA numbered: "--eps1- Proportional" -> "SIGMA(1,1)"
     if (grepl("^--eps(\\d+)($|[ \\t-])", nm)) {
       idx <- as.integer(sub("^--eps(\\d+).*", "\\1", nm))
-      if (nchar(se_prefix)) se_eps_counter <- idx else eps_counter <- idx
+      if (nchar(se_prefix)) {
+        se_eps_counter <- idx
+      } else {
+        eps_counter <- idx
+      }
       out[i] <- paste0(se_prefix, "SIGMA(", idx, ",", idx, ")")
       next
     }
@@ -98,9 +113,11 @@ library(tidyr)
     # SIGMA unnumbered: "--eps- Prop" -> positional
     if (grepl("^--eps($|[^0-9])", nm)) {
       idx <- if (nchar(se_prefix)) {
-        se_eps_counter <- se_eps_counter + 1L; se_eps_counter
+        se_eps_counter <- se_eps_counter + 1L
+        se_eps_counter
       } else {
-        eps_counter <- eps_counter + 1L; eps_counter
+        eps_counter <- eps_counter + 1L
+        eps_counter
       }
       out[i] <- paste0(se_prefix, "SIGMA(", idx, ",", idx, ")")
       next
@@ -115,6 +132,13 @@ library(tidyr)
 
     # OMEGA(x,y) stays as-is, just add se_ prefix if needed
     if (grepl("^OMEGA\\(", nm)) {
+      out[i] <- paste0(se_prefix, nm)
+      next
+    }
+
+    # Already-normalized PsN parameter names can also appear with SE prefixes:
+    # "seTHETA3", "seSIGMA(1,1)", or "seCL".
+    if (grepl("^THETA\\d+$", nm) || grepl("^SIGMA\\(", nm)) {
       out[i] <- paste0(se_prefix, nm)
       next
     }
@@ -192,8 +216,12 @@ read_sse_summary <- function(file) {
 
   # Helper: parse a CSV line respecting quotes (handles OMEGA(1,1) etc.)
   .parse_csv_line <- function(ln) {
-    row <- read.csv(textConnection(ln), header = FALSE,
-                    stringsAsFactors = FALSE, check.names = FALSE)
+    row <- read.csv(
+      textConnection(ln),
+      header = FALSE,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
     trimws(as.character(row[1, ]))
   }
 
@@ -209,10 +237,10 @@ read_sse_summary <- function(file) {
 
   # Drop first two columns (empty + ofv/label)
   param_names <- true_header[-(1:2)]
-  param_vals  <- true_vals_line[-(1:2)]
+  param_vals <- true_vals_line[-(1:2)]
   valid <- suppressWarnings(!is.na(as.numeric(param_vals)))
   param_names <- param_names[valid]
-  param_vals  <- as.numeric(param_vals[valid])
+  param_vals <- as.numeric(param_vals[valid])
   true_values <- setNames(param_vals, param_names)
 
   # --- Extract statistics (lines 10+) ---
@@ -225,13 +253,22 @@ read_sse_summary <- function(file) {
   stat_rows <- list()
   for (i in 11:length(lines)) {
     ln <- lines[i]
-    if (grepl("^\\s*$", ln) || grepl("^[A-Z]", ln) ||
-        grepl("standard error CI", ln, ignore.case = TRUE)) next
+    if (
+      grepl("^\\s*$", ln) ||
+        grepl("^[A-Z]", ln) ||
+        grepl("standard error CI", ln, ignore.case = TRUE)
+    ) {
+      next
+    }
     parts <- .parse_csv_line(ln)
     row_label <- parts[1]
-    if (nchar(row_label) == 0L) next
-    if (grepl("^[0-9.]+%$", row_label)) next
-    vals <- parts[-(1:2)]  # drop label + ofv
+    if (nchar(row_label) == 0L) {
+      next
+    }
+    if (grepl("^[0-9.]+%$", row_label)) {
+      next
+    }
+    vals <- parts[-(1:2)] # drop label + ofv
     stat_rows[[row_label]] <- suppressWarnings(
       as.numeric(vals[seq_len(n_params)])
     )
@@ -246,14 +283,18 @@ read_sse_summary <- function(file) {
   metrics <- data.frame(
     param = param_names,
     param_label = param_names,
-    param_type = vapply(param_names, .param_type, character(1),
-                        USE.NAMES = FALSE),
+    param_type = vapply(
+      param_names,
+      .param_type,
+      character(1),
+      USE.NAMES = FALSE
+    ),
     true_value = param_vals,
     mean_estimate = round(get_stat("mean"), 6),
     rse_empirical = round(get_stat("rse"), 2),
     rmse_relative = round(get_stat("relative_rmse"), 2),
     relative_bias = round(get_stat("relative_bias"), 2),
-    rb_ci_lower = NA_real_,  # Not available in summary format
+    rb_ci_lower = NA_real_, # Not available in summary format
     rb_ci_upper = NA_real_,
     n = rep(n_samples, n_params),
     stringsAsFactors = FALSE
@@ -267,8 +308,14 @@ read_sse_summary <- function(file) {
     if (!is.na(sd_vals[j]) && abs(param_vals[j]) > 1e-15 && !is.na(n_samples)) {
       sd_ree <- sd_vals[j] / abs(param_vals[j]) * 100
       se_rb <- sd_ree / sqrt(n_samples)
-      metrics$rb_ci_lower[j] <- round(metrics$relative_bias[j] - 1.96 * se_rb, 2)
-      metrics$rb_ci_upper[j] <- round(metrics$relative_bias[j] + 1.96 * se_rb, 2)
+      metrics$rb_ci_lower[j] <- round(
+        metrics$relative_bias[j] - 1.96 * se_rb,
+        2
+      )
+      metrics$rb_ci_upper[j] <- round(
+        metrics$relative_bias[j] + 1.96 * se_rb,
+        2
+      )
     }
   }
 
@@ -286,14 +333,20 @@ read_sse_summary <- function(file) {
 # =============================================================================
 
 .read_sse_raw_base <- function(file) {
-  if (!file.exists(file)) stop("Fichier SSE introuvable : ", file)
+  if (!file.exists(file)) {
+    stop("Fichier SSE introuvable : ", file)
+  }
 
   # Prefer readr::read_csv -- quote-aware (handles OMEGA(1,1) commas) and
   # robust type inference. Fall back to read.csv if readr unavailable.
   if (requireNamespace("readr", quietly = TRUE)) {
     raw <- suppressWarnings(suppressMessages(
-      readr::read_csv(file, show_col_types = FALSE, progress = FALSE,
-                      guess_max = 10000)
+      readr::read_csv(
+        file,
+        show_col_types = FALSE,
+        progress = FALSE,
+        guess_max = 10000
+      )
     ))
     raw <- as.data.frame(raw, check.names = FALSE)
   } else {
@@ -325,8 +378,12 @@ read_sse_raw <- function(file) {
   pre_filtered <- FALSE
   if ("minimization_successful" %in% names(raw)) {
     raw$minimization_successful <- as.numeric(raw$minimization_successful)
-    raw <- raw[!is.na(raw$minimization_successful) &
-               raw$minimization_successful == 1, , drop = FALSE]
+    raw <- raw[
+      !is.na(raw$minimization_successful) &
+        raw$minimization_successful == 1,
+      ,
+      drop = FALSE
+    ]
   } else {
     pre_filtered <- TRUE
   }
@@ -358,13 +415,15 @@ read_true_values <- function(ctl_lines) {
     return(numeric(0L))
   }
 
-  lines_clean <- sub(";.*$", "", ctl_lines)  # strip comments
+  lines_clean <- sub(";.*$", "", ctl_lines) # strip comments
   dollar_lines <- which(grepl("^\\s*\\$", lines_clean))
 
   # --- Helper: find block range ---
   .block_range <- function(keyword) {
     starts <- which(grepl(paste0("^\\s*\\$", keyword, "\\b"), lines_clean))
-    if (length(starts) == 0L) return(list())
+    if (length(starts) == 0L) {
+      return(list())
+    }
     ranges <- list()
     for (s in starts) {
       later <- dollar_lines[dollar_lines > s]
@@ -387,12 +446,18 @@ read_true_values <- function(ctl_lines) {
         inner <- sub("^\\((.*)\\)$", "\\1", ps)
         inner <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT)\\b", "", inner)
         toks <- trimws(strsplit(inner, ",")[[1]])
-        toks <- toks[nzchar(toks) &
-                     grepl("^-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?$", toks)]
+        toks <- toks[
+          nzchar(toks) &
+            grepl("^-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?$", toks)
+        ]
         nums <- as.numeric(sub("[dD]", "e", toks))
-        if (length(nums) == 3L)      vals <- c(vals, nums[2])
-        else if (length(nums) == 2L) vals <- c(vals, nums[2])
-        else if (length(nums) == 1L) vals <- c(vals, nums[1])
+        if (length(nums) == 3L) {
+          vals <- c(vals, nums[2])
+        } else if (length(nums) == 2L) {
+          vals <- c(vals, nums[2])
+        } else if (length(nums) == 1L) {
+          vals <- c(vals, nums[1])
+        }
       }
       remaining <- gsub("\\([^)]+\\)", "", stripped)
     } else {
@@ -400,7 +465,9 @@ read_true_values <- function(ctl_lines) {
     }
     # 2) Extract bare numbers from remaining text (e.g. "0.15 FIX 8.0")
     remaining <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT)\\b", "", remaining)
-    bare_locs <- gregexpr("-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?", remaining)[[1]]
+    bare_locs <- gregexpr("-?[0-9]+\\.?[0-9]*([eEdD][+-]?[0-9]+)?", remaining)[[
+      1
+    ]]
     if (bare_locs[1] > 0) {
       bare_strs <- regmatches(remaining, list(bare_locs))[[1]]
       for (bs in bare_strs) {
@@ -412,18 +479,38 @@ read_true_values <- function(ctl_lines) {
   }
 
   .numeric_tokens <- function(line) {
-    line <- gsub("(?i)\\b(FIX(ED)?|SAME|UNINT|BLOCK)\\b", " ", line, perl = TRUE)
-    locs <- gregexpr("-?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?",
-                     line, perl = TRUE)[[1]]
-    if (locs[1] < 0) return(numeric(0L))
+    line <- gsub(
+      "(?i)\\b(FIX(ED)?|SAME|UNINT|BLOCK)\\b",
+      " ",
+      line,
+      perl = TRUE
+    )
+    locs <- gregexpr(
+      "-?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?",
+      line,
+      perl = TRUE
+    )[[1]]
+    if (locs[1] < 0) {
+      return(numeric(0L))
+    }
     raw <- regmatches(line, list(locs))[[1]]
     vals <- as.numeric(gsub("[dD]", "E", raw))
     vals[!is.na(vals)]
   }
 
   .block_inline_values <- function(line, keyword) {
-    stripped <- sub(paste0("^\\s*\\$", keyword, "\\s*"), "", line, ignore.case = TRUE)
-    stripped <- sub("(?i)^\\s*BLOCK\\s*\\(\\s*\\d+\\s*\\)", "", stripped, perl = TRUE)
+    stripped <- sub(
+      paste0("^\\s*\\$", keyword, "\\s*"),
+      "",
+      line,
+      ignore.case = TRUE
+    )
+    stripped <- sub(
+      "(?i)^\\s*BLOCK\\s*\\(\\s*\\d+\\s*\\)",
+      "",
+      stripped,
+      perl = TRUE
+    )
     .numeric_tokens(stripped)
   }
 
@@ -436,7 +523,9 @@ read_true_values <- function(ctl_lines) {
       ln <- lines_clean[i]
       stripped <- sub("^\\s*\\$THETA\\s*", "", ln)
       stripped <- trimws(stripped)
-      if (nchar(stripped) == 0L) next
+      if (nchar(stripped) == 0L) {
+        next
+      }
       inits <- .extract_theta_inits(stripped)
       for (val in inits) {
         theta_idx <- theta_idx + 1L
@@ -449,7 +538,7 @@ read_true_values <- function(ctl_lines) {
   # --- Parse $OMEGA ---
   omega_vals <- numeric(0L)
   omega_names <- character(0L)
-  omega_row <- 0L  # global row counter across blocks
+  omega_row <- 0L # global row counter across blocks
 
   for (rng in .block_range("OMEGA")) {
     first_line <- lines_clean[rng[1]]
@@ -457,24 +546,35 @@ read_true_values <- function(ctl_lines) {
 
     if (is_block) {
       # BLOCK(n): lower-triangular values
-      n <- as.integer(sub(".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*", "\\1", first_line))
+      n <- as.integer(sub(
+        ".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*",
+        "\\1",
+        first_line
+      ))
       all_nums <- .block_inline_values(first_line, "OMEGA")
       idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
       for (i in idx_lines) {
         ln <- lines_clean[i]
-        if (grepl("^\\s*$", ln)) next
+        if (grepl("^\\s*$", ln)) {
+          next
+        }
         all_nums <- c(all_nums, .numeric_tokens(ln))
       }
       # Lower-triangular: row 1 has 1 element, row 2 has 2, etc.
       idx <- 1L
       for (row in seq_len(n)) {
         for (col in seq_len(row)) {
-          if (idx > length(all_nums)) break
+          if (idx > length(all_nums)) {
+            break
+          }
           val <- all_nums[idx]
           r_global <- omega_row + row
           c_global <- omega_row + col
           omega_vals <- c(omega_vals, val)
-          omega_names <- c(omega_names, paste0("OMEGA(", r_global, ",", c_global, ")"))
+          omega_names <- c(
+            omega_names,
+            paste0("OMEGA(", r_global, ",", c_global, ")")
+          )
           idx <- idx + 1L
         }
       }
@@ -485,20 +585,31 @@ read_true_values <- function(ctl_lines) {
         ln <- lines_clean[i]
         stripped <- sub("^\\s*\\$OMEGA\\s*", "", ln)
         stripped <- trimws(stripped)
-        if (nchar(stripped) == 0L) next
+        if (nchar(stripped) == 0L) {
+          next
+        }
         # Handle bounded (lower, init, upper) or standalone
         if (grepl("\\(", stripped)) {
           inner <- sub("^\\(([^)]+)\\).*", "\\1", stripped)
           nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
           nums <- nums[!is.na(nums)]
-          val <- if (length(nums) >= 2L) nums[2] else if (length(nums) == 1L) nums[1] else next
+          val <- if (length(nums) >= 2L) {
+            nums[2]
+          } else if (length(nums) == 1L) {
+            nums[1]
+          } else {
+            next
+          }
         } else {
           val <- as.numeric(sub("^(-?[0-9.eEdD]+).*", "\\1", stripped))
           if (is.na(val)) next
         }
         omega_row <- omega_row + 1L
         omega_vals <- c(omega_vals, val)
-        omega_names <- c(omega_names, paste0("OMEGA(", omega_row, ",", omega_row, ")"))
+        omega_names <- c(
+          omega_names,
+          paste0("OMEGA(", omega_row, ",", omega_row, ")")
+        )
       }
     }
   }
@@ -513,23 +624,34 @@ read_true_values <- function(ctl_lines) {
     is_block <- grepl("BLOCK\\s*\\(", first_line, ignore.case = TRUE)
 
     if (is_block) {
-      n <- as.integer(sub(".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*", "\\1", first_line))
+      n <- as.integer(sub(
+        ".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*",
+        "\\1",
+        first_line
+      ))
       all_nums <- .block_inline_values(first_line, "SIGMA")
       idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
       for (i in idx_lines) {
         ln <- lines_clean[i]
-        if (grepl("^\\s*$", ln)) next
+        if (grepl("^\\s*$", ln)) {
+          next
+        }
         all_nums <- c(all_nums, .numeric_tokens(ln))
       }
       idx <- 1L
       for (row in seq_len(n)) {
         for (col in seq_len(row)) {
-          if (idx > length(all_nums)) break
+          if (idx > length(all_nums)) {
+            break
+          }
           val <- all_nums[idx]
           r_global <- sigma_row + row
           c_global <- sigma_row + col
           sigma_vals <- c(sigma_vals, val)
-          sigma_names <- c(sigma_names, paste0("SIGMA(", r_global, ",", c_global, ")"))
+          sigma_names <- c(
+            sigma_names,
+            paste0("SIGMA(", r_global, ",", c_global, ")")
+          )
           idx <- idx + 1L
         }
       }
@@ -539,25 +661,38 @@ read_true_values <- function(ctl_lines) {
         ln <- lines_clean[i]
         stripped <- sub("^\\s*\\$SIGMA\\s*", "", ln)
         stripped <- trimws(stripped)
-        if (nchar(stripped) == 0L) next
+        if (nchar(stripped) == 0L) {
+          next
+        }
         if (grepl("\\(", stripped)) {
           inner <- sub("^\\(([^)]+)\\).*", "\\1", stripped)
           nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
           nums <- nums[!is.na(nums)]
-          val <- if (length(nums) >= 2L) nums[2] else if (length(nums) == 1L) nums[1] else next
+          val <- if (length(nums) >= 2L) {
+            nums[2]
+          } else if (length(nums) == 1L) {
+            nums[1]
+          } else {
+            next
+          }
         } else {
           val <- as.numeric(sub("^(-?[0-9.eEdD]+).*", "\\1", stripped))
           if (is.na(val)) next
         }
         sigma_row <- sigma_row + 1L
         sigma_vals <- c(sigma_vals, val)
-        sigma_names <- c(sigma_names, paste0("SIGMA(", sigma_row, ",", sigma_row, ")"))
+        sigma_names <- c(
+          sigma_names,
+          paste0("SIGMA(", sigma_row, ",", sigma_row, ")")
+        )
       }
     }
   }
 
-  setNames(c(theta_vals, omega_vals, sigma_vals),
-           c(theta_names, omega_names, sigma_names))
+  setNames(
+    c(theta_vals, omega_vals, sigma_vals),
+    c(theta_names, omega_names, sigma_names)
+  )
 }
 
 
@@ -574,14 +709,17 @@ read_true_values <- function(ctl_lines) {
 #' @return Tibble : param, param_type, true_value, mean_estimate,
 #'         rse_empirical, rmse_relative, relative_bias, n
 #' @export
-compute_sse_metrics <- function(sse_raw, true_values,
-                                param_labels = NULL) {
+compute_sse_metrics <- function(sse_raw, true_values, param_labels = NULL) {
   # Match SSE columns to true values
   available <- intersect(names(true_values), names(sse_raw))
   if (length(available) == 0L) {
     warning("Aucun parametre commun entre SSE et valeurs vraies")
-    return(tibble(param = character(), param_type = character(),
-                  true_value = numeric(), rse_empirical = numeric()))
+    return(tibble(
+      param = character(),
+      param_type = character(),
+      true_value = numeric(),
+      rse_empirical = numeric()
+    ))
   }
 
   results <- lapply(available, function(pname) {
@@ -589,7 +727,9 @@ compute_sse_metrics <- function(sse_raw, true_values,
     estimates <- estimates[!is.na(estimates)]
     true_val <- true_values[[pname]]
 
-    if (length(estimates) < 2L || abs(true_val) < 1e-15) return(NULL)
+    if (length(estimates) < 2L || abs(true_val) < 1e-15) {
+      return(NULL)
+    }
 
     mean_est <- mean(estimates)
     sd_est <- sd(estimates)
@@ -675,26 +815,40 @@ compute_sse_metrics <- function(sse_raw, true_values,
 #'   eigenvalues_raw, eigenvalues_corr                     (sorted desc)
 #'   p, param_names
 #' @export
-compute_empirical_d_criterion <- function(sse_raw, true_values,
-                                          rcond_threshold = 1e-15) {
+compute_empirical_d_criterion <- function(
+  sse_raw,
+  true_values,
+  rcond_threshold = 1e-15
+) {
   available <- intersect(names(true_values), names(sse_raw))
   p <- length(available)
 
   result <- list(
-    d_criterion = NA_real_, p = p, rcond = NA_real_,
-    ill_conditioned = FALSE, vcov = NULL,
-    d_criterion_corr = NA_real_, rcond_corr = NA_real_,
-    ill_conditioned_corr = FALSE, corr = NULL,
-    cond_number_raw = NA_real_, cond_number_corr = NA_real_,
-    eigenvalues_raw = numeric(0L), eigenvalues_corr = numeric(0L),
+    d_criterion = NA_real_,
+    p = p,
+    rcond = NA_real_,
+    ill_conditioned = FALSE,
+    vcov = NULL,
+    d_criterion_corr = NA_real_,
+    rcond_corr = NA_real_,
+    ill_conditioned_corr = FALSE,
+    corr = NULL,
+    cond_number_raw = NA_real_,
+    cond_number_corr = NA_real_,
+    eigenvalues_raw = numeric(0L),
+    eigenvalues_corr = numeric(0L),
     param_names = available
   )
 
-  if (p < 2L) return(result)
+  if (p < 2L) {
+    return(result)
+  }
 
   est_matrix <- as.matrix(sse_raw[, available, drop = FALSE])
   est_matrix <- est_matrix[complete.cases(est_matrix), , drop = FALSE]
-  if (nrow(est_matrix) < p + 1L) return(result)
+  if (nrow(est_matrix) < p + 1L) {
+    return(result)
+  }
 
   # Drop parameters with zero (or near-zero) empirical variance -- typically
   # parameters fixed at 0 in the .ctl, whose SSE column is constant. Without
@@ -702,7 +856,9 @@ compute_empirical_d_criterion <- function(sse_raw, true_values,
   # fails downstream.
   variances <- apply(est_matrix, 2L, var)
   keep <- !is.na(variances) & variances > 1e-20
-  if (sum(keep) < 2L) return(result)
+  if (sum(keep) < 2L) {
+    return(result)
+  }
   est_matrix <- est_matrix[, keep, drop = FALSE]
   available <- available[keep]
   p <- length(available)
@@ -711,25 +867,34 @@ compute_empirical_d_criterion <- function(sse_raw, true_values,
 
   vcov <- cov(est_matrix)
   corr <- tryCatch(cov2cor(vcov), error = function(e) NULL)
-  if (is.null(corr) || anyNA(corr)) return(result)
+  if (is.null(corr) || anyNA(corr)) {
+    return(result)
+  }
 
-  eig_v <- sort(eigen(vcov, symmetric = TRUE, only.values = TRUE)$values,
-                decreasing = TRUE)
-  eig_c <- sort(eigen(corr, symmetric = TRUE, only.values = TRUE)$values,
-                decreasing = TRUE)
+  eig_v <- sort(
+    eigen(vcov, symmetric = TRUE, only.values = TRUE)$values,
+    decreasing = TRUE
+  )
+  eig_c <- sort(
+    eigen(corr, symmetric = TRUE, only.values = TRUE)$values,
+    decreasing = TRUE
+  )
 
   result$vcov <- vcov
   result$corr <- corr
-  result$eigenvalues_raw  <- eig_v
+  result$eigenvalues_raw <- eig_v
   result$eigenvalues_corr <- eig_c
-  result$rcond     <- rcond(vcov)
+  result$rcond <- rcond(vcov)
   result$rcond_corr <- rcond(corr)
 
   safe_cond <- function(ev) {
-    if (length(ev) < 2L || any(!is.finite(ev)) || min(ev) <= 0) NA_real_
-    else max(ev) / min(ev)
+    if (length(ev) < 2L || any(!is.finite(ev)) || min(ev) <= 0) {
+      NA_real_
+    } else {
+      max(ev) / min(ev)
+    }
   }
-  result$cond_number_raw  <- safe_cond(eig_v)
+  result$cond_number_raw <- safe_cond(eig_v)
   result$cond_number_corr <- safe_cond(eig_c)
 
   # Raw D-criterion
@@ -791,9 +956,16 @@ compare_fim_sse <- function(sse_metrics, fim_rse, max_rse = 200) {
 
   # Prepare SSE side
   sse_df <- sse_metrics |>
-    dplyr::select(param, param_type, param_label,
-                  rse_sse = rse_empirical, rmse_sse = rmse_relative,
-                  relative_bias, rb_ci_lower, rb_ci_upper)
+    dplyr::select(
+      param,
+      param_type,
+      param_label,
+      rse_sse = rse_empirical,
+      rmse_sse = rmse_relative,
+      relative_bias,
+      rb_ci_lower,
+      rb_ci_upper
+    )
 
   # Full join to keep all params
 
@@ -809,8 +981,8 @@ compare_fim_sse <- function(sse_metrics, fim_rse, max_rse = 200) {
   # Status column
   comp$status <- dplyr::case_when(
     !is.na(comp$rse_fim) & !is.na(comp$rse_sse) ~ "matched",
-    !is.na(comp$rse_fim) & is.na(comp$rse_sse)  ~ "FIM only",
-    is.na(comp$rse_fim) & !is.na(comp$rse_sse)  ~ "SSE only",
+    !is.na(comp$rse_fim) & is.na(comp$rse_sse) ~ "FIM only",
+    is.na(comp$rse_fim) & !is.na(comp$rse_sse) ~ "SSE only",
     TRUE ~ "unknown"
   )
 
@@ -849,25 +1021,30 @@ compare_fim_sse <- function(sse_metrics, fim_rse, max_rse = 200) {
 plot_fim_vs_sse <- function(comparison_df, title = NULL) {
   # Filter to matched params only, remove NA
   df <- comparison_df |>
-    dplyr::filter(status == "matched",
-                  !is.na(rse_fim_capped), !is.na(rse_sse_capped))
+    dplyr::filter(
+      status == "matched",
+      !is.na(rse_fim_capped),
+      !is.na(rse_sse_capped)
+    )
 
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No common parameters between FIM and SSE") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No common parameters between FIM and SSE") +
+        .theme_design()
+    )
   }
 
   # Simplify param_type for color legend
   df$type_group <- dplyr::case_when(
-    grepl("^THETA", df$param_type)  ~ "Fixed effects",
-    grepl("^OMEGA", df$param_type)  ~ "IIV",
-    grepl("^SIGMA", df$param_type)  ~ "Residual",
-    TRUE                            ~ df$param_type
+    grepl("^THETA", df$param_type) ~ "Fixed effects",
+    grepl("^OMEGA", df$param_type) ~ "IIV",
+    grepl("^SIGMA", df$param_type) ~ "Residual",
+    TRUE ~ df$param_type
   )
 
   col_fixed <- "#6C2B91"
-  col_iiv   <- "#2B6991"
+  col_iiv <- "#2B6991"
   col_resid <- "#E07B39"
 
   lim_max <- max(c(df$rse_fim_capped, df$rse_sse_capped), na.rm = TRUE) * 1.1
@@ -885,7 +1062,8 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
   n_total <- nrow(df)
   sub_txt <- sprintf(
     "Circles = RSE vs RSE | Triangles = RRMSE (includes bias) | ±20%% band | %d/%d within band",
-    n_pass, n_total
+    n_pass,
+    n_total
   )
 
   p <- ggplot(df, aes(x = rse_sse_capped, y = rse_fim_capped)) +
@@ -893,27 +1071,52 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
     geom_ribbon(
       data = data.frame(x = seq(0, lim_max, length.out = 200)),
       aes(x = x, ymin = x * 0.8, ymax = x * 1.2, y = NULL),
-      fill = col_fixed, alpha = 0.1, inherit.aes = FALSE
+      fill = col_fixed,
+      alpha = 0.1,
+      inherit.aes = FALSE
     ) +
     # Identity line
-    geom_abline(slope = 1, intercept = 0, linetype = "solid", color = "grey50") +
+    geom_abline(
+      slope = 1,
+      intercept = 0,
+      linetype = "solid",
+      color = "grey50"
+    ) +
     # RMSE triangles (faded)
-    geom_point(aes(x = rmse_sse_capped, color = type_group),
-               size = 2.5, alpha = 0.3, shape = 17) +
+    geom_point(
+      aes(x = rmse_sse_capped, color = type_group),
+      size = 2.5,
+      alpha = 0.3,
+      shape = 17
+    ) +
     # Segments RSE -> RMSE (horizontal, showing bias impact)
-    geom_segment(aes(x = rse_sse_capped, xend = rmse_sse_capped,
-                     y = rse_fim_capped, yend = rse_fim_capped,
-                     color = type_group),
-                 alpha = 0.3, size = 0.5, linetype = "dotted") +
+    geom_segment(
+      aes(
+        x = rse_sse_capped,
+        xend = rmse_sse_capped,
+        y = rse_fim_capped,
+        yend = rse_fim_capped,
+        color = type_group
+      ),
+      alpha = 0.3,
+      size = 0.5,
+      linetype = "dotted"
+    ) +
     # RSE points (main)
     geom_point(aes(color = type_group), size = 3.5) +
     # Labels
-    geom_text(aes(label = label), nudge_y = lim_max * 0.03,
-              size = 3, check_overlap = TRUE) +
+    geom_text(
+      aes(label = label),
+      nudge_y = lim_max * 0.03,
+      size = 3,
+      check_overlap = TRUE
+    ) +
     scale_color_manual(
-      values = c("Fixed effects" = col_fixed,
-                 "IIV" = col_iiv,
-                 "Residual" = col_resid),
+      values = c(
+        "Fixed effects" = col_fixed,
+        "IIV" = col_iiv,
+        "Residual" = col_resid
+      ),
       name = NULL
     ) +
     coord_equal(xlim = lim, ylim = lim) +
@@ -924,9 +1127,11 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
       y = "FIM predicted RSE (%)"
     ) +
     .theme_design() +
-    theme(legend.position = "right",
-          plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5))
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5)
+    )
 
   p
 }
@@ -945,31 +1150,47 @@ plot_fim_vs_sse <- function(comparison_df, title = NULL) {
 #'         $summary (tibble: param, param_type, p5, q25, median, q75, p95,
 #'         rb, ci_lower, ci_upper)
 #' @export
-compute_ree_distribution <- function(sse_raw, true_values,
-                                     param_labels = NULL) {
+compute_ree_distribution <- function(
+  sse_raw,
+  true_values,
+  param_labels = NULL
+) {
   available <- intersect(names(true_values), names(sse_raw))
   if (length(available) == 0L) {
     return(list(
-      individual = tibble::tibble(param = character(), param_type = character(),
-                                  param_label = character(), ree = numeric()),
-      summary = tibble::tibble(param = character(), param_type = character(),
-                               param_label = character(),
-                               p5 = numeric(), q25 = numeric(),
-                               median = numeric(), q75 = numeric(),
-                               p95 = numeric(), rb = numeric(),
-                               ci_lower = numeric(), ci_upper = numeric())
+      individual = tibble::tibble(
+        param = character(),
+        param_type = character(),
+        param_label = character(),
+        ree = numeric()
+      ),
+      summary = tibble::tibble(
+        param = character(),
+        param_type = character(),
+        param_label = character(),
+        p5 = numeric(),
+        q25 = numeric(),
+        median = numeric(),
+        q75 = numeric(),
+        p95 = numeric(),
+        rb = numeric(),
+        ci_lower = numeric(),
+        ci_upper = numeric()
+      )
     ))
   }
 
   indiv_list <- list()
-  summ_list  <- list()
+  summ_list <- list()
 
   for (pname in available) {
     estimates <- as.numeric(sse_raw[[pname]])
     estimates <- estimates[!is.na(estimates)]
-    true_val  <- true_values[[pname]]
+    true_val <- true_values[[pname]]
 
-    if (length(estimates) < 2L || abs(true_val) < 1e-15) next
+    if (length(estimates) < 2L || abs(true_val) < 1e-15) {
+      next
+    }
 
     ree <- (estimates - true_val) / true_val * 100
 
@@ -987,8 +1208,7 @@ compute_ree_distribution <- function(sse_raw, true_values,
       stringsAsFactors = FALSE
     )
 
-    qs <- quantile(ree, probs = c(0.05, 0.25, 0.50, 0.75, 0.95),
-                   names = FALSE)
+    qs <- quantile(ree, probs = c(0.05, 0.25, 0.50, 0.75, 0.95), names = FALSE)
     rb <- mean(ree)
     se_rb <- sd(ree) / sqrt(length(ree))
 
@@ -996,7 +1216,11 @@ compute_ree_distribution <- function(sse_raw, true_values,
       param = pname,
       param_type = .param_type(pname),
       param_label = label,
-      p5 = qs[1], q25 = qs[2], median = qs[3], q75 = qs[4], p95 = qs[5],
+      p5 = qs[1],
+      q25 = qs[2],
+      median = qs[3],
+      q75 = qs[4],
+      p95 = qs[5],
       rb = round(rb, 2),
       ci_lower = round(rb - 1.96 * se_rb, 2),
       ci_upper = round(rb + 1.96 * se_rb, 2),
@@ -1006,7 +1230,7 @@ compute_ree_distribution <- function(sse_raw, true_values,
 
   list(
     individual = tibble::as_tibble(dplyr::bind_rows(indiv_list)),
-    summary    = tibble::as_tibble(dplyr::bind_rows(summ_list))
+    summary = tibble::as_tibble(dplyr::bind_rows(summ_list))
   )
 }
 
@@ -1028,9 +1252,11 @@ compute_ree_distribution <- function(sse_raw, true_values,
 plot_ree_boxplot <- function(ree_dist, title = NULL) {
   summ <- ree_dist$summary
   if (is.null(summ) || nrow(summ) == 0L) {
-    return(ggplot() +
-      labs(title = "No REE data available") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No REE data available") +
+        .theme_design()
+    )
   }
 
   # Map type for colors
@@ -1051,7 +1277,7 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
   )
 
   col_fixed <- "#6C2B91"
-  col_iiv   <- "#2B6991"
+  col_iiv <- "#2B6991"
   col_resid <- "#E07B39"
 
   # Order params: THETA, OMEGA, SIGMA
@@ -1063,32 +1289,57 @@ plot_ree_boxplot <- function(ree_dist, title = NULL) {
     # Reference line at 0
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
     # Bias thresholds: +/-20% (Pantaleo 2026), +/-30% (Djokoto 2024)
-    geom_hline(yintercept = c(-20, 20), linetype = "dotted",
-               color = "#16a34a", size = 0.35) +
-    geom_hline(yintercept = c(-30, 30), linetype = "dotted",
-               color = "#d97706", size = 0.35) +
+    geom_hline(
+      yintercept = c(-20, 20),
+      linetype = "dotted",
+      color = "#16a34a",
+      size = 0.35
+    ) +
+    geom_hline(
+      yintercept = c(-30, 30),
+      linetype = "dotted",
+      color = "#d97706",
+      size = 0.35
+    ) +
     # Boxplot with pre-computed quantiles
     geom_boxplot(
-      aes(ymin = p5, lower = q25, middle = median,
-          upper = q75, ymax = p95, fill = type_group),
-      stat = "identity", width = 0.6, alpha = 0.7,
-      color = "grey30", size = 0.4
+      aes(
+        ymin = p5,
+        lower = q25,
+        middle = median,
+        upper = q75,
+        ymax = p95,
+        fill = type_group
+      ),
+      stat = "identity",
+      width = 0.6,
+      alpha = 0.7,
+      color = "grey30",
+      size = 0.4
     ) +
     # Relative Bias as diamond, colored by magnitude
     geom_point(aes(y = rb, color = bias_flag), shape = 18, size = 3) +
     # 95% CI error bar for bias
-    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper),
-                  width = 0.2, size = 0.5, color = "black") +
+    geom_errorbar(
+      aes(ymin = ci_lower, ymax = ci_upper),
+      width = 0.2,
+      size = 0.5,
+      color = "black"
+    ) +
     scale_fill_manual(
-      values = c("Fixed effects" = col_fixed,
-                 "IIV" = col_iiv,
-                 "Residual" = col_resid),
+      values = c(
+        "Fixed effects" = col_fixed,
+        "IIV" = col_iiv,
+        "Residual" = col_resid
+      ),
       name = NULL
     ) +
     scale_color_manual(
-      values = c("|RB| <= 20%" = "#111827",
-                 "|RB| 20-30%" = "#d97706",
-                 "|RB| > 30%" = "#dc2626"),
+      values = c(
+        "|RB| <= 20%" = "#111827",
+        "|RB| 20-30%" = "#d97706",
+        "|RB| > 30%" = "#dc2626"
+      ),
       name = "Relative bias"
     ) +
     labs(
@@ -1130,13 +1381,18 @@ plot_rse_bar <- function(comparison_df, title = NULL) {
     dplyr::filter(!is.na(rse_fim) | !is.na(rse_sse))
 
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No parameters with RSE data") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No parameters with RSE data") +
+        .theme_design()
+    )
   }
 
-  df$label <- ifelse(is.na(df$param_label) | df$param_label == df$param,
-                     df$param, df$param_label)
+  df$label <- ifelse(
+    is.na(df$param_label) | df$param_label == df$param,
+    df$param,
+    df$param_label
+  )
   df$label <- factor(df$label, levels = df$label)
 
   df_long <- tidyr::pivot_longer(
@@ -1154,16 +1410,29 @@ plot_rse_bar <- function(comparison_df, title = NULL) {
   ttl <- title %||% "FIM vs SSE: RSE Comparison"
 
   p <- ggplot(df_long, aes(x = label, y = rse, fill = source)) +
-    geom_col(position = position_dodge(width = 0.7), width = 0.6, alpha = 0.85,
-             na.rm = TRUE) +
+    geom_col(
+      position = position_dodge(width = 0.7),
+      width = 0.6,
+      alpha = 0.85,
+      na.rm = TRUE
+    ) +
     # Reference lines
-    geom_hline(yintercept = 20, linetype = "dashed", color = "#16a34a",
-               size = 0.4, alpha = 0.7) +
-    geom_hline(yintercept = 50, linetype = "dashed", color = "#d97706",
-               size = 0.4, alpha = 0.7) +
+    geom_hline(
+      yintercept = 20,
+      linetype = "dashed",
+      color = "#16a34a",
+      size = 0.4,
+      alpha = 0.7
+    ) +
+    geom_hline(
+      yintercept = 50,
+      linetype = "dashed",
+      color = "#d97706",
+      size = 0.4,
+      alpha = 0.7
+    ) +
     scale_fill_manual(
-      values = c("FIM predicted" = "#4682B4",
-                 "SSE empirical" = "#CD5C5C"),
+      values = c("FIM predicted" = "#4682B4", "SSE empirical" = "#CD5C5C"),
       name = NULL
     ) +
     labs(

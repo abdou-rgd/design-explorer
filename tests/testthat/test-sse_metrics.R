@@ -12,12 +12,16 @@ library(ggplot2)
 
 project_root <- Sys.getenv("DESIGN_EXPLORER_ROOT", unset = NA_character_)
 if (is.na(project_root) || !nzchar(project_root)) {
-  this_file <- tryCatch(normalizePath(sys.frame(0)$ofile),
-                        error = function(e) NULL)
+  this_file <- tryCatch(normalizePath(sys.frame(0)$ofile), error = function(e) {
+    NULL
+  })
   if (!is.null(this_file)) {
     d <- dirname(this_file)
     for (i in seq_len(6)) {
-      if (file.exists(file.path(d, "CLAUDE.md"))) { project_root <- d; break }
+      if (file.exists(file.path(d, "CLAUDE.md"))) {
+        project_root <- d
+        break
+      }
       d <- dirname(d)
     }
   }
@@ -75,12 +79,20 @@ make_sse_20_sample_fixture <- function() {
 }
 
 true_values_20_sample <- c(
-  THETA1 = 0.005933, THETA2 = 3.035, THETA3 = 0.01755,
-  THETA4 = 2.970, THETA5 = 0.007549, THETA6 = 0.6703,
-  `OMEGA(1,1)` = 0.06501, `OMEGA(2,1)` = 0.02584,
-  `OMEGA(2,2)` = 0.04412, `OMEGA(3,3)` = 0.3331,
-  `OMEGA(4,4)` = 0.0618, `OMEGA(5,5)` = 0.2419,
-  `OMEGA(6,6)` = 0.4362, `SIGMA(1,1)` = 0.01897,
+  THETA1 = 0.005933,
+  THETA2 = 3.035,
+  THETA3 = 0.01755,
+  THETA4 = 2.970,
+  THETA5 = 0.007549,
+  THETA6 = 0.6703,
+  `OMEGA(1,1)` = 0.06501,
+  `OMEGA(2,1)` = 0.02584,
+  `OMEGA(2,2)` = 0.04412,
+  `OMEGA(3,3)` = 0.3331,
+  `OMEGA(4,4)` = 0.0618,
+  `OMEGA(5,5)` = 0.2419,
+  `OMEGA(6,6)` = 0.4362,
+  `SIGMA(1,1)` = 0.01897,
   `SIGMA(2,2)` = 0.9463
 )
 
@@ -90,10 +102,17 @@ true_values_20_sample <- c(
 # =============================================================================
 
 test_that(".normalize_psn_cols() handles standard PsN headers", {
-  out <- .normalize_psn_cols(c("--th1- CL", "--th2- V", "--eps1- Prop",
-                               "ETA(1) CL", "OMEGA(2,1)"))
-  expect_equal(out, c("THETA1", "THETA2", "SIGMA(1,1)",
-                      "OMEGA(1,1)", "OMEGA(2,1)"))
+  out <- .normalize_psn_cols(c(
+    "--th1- CL",
+    "--th2- V",
+    "--eps1- Prop",
+    "ETA(1) CL",
+    "OMEGA(2,1)"
+  ))
+  expect_equal(
+    out,
+    c("THETA1", "THETA2", "SIGMA(1,1)", "OMEGA(1,1)", "OMEGA(2,1)")
+  )
 })
 
 test_that(".normalize_psn_cols() accepts --th10 without trailing dash", {
@@ -102,8 +121,25 @@ test_that(".normalize_psn_cols() accepts --th10 without trailing dash", {
 })
 
 test_that(".normalize_psn_cols() preserves SE prefix", {
-  out <- .normalize_psn_cols(c("se--th1- CL", "seOMEGA(1,1)", "seETA(2)"))
-  expect_equal(out, c("se_THETA1", "se_OMEGA(1,1)", "se_OMEGA(2,2)"))
+  out <- .normalize_psn_cols(c(
+    "se--th1- CL",
+    "seOMEGA(1,1)",
+    "seETA(2)",
+    "seCL",
+    "seTHETA3",
+    "seSIGMA(1,1)"
+  ))
+  expect_equal(
+    out,
+    c(
+      "se_THETA1",
+      "se_OMEGA(1,1)",
+      "se_OMEGA(2,2)",
+      "se_CL",
+      "se_THETA3",
+      "se_SIGMA(1,1)"
+    )
+  )
 })
 
 test_that(".normalize_psn_cols() maps unnumbered --th- positionally", {
@@ -111,28 +147,51 @@ test_that(".normalize_psn_cols() maps unnumbered --th- positionally", {
   # With a FIXED THETA7, --th8- anchors the counter to 8 so the next
   # unnumbered --th- becomes THETA10 (not THETA9).
   hdr <- c(
-    "--th1- CL", "--th2- V", "--th6- F1",
-    "--th8- Allo_CL", "--th9- Allo_V",
-    "--th- COV1", "--th- COV2", "--th- COV3",
+    "--th1- CL",
+    "--th2- V",
+    "--th6- F1",
+    "--th8- Allo_CL",
+    "--th9- Allo_V",
+    "--th- COV1",
+    "--th- COV2",
+    "--th- COV3",
     "OMEGA(2,1)",
-    "--th-", "--th-_", "--th-__",
-    "--eps1- Prop", "--eps2- Add",
-    "se--th1- CL", "se--th8- Allo_CL",
-    "se--th- COV1", "se--th-",
+    "--th-",
+    "--th-_",
+    "--th-__",
+    "--eps1- Prop",
+    "--eps2- Add",
+    "se--th1- CL",
+    "se--th8- Allo_CL",
+    "se--th- COV1",
+    "se--th-",
     "se--eps1- Prop"
   )
   out <- .normalize_psn_cols(hdr)
-  expect_equal(out, c(
-    "THETA1", "THETA2", "THETA6",
-    "THETA8", "THETA9",
-    "THETA10", "THETA11", "THETA12",
-    "OMEGA(2,1)",
-    "THETA13", "THETA14", "THETA15",
-    "SIGMA(1,1)", "SIGMA(2,2)",
-    "se_THETA1", "se_THETA8",
-    "se_THETA9", "se_THETA10",
-    "se_SIGMA(1,1)"
-  ))
+  expect_equal(
+    out,
+    c(
+      "THETA1",
+      "THETA2",
+      "THETA6",
+      "THETA8",
+      "THETA9",
+      "THETA10",
+      "THETA11",
+      "THETA12",
+      "OMEGA(2,1)",
+      "THETA13",
+      "THETA14",
+      "THETA15",
+      "SIGMA(1,1)",
+      "SIGMA(2,2)",
+      "se_THETA1",
+      "se_THETA8",
+      "se_THETA9",
+      "se_THETA10",
+      "se_SIGMA(1,1)"
+    )
+  )
 })
 
 
@@ -142,24 +201,23 @@ test_that(".normalize_psn_cols() maps unnumbered --th- positionally", {
 
 test_that("compare_fim_sse() flags FIM-only and SSE-only params via status", {
   sse_metrics <- tibble::tibble(
-    param         = c("THETA1", "THETA2", "OMEGA(1,1)"),
-    param_type    = c("THETA", "THETA", "OMEGA (diag.)"),
-    param_label   = c("CL", "V", "OMEGA(1,1)"),
+    param = c("THETA1", "THETA2", "OMEGA(1,1)"),
+    param_type = c("THETA", "THETA", "OMEGA (diag.)"),
+    param_label = c("CL", "V", "OMEGA(1,1)"),
     rse_empirical = c(5, 10, 25),
     rmse_relative = c(6, 11, 27),
     relative_bias = c(0.5, -1, 2),
-    rb_ci_lower   = c(-1, -3, -1),
-    rb_ci_upper   = c(2, 1, 5)
+    rb_ci_lower = c(-1, -3, -1),
+    rb_ci_upper = c(2, 1, 5)
   )
   fim_rse <- tibble::tibble(
-    param   = c("THETA1", "THETA2", "THETA10"),
+    param = c("THETA1", "THETA2", "THETA10"),
     rse_pct = c(4, 9, 50)
   )
 
   comp <- compare_fim_sse(sse_metrics, fim_rse)
 
-  expect_setequal(comp$param,
-                  c("THETA1", "THETA2", "OMEGA(1,1)", "THETA10"))
+  expect_setequal(comp$param, c("THETA1", "THETA2", "OMEGA(1,1)", "THETA10"))
   expect_equal(comp$status[comp$param == "THETA1"], "matched")
   expect_equal(comp$status[comp$param == "THETA10"], "FIM only")
   expect_equal(comp$status[comp$param == "OMEGA(1,1)"], "SSE only")
@@ -167,9 +225,14 @@ test_that("compare_fim_sse() flags FIM-only and SSE-only params via status", {
 
 test_that("compare_fim_sse() preserves NA when capping missing values", {
   sse_metrics <- tibble::tibble(
-    param = "THETA1", param_type = "THETA", param_label = "CL",
-    rse_empirical = NA_real_, rmse_relative = NA_real_,
-    relative_bias = 0, rb_ci_lower = -1, rb_ci_upper = 1
+    param = "THETA1",
+    param_type = "THETA",
+    param_label = "CL",
+    rse_empirical = NA_real_,
+    rmse_relative = NA_real_,
+    relative_bias = 0,
+    rb_ci_lower = -1,
+    rb_ci_upper = 1
   )
   fim_rse <- tibble::tibble(param = "THETA1", rse_pct = 250)
 
@@ -217,20 +280,22 @@ test_that("compute_empirical_correlations() returns the SSE correlation matrix",
 
 test_that("plot_rse_bar() includes FIM-only and SSE-only params as single bars", {
   comp <- tibble::tibble(
-    param         = c("THETA1", "THETA10", "OMEGA(1,1)"),
-    param_type    = c("THETA", "THETA", "OMEGA (diag.)"),
-    param_label   = c("CL", "THETA10", "OMEGA(1,1)"),
-    rse_fim       = c(5, 50, NA_real_),
-    rse_sse       = c(6, NA_real_, 25),
-    status        = c("matched", "FIM only", "SSE only")
+    param = c("THETA1", "THETA10", "OMEGA(1,1)"),
+    param_type = c("THETA", "THETA", "OMEGA (diag.)"),
+    param_label = c("CL", "THETA10", "OMEGA(1,1)"),
+    rse_fim = c(5, 50, NA_real_),
+    rse_sse = c(6, NA_real_, 25),
+    status = c("matched", "FIM only", "SSE only")
   )
 
   p <- plot_rse_bar(comp)
   expect_s3_class(p, "ggplot")
 
   rendered <- p$data
-  expect_setequal(as.character(unique(rendered$label)),
-                  c("CL", "THETA10", "OMEGA(1,1)"))
+  expect_setequal(
+    as.character(unique(rendered$label)),
+    c("CL", "THETA10", "OMEGA(1,1)")
+  )
 
   # FIM-only param has rse_fim non-NA but rse_sse NA after pivot_longer
   theta10 <- rendered[rendered$label == "THETA10", ]
@@ -240,8 +305,12 @@ test_that("plot_rse_bar() includes FIM-only and SSE-only params as single bars",
 
 test_that("plot_rse_bar() returns empty-state ggplot when no RSE data", {
   comp <- tibble::tibble(
-    param = character(), param_label = character(), param_type = character(),
-    rse_fim = numeric(), rse_sse = numeric(), status = character()
+    param = character(),
+    param_label = character(),
+    param_type = character(),
+    rse_fim = numeric(),
+    rse_sse = numeric(),
+    status = character()
   )
   p <- plot_rse_bar(comp)
   expect_s3_class(p, "ggplot")
@@ -275,10 +344,20 @@ test_that("compute_sse_reliability_map joins precision, diagnostics, and shrinka
   rel <- compute_sse_reliability_map(sse, true_values_20_sample)
 
   expect_equal(nrow(rel), 15L)
-  expect_named(rel, c(
-    "param", "param_label", "param_type", "rse_empirical", "relative_bias",
-    "pct_se_na", "pct_rse_over_100", "mean_shrinkage", "risk_score"
-  ))
+  expect_named(
+    rel,
+    c(
+      "param",
+      "param_label",
+      "param_type",
+      "rse_empirical",
+      "relative_bias",
+      "pct_se_na",
+      "pct_rse_over_100",
+      "mean_shrinkage",
+      "risk_score"
+    )
+  )
   expect_true(all(c("THETA1", "OMEGA(3,3)", "SIGMA(2,2)") %in% rel$param))
   expect_true(rel$pct_se_na[rel$param == "THETA1"] > 0)
   expect_true(rel$pct_rse_over_100[rel$param == "OMEGA(3,3)"] > 0)
@@ -307,35 +386,47 @@ test_that("plot_sse_reliability_map returns an empty state or a faceted ggplot",
 
 write_patab_fixture <- function(root) {
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
-    " 1 0 1.10 10.0 0.50 20.0 0.10 0.70 0.01 0.02",
-    " 1 0 1.10 10.0 0.50 20.0 0.10 0.70 0.01 0.02",
-    " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
-    " 2 1 1.20 11.0 0.55 21.0 0.11 0.71 0.03 0.04",
-    " 2 1 1.20 11.0 0.55 21.0 0.11 0.71 0.03 0.04"
-  ), file.path(root, "patab1.tab-1"))
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
-    " 1 0 1.00 10.0 0.40 20.0 0.10 0.70 0.00 0.00",
-    " 1 0 1.00 10.0 0.40 20.0 0.10 0.70 0.00 0.00",
-    " 2 1 1.00 10.0 0.50 20.0 0.10 0.70 0.00 0.00",
-    " 2 1 1.00 10.0 0.50 20.0 0.10 0.70 0.00 0.00"
-  ), file.path(root, "patab1.tab-sim-1"))
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
-    " 1 0 2.20 12.0 0.70 22.0 0.12 0.72 0.05 0.06",
-    " 2 1 2.40 13.0 0.75 23.0 0.13 0.73 0.07 0.08"
-  ), file.path(root, "patab1.tab-2"))
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
-    " 1 0 2.00 12.0 0.60 22.0 0.12 0.72 0.00 0.00",
-    " 2 1 2.00 12.0 0.65 22.0 0.12 0.72 0.00 0.00"
-  ), file.path(root, "patab1.tab-sim-2"))
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
+      " 1 0 1.10 10.0 0.50 20.0 0.10 0.70 0.01 0.02",
+      " 1 0 1.10 10.0 0.50 20.0 0.10 0.70 0.01 0.02",
+      " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
+      " 2 1 1.20 11.0 0.55 21.0 0.11 0.71 0.03 0.04",
+      " 2 1 1.20 11.0 0.55 21.0 0.11 0.71 0.03 0.04"
+    ),
+    file.path(root, "patab1.tab-1")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
+      " 1 0 1.00 10.0 0.40 20.0 0.10 0.70 0.00 0.00",
+      " 1 0 1.00 10.0 0.40 20.0 0.10 0.70 0.00 0.00",
+      " 2 1 1.00 10.0 0.50 20.0 0.10 0.70 0.00 0.00",
+      " 2 1 1.00 10.0 0.50 20.0 0.10 0.70 0.00 0.00"
+    ),
+    file.path(root, "patab1.tab-sim-1")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
+      " 1 0 2.20 12.0 0.70 22.0 0.12 0.72 0.05 0.06",
+      " 2 1 2.40 13.0 0.75 23.0 0.13 0.73 0.07 0.08"
+    ),
+    file.path(root, "patab1.tab-2")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1 ETA1 ETA2",
+      " 1 0 2.00 12.0 0.60 22.0 0.12 0.72 0.00 0.00",
+      " 2 1 2.00 12.0 0.65 22.0 0.12 0.72 0.00 0.00"
+    ),
+    file.path(root, "patab1.tab-sim-2")
+  )
 }
 
 test_that("read_sse_patab_outputs() parses and deduplicates PsN patab files", {
@@ -348,23 +439,31 @@ test_that("read_sse_patab_outputs() parses and deduplicates PsN patab files", {
   expect_setequal(unique(patab$kind), c("estimation", "simulation"))
   expect_equal(length(unique(patab$sample)), 2L)
   expect_equal(length(unique(patab$ID)), 2L)
-  expect_true(all(c("CL", "VC", "Q", "VP", "KA", "F1", "ETA1", "ETA2") %in%
-                    names(patab)))
+  expect_true(all(
+    c("CL", "VC", "Q", "VP", "KA", "F1", "ETA1", "ETA2") %in%
+      names(patab)
+  ))
 })
 
 test_that("read_sse_patab_outputs() accepts explicit pk_individuals table names", {
   root <- tempfile("pk-individuals-fixture-")
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1",
-    " 1 0 1.10 10.0 0.50 20.0 0.10 0.70"
-  ), file.path(root, "pk_individuals.tab-1"))
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1",
-    " 1 0 1.00 10.0 0.40 20.0 0.10 0.70"
-  ), file.path(root, "pk_individuals.tab-sim-1"))
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.10 10.0 0.50 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-1")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.00 10.0 0.40 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-sim-1")
+  )
 
   patab <- read_sse_patab_outputs(root, table_pattern = "pk_individuals")
 
@@ -376,16 +475,22 @@ test_that("read_sse_patab_outputs() accepts explicit pk_individuals table names"
 test_that("read_sse_patab_outputs() reads uploaded zip paths without extensions", {
   root <- tempfile("pk-individuals-zip-fixture-")
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1",
-    " 1 0 1.10 10.0 0.50 20.0 0.10 0.70"
-  ), file.path(root, "pk_individuals.tab-1"))
-  writeLines(c(
-    "TABLE NO.  1",
-    " ID ARM CL VC Q VP KA F1",
-    " 1 0 1.00 10.0 0.40 20.0 0.10 0.70"
-  ), file.path(root, "pk_individuals.tab-sim-1"))
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.10 10.0 0.50 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-1")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.00 10.0 0.40 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-sim-1")
+  )
 
   zip_path <- tempfile(fileext = ".zip")
   old_wd <- setwd(root)
@@ -407,8 +512,10 @@ test_that("compute_individual_pk_recovery() compares estimation against simulati
 
   rec <- compute_individual_pk_recovery(patab)
 
-  expect_true(all(c("table", "sample", "ID", "param", "sim", "est", "relative_error") %in%
-                    names(rec)))
+  expect_true(all(
+    c("table", "sample", "ID", "param", "sim", "est", "relative_error") %in%
+      names(rec)
+  ))
   expect_true(all(c("CL", "VC", "Q", "VP", "KA", "F1") %in% rec$param))
   cl_row <- rec[rec$sample == 1 & rec$ID == 1 & rec$param == "CL", ]
   expect_equal(cl_row$sim, 1)
@@ -428,4 +535,93 @@ test_that("individual PK plots return ggplot objects", {
     "ggplot_built"
   )
   expect_s3_class(plot_individual_pk_error_distribution(rec), "ggplot")
+})
+
+test_that("read_sse_patab_outputs() parses PsN alternative-sample table names", {
+  root <- tempfile("pk-individuals-alt-fixture-")
+  dir.create(root, recursive = TRUE, showWarnings = FALSE)
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.10 10.0 0.50 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-1-1")
+  )
+  writeLines(
+    c(
+      "TABLE NO.  1",
+      " ID ARM CL VC Q VP KA F1",
+      " 1 0 1.00 10.0 0.40 20.0 0.10 0.70"
+    ),
+    file.path(root, "pk_individuals.tab-sim-1")
+  )
+
+  patab <- read_sse_patab_outputs(root, table_pattern = "pk_individuals")
+  rec <- compute_individual_pk_recovery(patab)
+
+  expect_equal(unique(patab$table), "pk_individuals.tab")
+  expect_equal(unique(patab$sample), 1L)
+  expect_equal(patab$alternative[patab$kind == "estimation"], 1L)
+  expect_true(is.na(patab$alternative[patab$kind == "simulation"]))
+  expect_equal(nrow(rec), 6L)
+  expect_equal(unique(rec$alternative), 1L)
+})
+
+test_that("PsN-oriented SSE helpers separate hypotheses and dOFV", {
+  sse <- tibble::tibble(
+    hypothesis = rep(c("simulation", "mc-alternative_1"), each = 3),
+    sample = rep(1:3, times = 2),
+    minimization_successful = c(1, 1, 0, 1, 1, 1),
+    covariance_step_successful = c(1, 1, 0, 1, 1, 1),
+    estimate_near_boundary = 0,
+    rounding_errors = 0,
+    condition_number = c(10, 20, NA, 11, 22, 33),
+    ofv = c(100, 101, 102, 95, 104, 108),
+    CL = c(1, 1.1, 1.2, 0.9, 1.0, 1.3),
+    se_CL = c(0.1, 0.1, NA, 0.2, 0.2, 0.2)
+  )
+  sse$converged <- sse$minimization_successful == 1
+
+  choices <- sse_hypothesis_choices(sse)
+  expect_true("auto" %in% choices$value)
+  expect_equal(
+    filter_sse_hypothesis(sse, "auto")$hypothesis |>
+      unique(),
+    "mc-alternative_1"
+  )
+
+  comp <- compute_sse_run_composition(sse)
+  expect_equal(nrow(comp), 2L)
+  expect_true(all(
+    c(
+      "hypothesis",
+      "hypothesis_type",
+      "n_runs",
+      "n_minimization_ok",
+      "n_high_condition_number"
+    ) %in%
+      names(comp)
+  ))
+
+  summary <- compute_sse_psn_parameter_summary(
+    filter_sse_hypothesis(sse, "mc-alternative_1"),
+    c(CL = 1)
+  )
+  expect_equal(summary$param, "CL")
+  expect_true(all(
+    c(
+      "median_estimate",
+      "skewness",
+      "kurtosis",
+      "relative_absolute_bias",
+      "rse"
+    ) %in%
+      names(summary)
+  ))
+
+  dofv <- compute_sse_dofv_diagnostics(sse)
+  expect_equal(nrow(dofv$long), 3L)
+  expect_equal(dofv$long$dofv[dofv$long$sample == 1], -5)
+  expect_s3_class(plot_sse_dofv_distribution(dofv$long), "ggplot")
 })

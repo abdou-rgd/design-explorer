@@ -2,19 +2,35 @@
 # sse_individual_pk.R -- PsN keep_tables / patab individual PK outputs
 # =============================================================================
 
-
 # =============================================================================
 # .parse_patab_sample() -- sample index + kind from PsN patab filename
 # =============================================================================
 
 .parse_patab_sample <- function(path) {
   nm <- basename(path)
-  is_sim <- grepl("\\.tab-sim-\\d+$", nm)
-  sample <- as.integer(sub("^.*\\.tab(?:-sim)?-(\\d+)$", "\\1", nm))
+  if (grepl("\\.tab-sim-\\d+$", nm)) {
+    return(list(
+      table = sub("^(.*\\.tab)-sim-\\d+$", "\\1", nm),
+      sample = as.integer(sub("^.*\\.tab-sim-(\\d+)$", "\\1", nm)),
+      alternative = NA_integer_,
+      kind = "simulation"
+    ))
+  }
+
+  if (grepl("\\.tab-\\d+-\\d+$", nm)) {
+    return(list(
+      table = sub("^(.*\\.tab)-\\d+-\\d+$", "\\1", nm),
+      sample = as.integer(sub("^.*\\.tab-\\d+-(\\d+)$", "\\1", nm)),
+      alternative = as.integer(sub("^.*\\.tab-(\\d+)-\\d+$", "\\1", nm)),
+      kind = "estimation"
+    ))
+  }
+
   list(
-    table = sub("^(.*\\.tab)(?:-sim)?-\\d+$", "\\1", nm),
-    sample = sample,
-    kind = if (is_sim) "simulation" else "estimation"
+    table = sub("^(.*\\.tab)-\\d+$", "\\1", nm),
+    sample = as.integer(sub("^.*\\.tab-(\\d+)$", "\\1", nm)),
+    alternative = NA_integer_,
+    kind = "estimation"
   )
 }
 
@@ -41,8 +57,13 @@
     )))
   }
 
-  dat <- read.table(text = body, header = FALSE, col.names = header,
-                    check.names = FALSE, stringsAsFactors = FALSE)
+  dat <- read.table(
+    text = body,
+    header = FALSE,
+    col.names = header,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
   dat <- dat[!is.na(dat[[1]]) & dat[[1]] != "ID", , drop = FALSE]
   dat[] <- lapply(dat, function(x) suppressWarnings(as.numeric(x)))
   tibble::as_tibble(dat)
@@ -54,7 +75,9 @@
 # =============================================================================
 
 .is_zip_archive <- function(path) {
-  if (!file.exists(path) || dir.exists(path)) return(FALSE)
+  if (!file.exists(path) || dir.exists(path)) {
+    return(FALSE)
+  }
   con <- file(path, open = "rb")
   on.exit(close(con), add = TRUE)
   sig <- readBin(con, what = "raw", n = 4L)
@@ -68,8 +91,10 @@
 #'
 #' Accepts a PsN run directory or a zip archive containing keep_tables outputs.
 #' The recommended NONMEM convention is `FILE=pk_individuals.tab`, which PsN
-#' keeps as files like `pk_individuals.tab-1` and
-#' `pk_individuals.tab-sim-1`. Legacy PsN names such as `patab1.tab-1` and
+#' keeps as files like `pk_individuals.tab-1`,
+#' `pk_individuals.tab-sim-1`, and, for alternative models,
+#' `pk_individuals.tab-1-1` where the first number is the alternative and the
+#' second is the sample. Legacy PsN names such as `patab1.tab-1` and
 #' `patab1.tab-sim-1` are also accepted. Repeated subject rows are deduplicated
 #' because these tables are often record-level repeats of subject-level PK/ETA
 #' values.
@@ -78,10 +103,14 @@
 #' @param deduplicate Logical; keep one row per table/sample/kind/ID/value set.
 #' @param table_pattern Optional regular expression used to keep only matching
 #'   table filenames.
-#' @return Tibble with `table`, `sample`, `kind`, `source_file`, and patab columns.
+#' @return Tibble with `table`, `sample`, `alternative`, `kind`,
+#'   `source_file`, and patab columns.
 #' @export
-read_sse_patab_outputs <- function(path, deduplicate = TRUE,
-                                   table_pattern = NULL) {
+read_sse_patab_outputs <- function(
+  path,
+  deduplicate = TRUE,
+  table_pattern = NULL
+) {
   if (is.null(path) || !file.exists(path)) {
     stop("patab path not found: ", path, call. = FALSE)
   }
@@ -96,16 +125,26 @@ read_sse_patab_outputs <- function(path, deduplicate = TRUE,
     on.exit(unlink(cleanup, recursive = TRUE, force = TRUE), add = TRUE)
   }
 
-  files <- list.files(root, pattern = "\\.tab(-sim)?-\\d+$",
-                      recursive = TRUE, full.names = TRUE)
+  files <- list.files(
+    root,
+    pattern = "\\.tab(-sim-\\d+|-\\d+(-\\d+)?)$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
   files <- files[!dir.exists(files)]
-  if (!is.null(table_pattern) && length(table_pattern) == 1L &&
-      nzchar(table_pattern)) {
+  if (
+    !is.null(table_pattern) &&
+      length(table_pattern) == 1L &&
+      nzchar(table_pattern)
+  ) {
     files <- files[grepl(table_pattern, basename(files), ignore.case = TRUE)]
   }
   if (length(files) == 0L) {
     return(tibble::tibble(
-      table = character(), sample = integer(), kind = character(),
+      table = character(),
+      sample = integer(),
+      alternative = integer(),
+      kind = character(),
       source_file = character()
     ))
   }
@@ -113,15 +152,26 @@ read_sse_patab_outputs <- function(path, deduplicate = TRUE,
   rows <- lapply(files, function(f) {
     meta <- .parse_patab_sample(f)
     dat <- .read_one_patab(f)
-    if (nrow(dat) == 0L) return(NULL)
+    if (nrow(dat) == 0L) {
+      return(NULL)
+    }
 
     dat$table <- meta$table
     dat$sample <- meta$sample
+    dat$alternative <- meta$alternative
     dat$kind <- meta$kind
     dat$source_file <- basename(f)
-    dat <- dat[, c("table", "sample", "kind", "source_file",
-                   setdiff(names(dat), c("table", "sample", "kind",
-                                         "source_file")))]
+    dat <- dat[, c(
+      "table",
+      "sample",
+      "alternative",
+      "kind",
+      "source_file",
+      setdiff(
+        names(dat),
+        c("table", "sample", "alternative", "kind", "source_file")
+      )
+    )]
     dat
   })
 
@@ -129,7 +179,7 @@ read_sse_patab_outputs <- function(path, deduplicate = TRUE,
   if (deduplicate && nrow(out) > 0L) {
     out <- dplyr::distinct(out)
   }
-  dplyr::arrange(out, table, sample, kind, ID)
+  dplyr::arrange(out, table, sample, alternative, kind, ID)
 }
 
 
@@ -144,20 +194,33 @@ read_sse_patab_outputs <- function(path, deduplicate = TRUE,
 #' @return Long tibble with `sim`, `est`, and relative error.
 #' @export
 compute_individual_pk_recovery <- function(
-    patab_data,
-    params = c("CL", "VC", "Q", "VP", "KA", "F1")) {
+  patab_data,
+  params = c("CL", "VC", "Q", "VP", "KA", "F1")
+) {
   empty <- tibble::tibble(
-    table = character(), sample = integer(), ID = numeric(), ARM = numeric(),
-    param = character(), sim = numeric(), est = numeric(),
+    table = character(),
+    sample = integer(),
+    alternative = integer(),
+    ID = numeric(),
+    ARM = numeric(),
+    param = character(),
+    sim = numeric(),
+    est = numeric(),
     relative_error = numeric()
   )
-  if (is.null(patab_data) || nrow(patab_data) == 0L) return(empty)
+  if (is.null(patab_data) || nrow(patab_data) == 0L) {
+    return(empty)
+  }
 
   available <- intersect(params, names(patab_data))
-  if (length(available) == 0L) return(empty)
+  if (length(available) == 0L) {
+    return(empty)
+  }
 
-  base_cols <- intersect(c("table", "sample", "kind", "ID", "ARM"),
-                         names(patab_data))
+  base_cols <- intersect(
+    c("table", "sample", "alternative", "kind", "ID", "ARM"),
+    names(patab_data)
+  )
   long <- patab_data |>
     dplyr::select(dplyr::all_of(base_cols), dplyr::all_of(available)) |>
     tidyr::pivot_longer(
@@ -171,11 +234,12 @@ compute_individual_pk_recovery <- function(
     dplyr::select(table, sample, ID, param, sim = value)
   est <- long |>
     dplyr::filter(kind == "estimation") |>
-    dplyr::select(table, sample, ID, ARM, param, est = value)
+    dplyr::select(table, sample, alternative, ID, ARM, param, est = value)
 
-  out <- dplyr::inner_join(est, sim,
-                           by = c("table", "sample", "ID", "param"))
-  if (nrow(out) == 0L) return(empty)
+  out <- dplyr::inner_join(est, sim, by = c("table", "sample", "ID", "param"))
+  if (nrow(out) == 0L) {
+    return(empty)
+  }
 
   out$relative_error <- dplyr::if_else(
     !is.na(out$sim) & abs(out$sim) > 1e-15,
@@ -183,8 +247,18 @@ compute_individual_pk_recovery <- function(
     NA_real_
   )
   out |>
-    dplyr::select(table, sample, ID, ARM, param, sim, est, relative_error) |>
-    dplyr::arrange(table, sample, ID, param)
+    dplyr::select(
+      table,
+      sample,
+      alternative,
+      ID,
+      ARM,
+      param,
+      sim,
+      est,
+      relative_error
+    ) |>
+    dplyr::arrange(table, sample, alternative, ID, param)
 }
 
 
@@ -199,17 +273,29 @@ compute_individual_pk_recovery <- function(
 #' @export
 summarize_individual_pk_archive <- function(patab_data) {
   if (is.null(patab_data) || nrow(patab_data) == 0L) {
-    return(list(n_files = 0L, n_est = 0L, n_sim = 0L,
-                n_samples = 0L, n_ids = 0L, columns = character()))
+    return(list(
+      n_files = 0L,
+      n_est = 0L,
+      n_sim = 0L,
+      n_samples = 0L,
+      n_ids = 0L,
+      columns = character()
+    ))
   }
   list(
     n_files = length(unique(patab_data$source_file)),
-    n_est = length(unique(patab_data$source_file[patab_data$kind == "estimation"])),
-    n_sim = length(unique(patab_data$source_file[patab_data$kind == "simulation"])),
+    n_est = length(unique(patab_data$source_file[
+      patab_data$kind == "estimation"
+    ])),
+    n_sim = length(unique(patab_data$source_file[
+      patab_data$kind == "simulation"
+    ])),
     n_samples = length(unique(patab_data$sample)),
     n_ids = length(unique(patab_data$ID)),
-    columns = setdiff(names(patab_data),
-                      c("table", "sample", "kind", "source_file"))
+    columns = setdiff(
+      names(patab_data),
+      c("table", "sample", "kind", "source_file")
+    )
   )
 }
 
@@ -225,17 +311,25 @@ summarize_individual_pk_archive <- function(patab_data) {
 #' @export
 plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
   if (is.null(recovery_data) || nrow(recovery_data) == 0L) {
-    return(ggplot() +
-      labs(title = "No individual PK patab data available") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No individual PK patab data available") +
+        .theme_design()
+    )
   }
 
-  df <- recovery_data[is.finite(recovery_data$sim) &
-                        is.finite(recovery_data$est), , drop = FALSE]
+  df <- recovery_data[
+    is.finite(recovery_data$sim) &
+      is.finite(recovery_data$est),
+    ,
+    drop = FALSE
+  ]
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No finite individual PK recovery values") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No finite individual PK recovery values") +
+        .theme_design()
+    )
   }
 
   if (isTRUE(log_axes)) {
@@ -244,54 +338,66 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
 
   df$error_capped <- pmax(pmin(df$relative_error, 100), -100)
   summary_source <- df[!is.na(df$relative_error), , drop = FALSE]
-  summary_rows <- lapply(split(summary_source, summary_source$param,
-                               drop = TRUE), function(group) {
-    if (isTRUE(log_axes)) {
-      label_x <- min(group$sim[group$sim > 0], na.rm = TRUE)
-      label_y <- max(group$est[group$est > 0], na.rm = TRUE)
-    } else {
-      label_x <- -Inf
-      label_y <- Inf
+  summary_rows <- lapply(
+    split(summary_source, summary_source$param, drop = TRUE),
+    function(group) {
+      if (isTRUE(log_axes)) {
+        label_x <- min(group$sim[group$sim > 0], na.rm = TRUE)
+        label_y <- max(group$est[group$est > 0], na.rm = TRUE)
+      } else {
+        label_x <- -Inf
+        label_y <- Inf
+      }
+      data.frame(
+        param = group$param[[1]],
+        median_error = stats::median(group$relative_error, na.rm = TRUE),
+        iqr_error = stats::IQR(group$relative_error, na.rm = TRUE),
+        pct_abs20 = mean(abs(group$relative_error) <= 20, na.rm = TRUE) * 100,
+        label_x = label_x,
+        label_y = label_y,
+        stringsAsFactors = FALSE
+      )
     }
-    data.frame(
-      param = group$param[[1]],
-      median_error = stats::median(group$relative_error, na.rm = TRUE),
-      iqr_error = stats::IQR(group$relative_error, na.rm = TRUE),
-      pct_abs20 = mean(abs(group$relative_error) <= 20, na.rm = TRUE) * 100,
-      label_x = label_x,
-      label_y = label_y,
-      stringsAsFactors = FALSE
-    )
-  })
+  )
   summary_df <- tibble::as_tibble(dplyr::bind_rows(summary_rows))
   summary_df$label <- sprintf(
     "median %+0.1f%%\nIQR %.1f%%\n|err|<=20%%: %.0f%%",
-    summary_df$median_error, summary_df$iqr_error, summary_df$pct_abs20
+    summary_df$median_error,
+    summary_df$iqr_error,
+    summary_df$pct_abs20
   )
 
   p <- ggplot(df, aes(x = sim, y = est)) +
-    geom_abline(slope = 1, intercept = 0, color = "grey55",
-                linewidth = 0.4) +
+    geom_abline(slope = 1, intercept = 0, color = "grey55", linewidth = 0.4) +
     geom_point(aes(color = error_capped), alpha = 0.45, size = 1.25) +
     geom_label(
       data = summary_df,
       aes(x = label_x, y = label_y, label = label),
       inherit.aes = FALSE,
-      hjust = -0.05, vjust = 1.08,
-      linewidth = 0, fill = "white", alpha = 0.82,
-      size = 2.45, lineheight = 0.92
+      hjust = -0.05,
+      vjust = 1.08,
+      linewidth = 0,
+      fill = "white",
+      alpha = 0.82,
+      size = 2.45,
+      lineheight = 0.92
     ) +
-    facet_wrap(~ param, scales = "free", ncol = 3) +
+    facet_wrap(~param, scales = "free", ncol = 3) +
     scale_color_gradient2(
-      low = "#2563eb", mid = "#64748b", high = "#dc2626",
-      midpoint = 0, limits = c(-100, 100),
+      low = "#2563eb",
+      mid = "#64748b",
+      high = "#dc2626",
+      midpoint = 0,
+      limits = c(-100, 100),
       name = "Relative error (%)\ncapped at +/-100"
     ) +
-    guides(color = guide_colorbar(
-      title.position = "top",
-      barheight = grid::unit(52, "pt"),
-      barwidth = grid::unit(14, "pt")
-    )) +
+    guides(
+      color = guide_colorbar(
+        title.position = "top",
+        barheight = grid::unit(52, "pt"),
+        barwidth = grid::unit(14, "pt")
+      )
+    ) +
     labs(
       title = "Individual PK Recovery",
       subtitle = "Estimated table values vs simulated values; identity line marks perfect recovery",
@@ -312,10 +418,12 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
     p <- p +
       scale_x_log10() +
       scale_y_log10() +
-      labs(subtitle = paste(
-        "Log-log scale; estimated table values vs simulated values;",
-        "identity line marks perfect recovery"
-      ))
+      labs(
+        subtitle = paste(
+          "Log-log scale; estimated table values vs simulated values;",
+          "identity line marks perfect recovery"
+        )
+      )
   }
   p
 }
@@ -328,16 +436,20 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
 #' @export
 plot_individual_pk_error_distribution <- function(recovery_data) {
   if (is.null(recovery_data) || nrow(recovery_data) == 0L) {
-    return(ggplot() +
-      labs(title = "No individual PK error data available") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No individual PK error data available") +
+        .theme_design()
+    )
   }
 
   df <- recovery_data[!is.na(recovery_data$relative_error), , drop = FALSE]
   if (nrow(df) == 0L) {
-    return(ggplot() +
-      labs(title = "No finite individual PK relative errors") +
-      .theme_design())
+    return(
+      ggplot() +
+        labs(title = "No finite individual PK relative errors") +
+        .theme_design()
+    )
   }
 
   summary_rows <- lapply(split(df, df$param, drop = TRUE), function(group) {
@@ -353,17 +465,37 @@ plot_individual_pk_error_distribution <- function(recovery_data) {
 
   ggplot(df, aes(x = param_ordered, y = relative_error)) +
     geom_hline(yintercept = 0, color = "grey55", linewidth = 0.35) +
-    geom_hline(yintercept = c(-20, 20), linetype = "dashed",
-               color = "#d97706", linewidth = 0.35) +
-    geom_hline(yintercept = c(-50, 50), linetype = "dotted",
-               color = "#dc2626", linewidth = 0.35) +
-    geom_jitter(width = 0.12, height = 0, alpha = 0.08, size = 0.65,
-                color = "#334155") +
-    geom_boxplot(aes(fill = median_abs_error), alpha = 0.82,
-                 outlier.shape = NA, width = 0.58) +
+    geom_hline(
+      yintercept = c(-20, 20),
+      linetype = "dashed",
+      color = "#d97706",
+      linewidth = 0.35
+    ) +
+    geom_hline(
+      yintercept = c(-50, 50),
+      linetype = "dotted",
+      color = "#dc2626",
+      linewidth = 0.35
+    ) +
+    geom_jitter(
+      width = 0.12,
+      height = 0,
+      alpha = 0.08,
+      size = 0.65,
+      color = "#334155"
+    ) +
+    geom_boxplot(
+      aes(fill = median_abs_error),
+      alpha = 0.82,
+      outlier.shape = NA,
+      width = 0.58
+    ) +
     coord_flip() +
-    scale_fill_gradient(low = "#d1fae5", high = "#dc2626",
-                        name = "Median |error| (%)") +
+    scale_fill_gradient(
+      low = "#d1fae5",
+      high = "#dc2626",
+      name = "Median |error| (%)"
+    ) +
     labs(
       title = "Individual PK Relative Error",
       subtitle = "100 x (estimated - simulated) / |simulated|; dashed = +/-20%, dotted = +/-50%",
