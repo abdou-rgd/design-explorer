@@ -14,6 +14,7 @@ source_core <- function(root = ".", local = parent.frame()) {
     "sse_metrics.R",
     "sse_diagnostics.R",
     "sse_individual_pk.R",
+    "sse_individual_pk_diagnostics.R",
     "sse_comparison.R",
     "mrgsolve_bridge.R",
     "pk_templates.R",

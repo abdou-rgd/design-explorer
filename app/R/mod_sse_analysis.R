@@ -39,19 +39,43 @@ mod_sse_analysis_ui <- function(id) {
       "Analysis workspace",
       subtitle = "Choose one diagnostic view at a time. Parameter filters apply to parameter-based views.",
       control_panel(
-        checkboxInput(ns("show_failed"), "Include failed runs in plots",
-                      value = FALSE),
-        checkboxInput(ns("color_ofv"), "Color OFV by convergence status",
-                      value = TRUE),
-        checkboxInput(ns("pk_log_axes"), "Log scale for Individual PK recovery",
-                      value = FALSE),
+        checkboxInput(
+          ns("show_failed"),
+          "Include failed runs in plots",
+          value = FALSE
+        ),
+        checkboxInput(
+          ns("color_ofv"),
+          "Color OFV by convergence status",
+          value = TRUE
+        ),
+        checkboxInput(
+          ns("pk_log_axes"),
+          "Log scale for Individual PK recovery",
+          value = FALSE
+        ),
         radioButtons(
-          ns("active_view"), "Active view",
+          ns("pk_run_filter"),
+          "Individual PK run set",
+          choices = c(
+            "Minimization OK" = "minimization_successful",
+            "Strict QC" = "strict_qc_ok",
+            "All runs" = "all_runs"
+          ),
+          selected = "minimization_successful",
+          inline = TRUE
+        ),
+        radioButtons(
+          ns("active_view"),
+          "Active view",
           choices = c(
             "Parameter distributions" = "distributions",
             "SSE reliability map" = "reliability",
             "Individual PK recovery" = "indiv_pk_recovery",
             "Individual PK errors" = "indiv_pk_errors",
+            "Individual PK intervals" = "indiv_pk_intervals",
+            "Individual PK outliers" = "indiv_pk_outliers",
+            "Individual PK heatmap" = "indiv_pk_heatmap",
             "OFV distribution" = "ofv",
             "Shrinkage boxplot" = "shrink_box",
             "Exploratory RSE-shrinkage map" = "shrink_scatter",
@@ -63,7 +87,8 @@ mod_sse_analysis_ui <- function(id) {
           inline = TRUE
         ),
         radioButtons(
-          ns("diagnostic_param_group"), "Parameter set",
+          ns("diagnostic_param_group"),
+          "Parameter set",
           choices = c(
             "Top issues" = "top",
             "Fixed effects" = "theta",
@@ -83,28 +108,36 @@ mod_sse_analysis_ui <- function(id) {
 }
 
 
-mod_sse_analysis_server <- function(id,
-                                    sse_a_shared = reactive(NULL),
-                                    sse_b_shared = reactive(NULL),
-                                    name_a = reactive("Design A"),
-                                    name_b = reactive("Design B"),
-                                    true_vals,
-                                    param_labels = reactive(NULL),
-                                    individual_pk_shared = reactive(NULL)) {
+mod_sse_analysis_server <- function(
+  id,
+  sse_a_shared = reactive(NULL),
+  sse_b_shared = reactive(NULL),
+  name_a = reactive("Design A"),
+  name_b = reactive("Design B"),
+  true_vals,
+  param_labels = reactive(NULL),
+  individual_pk_shared = reactive(NULL)
+) {
   moduleServer(id, function(input, output, session) {
-
     # --- Design selector (show only when B is loaded) ---
     output$design_selector <- renderUI({
       b <- sse_b_shared()
-      if (is.null(b)) return(NULL)
+      if (is.null(b)) {
+        return(NULL)
+      }
 
       choices <- c("a" = "a", "b" = "b")
       names(choices) <- c(name_a(), name_b())
 
       control_panel(
         label = "Analyze",
-        radioButtons(session$ns("which_design"), label = NULL,
-                     choices = choices, selected = "a", inline = TRUE)
+        radioButtons(
+          session$ns("which_design"),
+          label = NULL,
+          choices = choices,
+          selected = "a",
+          inline = TRUE
+        )
       )
     })
 
@@ -145,7 +178,7 @@ mod_sse_analysis_server <- function(id,
     # --- Param distributions (long-format data) ---
     dist_data <- reactive({
       dat <- sse_all()
-      tv  <- true_vals()
+      tv <- true_vals()
       req(dat, tv)
       compute_param_distributions(dat, tv, param_labels())
     })
@@ -154,22 +187,25 @@ mod_sse_analysis_server <- function(id,
       dd <- dist_data()
       req(dd)
 
-      meta_rows <- lapply(split(dd, list(dd$param_label, dd$param_type),
-                                drop = TRUE), function(group) {
-        true_value <- group$true_value[[1]]
-        med <- stats::median(group$estimate, na.rm = TRUE)
-        iqr <- stats::IQR(group$estimate, na.rm = TRUE)
-        data.frame(
-          param_label = group$param_label[[1]],
-          param_type = group$param_type[[1]],
-          true_value = true_value,
-          med = med,
-          iqr = iqr,
-          score = abs(med - true_value) / pmax(abs(true_value), 1e-12) +
-            iqr / pmax(abs(true_value), 1e-12),
-          stringsAsFactors = FALSE
-        )
-      })
+      meta_rows <- lapply(
+        split(dd, list(dd$param_label, dd$param_type), drop = TRUE),
+        function(group) {
+          true_value <- group$true_value[[1]]
+          med <- stats::median(group$estimate, na.rm = TRUE)
+          iqr <- stats::IQR(group$estimate, na.rm = TRUE)
+          data.frame(
+            param_label = group$param_label[[1]],
+            param_type = group$param_type[[1]],
+            true_value = true_value,
+            med = med,
+            iqr = iqr,
+            score = abs(med - true_value) /
+              pmax(abs(true_value), 1e-12) +
+              iqr / pmax(abs(true_value), 1e-12),
+            stringsAsFactors = FALSE
+          )
+        }
+      )
       meta <- tibble::as_tibble(dplyr::bind_rows(meta_rows))
 
       top <- meta |>
@@ -191,7 +227,9 @@ mod_sse_analysis_server <- function(id,
       group <- input$diagnostic_param_group %||% "top"
       if (identical(group, "custom")) {
         selected <- isolate(input$selected_params)
-        if (is.null(selected)) selected <- sets$top
+        if (is.null(selected)) {
+          selected <- sets$top
+        }
         return(selected)
       }
       selected <- sets[[group]]
@@ -212,18 +250,30 @@ mod_sse_analysis_server <- function(id,
       updateRadioButtons(session, "diagnostic_param_group", selected = group)
     }
 
-    observeEvent(input$diagnostic_param_group, {
-      if (identical(input$diagnostic_param_group, "custom")) return()
-      set_selected_params(selected_diagnostic_group())
-    }, ignoreInit = TRUE)
+    observeEvent(
+      input$diagnostic_param_group,
+      {
+        if (identical(input$diagnostic_param_group, "custom")) {
+          return()
+        }
+        set_selected_params(selected_diagnostic_group())
+      },
+      ignoreInit = TRUE
+    )
 
-    observeEvent(input$selected_params, {
-      if (isTRUE(updating_param_selection())) return()
-      group <- input$diagnostic_param_group %||% "top"
-      if (!identical(group, "custom")) {
-        set_param_group("custom")
-      }
-    }, ignoreInit = TRUE)
+    observeEvent(
+      input$selected_params,
+      {
+        if (isTRUE(updating_param_selection())) {
+          return()
+        }
+        group <- input$diagnostic_param_group %||% "top"
+        if (!identical(group, "custom")) {
+          set_param_group("custom")
+        }
+      },
+      ignoreInit = TRUE
+    )
 
     observeEvent(input$params_all, {
       sets <- diagnostic_param_sets()
@@ -258,14 +308,22 @@ mod_sse_analysis_server <- function(id,
     # --- Param filter UI ---
     output$param_filter_ui <- renderUI({
       dd <- dist_data()
-      if (is.null(dd) || nrow(dd) == 0L) return(NULL)
+      if (is.null(dd) || nrow(dd) == 0L) {
+        return(NULL)
+      }
 
       all_params <- unique(dd$param_label)
-      selected <- isolate(input$selected_params) %||% selected_diagnostic_group()
-      summary <- sprintf("%d selected of %d", length(selected), length(all_params))
+      selected <- isolate(input$selected_params) %||%
+        selected_diagnostic_group()
+      summary <- sprintf(
+        "%d selected of %d",
+        length(selected),
+        length(all_params)
+      )
 
       compact_param_filter_ui(
-        session$ns, "selected_params",
+        session$ns,
+        "selected_params",
         choices = all_params,
         selected = selected,
         summary = summary,
@@ -284,16 +342,26 @@ mod_sse_analysis_server <- function(id,
     # --- Filtered distribution data ---
     dist_data_filtered <- reactive({
       dd <- dist_data()
-      if (is.null(dd)) return(NULL)
+      if (is.null(dd)) {
+        return(NULL)
+      }
       sel <- input$selected_params
-      if (is.null(sel)) sel <- selected_diagnostic_group()
-      if (length(sel) == 0L) return(dd[0, ])
+      if (is.null(sel)) {
+        sel <- selected_diagnostic_group()
+      }
+      if (length(sel) == 0L) {
+        return(dd[0, ])
+      }
       dd[dd$param_label %in% sel, ]
     })
 
     dist_plot_height <- reactive({
       dd <- dist_data_filtered()
-      n_params <- if (is.null(dd) || nrow(dd) == 0L) 1L else length(unique(dd$param_label))
+      n_params <- if (is.null(dd) || nrow(dd) == 0L) {
+        1L
+      } else {
+        length(unique(dd$param_label))
+      }
       paste0(max(520L, min(980L, 260L * ceiling(n_params / 3))), "px")
     })
 
@@ -301,13 +369,20 @@ mod_sse_analysis_server <- function(id,
     dist_plot_fn <- reactive({
       dd <- dist_data_filtered()
       if (is.null(dd) || nrow(dd) == 0L) {
-        return(ggplot() +
-          labs(title = "Load SSE data in SSE Upload tab") +
-          .theme_design())
+        return(
+          ggplot() +
+            labs(title = "Load SSE data in SSE Upload tab") +
+            .theme_design()
+        )
       }
       plot_param_distributions(dd, show_failed = isTRUE(input$show_failed))
     })
-    output$dist_plot <- renderPlot({ dist_plot_fn() }, res = 110)
+    output$dist_plot <- renderPlot(
+      {
+        dist_plot_fn()
+      },
+      res = 110
+    )
     plot_export_server(input, output, session, "dist_export", dist_plot_fn)
 
     output$active_view_ui <- renderUI({
@@ -317,80 +392,151 @@ mod_sse_analysis_server <- function(id,
         return(analysis_workspace(
           "SSE reliability map",
           plotOutput(session$ns("reliability_map"), height = "560px"),
-          plot_export_ui(session$ns, "reliability_export",
-                         default_fname = "sse_reliability_map")
+          plot_export_ui(
+            session$ns,
+            "reliability_export",
+            default_fname = "sse_reliability_map"
+          )
         ))
       }
       if (active == "indiv_pk_recovery") {
         return(analysis_workspace(
           "Individual PK recovery",
           plotOutput(session$ns("individual_pk_recovery"), height = "620px"),
-          plot_export_ui(session$ns, "individual_pk_recovery_export",
-                         default_fname = "individual_pk_recovery")
+          plot_export_ui(
+            session$ns,
+            "individual_pk_recovery_export",
+            default_fname = "individual_pk_recovery"
+          )
         ))
       }
       if (active == "indiv_pk_errors") {
         return(analysis_workspace(
           "Individual PK relative errors",
           plotOutput(session$ns("individual_pk_errors"), height = "460px"),
-          plot_export_ui(session$ns, "individual_pk_errors_export",
-                         default_fname = "individual_pk_relative_errors")
+          plot_export_ui(
+            session$ns,
+            "individual_pk_errors_export",
+            default_fname = "individual_pk_relative_errors"
+          )
+        ))
+      }
+      if (active == "indiv_pk_intervals") {
+        return(analysis_workspace(
+          "Individual PK intervals",
+          plotOutput(session$ns("individual_pk_intervals"), height = "520px"),
+          plot_export_ui(
+            session$ns,
+            "individual_pk_intervals_export",
+            default_fname = "individual_pk_error_intervals"
+          )
+        ))
+      }
+      if (active == "indiv_pk_outliers") {
+        return(analysis_workspace(
+          "Individual PK outliers",
+          plotOutput(session$ns("individual_pk_outliers"), height = "640px"),
+          DTOutput(session$ns("individual_pk_outliers_table")),
+          actions = tagList(
+            plot_export_ui(
+              session$ns,
+              "individual_pk_outliers_export",
+              default_fname = "individual_pk_outliers"
+            ),
+            downloadButton(
+              session$ns("export_individual_pk_outliers_csv"),
+              "Export CSV",
+              class = "btn-sm btn-default"
+            )
+          )
+        ))
+      }
+      if (active == "indiv_pk_heatmap") {
+        return(analysis_workspace(
+          "Individual PK heatmap",
+          plotOutput(session$ns("individual_pk_heatmap"), height = "820px"),
+          plot_export_ui(
+            session$ns,
+            "individual_pk_heatmap_export",
+            default_fname = "individual_pk_error_heatmap"
+          )
         ))
       }
       if (active == "ofv") {
         return(analysis_workspace(
           "OFV distribution",
           plotOutput(session$ns("ofv_plot"), height = "420px"),
-          plot_export_ui(session$ns, "ofv_export",
-                         default_fname = "sse_ofv_distribution")
+          plot_export_ui(
+            session$ns,
+            "ofv_export",
+            default_fname = "sse_ofv_distribution"
+          )
         ))
       }
       if (active == "shrink_box") {
         return(analysis_workspace(
           "Shrinkage distribution per ETA",
           plotOutput(session$ns("shrink_box"), height = "460px"),
-          plot_export_ui(session$ns, "shrink_box_export",
-                         default_fname = "sse_shrinkage_boxplot")
+          plot_export_ui(
+            session$ns,
+            "shrink_box_export",
+            default_fname = "sse_shrinkage_boxplot"
+          )
         ))
       }
       if (active == "shrink_scatter") {
         return(analysis_workspace(
           "Exploratory precision vs shrinkage map",
           plotOutput(session$ns("shrink_scatter"), height = "560px"),
-          plot_export_ui(session$ns, "shrink_scatter_export",
-                         default_fname = "sse_shrinkage_rse_scatter")
+          plot_export_ui(
+            session$ns,
+            "shrink_scatter_export",
+            default_fname = "sse_shrinkage_rse_scatter"
+          )
         ))
       }
       if (active == "eta_risk") {
         return(analysis_workspace(
           "Heuristic ETA review ranking",
           DTOutput(session$ns("eta_risk_table")),
-          actions = downloadButton(session$ns("export_eta_risk_csv"),
-                                   "Export CSV", class = "btn-sm btn-default")
+          actions = downloadButton(
+            session$ns("export_eta_risk_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
         ))
       }
       if (active == "shrink_table") {
         return(analysis_workspace(
           "Shrinkage summary table",
           DTOutput(session$ns("shrink_table")),
-          actions = downloadButton(session$ns("export_shrink_csv"),
-                                   "Export CSV", class = "btn-sm btn-default")
+          actions = downloadButton(
+            session$ns("export_shrink_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
         ))
       }
       if (active == "diagnostics") {
         return(analysis_workspace(
           "Per-parameter diagnostics",
           DTOutput(session$ns("diag_table")),
-          actions = downloadButton(session$ns("export_diag_csv"),
-                                   "Export CSV", class = "btn-sm btn-default")
+          actions = downloadButton(
+            session$ns("export_diag_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
         ))
       }
 
       analysis_workspace(
         "Parameter estimate distributions",
         plotOutput(session$ns("dist_plot"), height = dist_plot_height()),
-        plot_export_ui(session$ns, "dist_export",
-                       default_fname = "sse_param_distributions")
+        plot_export_ui(
+          session$ns,
+          "dist_export",
+          default_fname = "sse_param_distributions"
+        )
       )
     })
 
@@ -402,23 +548,34 @@ mod_sse_analysis_server <- function(id,
       }
       plot_ofv_distribution(dat, color_by_status = isTRUE(input$color_ofv))
     })
-    output$ofv_plot <- renderPlot({ ofv_plot_fn() }, res = 110)
+    output$ofv_plot <- renderPlot(
+      {
+        ofv_plot_fn()
+      },
+      res = 110
+    )
     plot_export_server(input, output, session, "ofv_export", ofv_plot_fn)
 
     # --- Reliability map ---
     reliability_data <- reactive({
       dat <- sse_all()
-      tv  <- true_vals()
+      tv <- true_vals()
       req(dat, tv)
       compute_sse_reliability_map(dat, tv, param_labels())
     })
 
     reliability_filtered <- reactive({
       rel <- reliability_data()
-      if (is.null(rel) || nrow(rel) == 0L) return(rel)
+      if (is.null(rel) || nrow(rel) == 0L) {
+        return(rel)
+      }
       sel <- input$selected_params
-      if (is.null(sel)) sel <- selected_diagnostic_group()
-      if (length(sel) == 0L) return(rel[0, ])
+      if (is.null(sel)) {
+        sel <- selected_diagnostic_group()
+      }
+      if (length(sel) == 0L) {
+        return(rel[0, ])
+      }
       rel[rel$param_label %in% sel, ]
     })
 
@@ -426,14 +583,47 @@ mod_sse_analysis_server <- function(id,
       rel <- reliability_filtered()
       plot_sse_reliability_map(rel)
     })
-    output$reliability_map <- renderPlot({ reliability_plot_fn() }, res = 110)
-    plot_export_server(input, output, session, "reliability_export",
-                       reliability_plot_fn)
+    output$reliability_map <- renderPlot(
+      {
+        reliability_plot_fn()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "reliability_export",
+      reliability_plot_fn
+    )
 
     # --- Individual PK patab outputs ---
+    individual_pk_diagnostics_data <- reactive({
+      dat <- individual_pk_shared()
+      if (is.null(dat) || nrow(dat) == 0L) {
+        return(build_individual_pk_diagnostics(NULL, tibble::tibble()))
+      }
+      sse <- tryCatch(sse_all(), error = function(e) NULL)
+      build_individual_pk_diagnostics(sse, dat)
+    })
+
+    individual_pk_diagnostics_recovery <- reactive({
+      diag <- individual_pk_diagnostics_data()
+      filter_individual_pk_recovery(
+        diag$individual_pk_recovery_long,
+        status_filter = input$pk_run_filter %||% "minimization_successful"
+      )
+    })
+
+    individual_pk_diagnostics_by_id <- reactive({
+      summarize_individual_pk_by_id_param(individual_pk_diagnostics_recovery())
+    })
+
     individual_pk_recovery_data <- reactive({
       dat <- individual_pk_shared()
-      if (is.null(dat) || nrow(dat) == 0L) return(tibble::tibble())
+      if (is.null(dat) || nrow(dat) == 0L) {
+        return(tibble::tibble())
+      }
       compute_individual_pk_recovery(dat)
     })
 
@@ -441,28 +631,175 @@ mod_sse_analysis_server <- function(id,
       rec <- individual_pk_recovery_data()
       plot_individual_pk_recovery(rec, log_axes = isTRUE(input$pk_log_axes))
     })
-    output$individual_pk_recovery <- renderPlot({
-      individual_pk_recovery_plot()
-    }, res = 110)
-    plot_export_server(input, output, session, "individual_pk_recovery_export",
-                       individual_pk_recovery_plot)
+    output$individual_pk_recovery <- renderPlot(
+      {
+        individual_pk_recovery_plot()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "individual_pk_recovery_export",
+      individual_pk_recovery_plot
+    )
 
     individual_pk_errors_plot <- reactive({
       rec <- individual_pk_recovery_data()
       plot_individual_pk_error_distribution(rec)
     })
-    output$individual_pk_errors <- renderPlot({
-      individual_pk_errors_plot()
-    }, res = 110)
-    plot_export_server(input, output, session, "individual_pk_errors_export",
-                       individual_pk_errors_plot)
+    output$individual_pk_errors <- renderPlot(
+      {
+        individual_pk_errors_plot()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "individual_pk_errors_export",
+      individual_pk_errors_plot
+    )
+
+    individual_pk_intervals_plot <- reactive({
+      diag <- individual_pk_diagnostics_data()
+      plot_individual_pk_error_forest(
+        diag$individual_pk_summary_by_param,
+        status_filter = input$pk_run_filter %||% "minimization_successful"
+      )
+    })
+    output$individual_pk_intervals <- renderPlot(
+      {
+        individual_pk_intervals_plot()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "individual_pk_intervals_export",
+      individual_pk_intervals_plot
+    )
+
+    individual_pk_outliers_plot <- reactive({
+      plot_individual_pk_outliers(
+        individual_pk_diagnostics_by_id(),
+        top_n = 25L
+      )
+    })
+    output$individual_pk_outliers <- renderPlot(
+      {
+        individual_pk_outliers_plot()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "individual_pk_outliers_export",
+      individual_pk_outliers_plot
+    )
+
+    output$individual_pk_outliers_table <- renderDT({
+      outliers <- individual_pk_diagnostics_by_id()
+      req(outliers)
+      if (nrow(outliers) == 0L) {
+        return(NULL)
+      }
+      display <- outliers |>
+        dplyr::slice_head(n = 50) |>
+        dplyr::select(
+          Rank = outlier_rank,
+          ID,
+          ARM,
+          Parameter = param,
+          `N runs` = n_samples,
+          `Median error (%)` = median_relative_error,
+          `P5 error (%)` = p5_relative_error,
+          `P95 error (%)` = p95_relative_error,
+          `Median |error| (%)` = median_abs_relative_error,
+          `P95 |error| (%)` = p95_abs_relative_error,
+          `% |error| >20` = pct_abs_error_over_20,
+          `% |error| >50` = pct_abs_error_over_50
+        )
+      numeric_cols <- vapply(display, is.numeric, logical(1))
+      display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
+
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(
+          pageLength = 15,
+          dom = "tip",
+          scrollX = TRUE,
+          order = list(list(0, "asc"))
+        )
+      ) |>
+        formatStyle(
+          "Median |error| (%)",
+          backgroundColor = styleInterval(
+            c(20, 40),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        ) |>
+        formatStyle(
+          "P95 |error| (%)",
+          backgroundColor = styleInterval(
+            c(50, 100),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        )
+    })
+
+    output$export_individual_pk_outliers_csv <- downloadHandler(
+      filename = function() {
+        paste0(
+          "individual_pk_outliers_",
+          format(Sys.time(), "%Y%m%d_%H%M%S"),
+          ".csv"
+        )
+      },
+      content = function(file) {
+        outliers <- individual_pk_diagnostics_by_id()
+        req(outliers)
+        tryCatch(
+          write.csv(outliers, file, row.names = FALSE),
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
+        )
+      }
+    )
+
+    individual_pk_heatmap_plot <- reactive({
+      plot_individual_pk_error_heatmap(individual_pk_diagnostics_by_id())
+    })
+    output$individual_pk_heatmap <- renderPlot(
+      {
+        individual_pk_heatmap_plot()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "individual_pk_heatmap_export",
+      individual_pk_heatmap_plot
+    )
 
     # --- Shrinkage: long-format data per replicate ---
     shrink_long <- reactive({
       dat <- sse_all()
       req(dat)
       compute_shrinkage_long(
-        dat, param_labels = param_labels(),
+        dat,
+        param_labels = param_labels(),
         only_converged = !isTRUE(input$show_failed)
       )
     })
@@ -472,7 +809,8 @@ mod_sse_analysis_server <- function(id,
       dat <- sse_all()
       req(dat)
       compute_shrinkage_summary(
-        dat, param_labels = param_labels(),
+        dat,
+        param_labels = param_labels(),
         only_converged = !isTRUE(input$show_failed)
       )
     })
@@ -482,52 +820,87 @@ mod_sse_analysis_server <- function(id,
       sl <- shrink_long()
       plot_shrinkage_boxplot(sl)
     })
-    output$shrink_box <- renderPlot({ shrink_box_fn() }, res = 110)
-    plot_export_server(input, output, session, "shrink_box_export",
-                       shrink_box_fn)
+    output$shrink_box <- renderPlot(
+      {
+        shrink_box_fn()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "shrink_box_export",
+      shrink_box_fn
+    )
 
     # --- Scatter RSE vs shrinkage ---
     shrink_scatter_fn <- reactive({
       dat <- sse_all()
-      tv  <- true_vals()
+      tv <- true_vals()
       if (is.null(dat) || is.null(tv)) {
-        return(ggplot() +
-          labs(title = "Load SSE data and .ctl to see identifiability scatter") +
-          .theme_design())
+        return(
+          ggplot() +
+            labs(
+              title = "Load SSE data and .ctl to see identifiability scatter"
+            ) +
+            .theme_design()
+        )
       }
-      plot_shrinkage_rse_scatter(dat, tv, param_labels(),
-                                 shrink_sum = shrink_summary())
+      plot_shrinkage_rse_scatter(
+        dat,
+        tv,
+        param_labels(),
+        shrink_sum = shrink_summary()
+      )
     })
-    output$shrink_scatter <- renderPlot({ shrink_scatter_fn() }, res = 110)
-    plot_export_server(input, output, session, "shrink_scatter_export",
-                       shrink_scatter_fn)
+    output$shrink_scatter <- renderPlot(
+      {
+        shrink_scatter_fn()
+      },
+      res = 110
+    )
+    plot_export_server(
+      input,
+      output,
+      session,
+      "shrink_scatter_export",
+      shrink_scatter_fn
+    )
 
     # --- Shrinkage summary table ---
     output$shrink_table <- renderDT({
       ss <- shrink_summary()
       req(ss)
-      if (nrow(ss) == 0L) return(NULL)
+      if (nrow(ss) == 0L) {
+        return(NULL)
+      }
 
       display <- ss |>
         dplyr::select(
-          Parameter   = param_label,
-          ETA         = eta,
-          `N runs`    = n,
-          `Mean (%)`  = mean_shrink,
+          Parameter = param_label,
+          ETA = eta,
+          `N runs` = n,
+          `Mean (%)` = mean_shrink,
           `Median (%)` = median_shrink,
-          `SD (%)`    = sd_shrink,
-          `P5 (%)`    = p5,
-          `P95 (%)`   = p95
+          `SD (%)` = sd_shrink,
+          `P5 (%)` = p5,
+          `P95 (%)` = p95
         )
 
-      datatable(display, rownames = FALSE,
-                class = "stripe hover compact",
-                options = list(pageLength = 20, dom = "t",
-                               scrollX = TRUE)) |>
-        formatStyle("Mean (%)",
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 20, dom = "t", scrollX = TRUE)
+      ) |>
+        formatStyle(
+          "Mean (%)",
           backgroundColor = styleInterval(
-            c(20, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
-          ))
+            c(20, 30),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        )
     })
 
     output$export_shrink_csv <- downloadHandler(
@@ -539,7 +912,9 @@ mod_sse_analysis_server <- function(id,
         req(ss)
         tryCatch(
           write.csv(ss, file, row.names = FALSE),
-          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
         )
       }
     )
@@ -547,7 +922,9 @@ mod_sse_analysis_server <- function(id,
     # --- ETA risk ranking table ---
     eta_risk_data <- reactive({
       rel <- reliability_data()
-      if (is.null(rel) || nrow(rel) == 0L) return(tibble::tibble())
+      if (is.null(rel) || nrow(rel) == 0L) {
+        return(tibble::tibble())
+      }
       rel |>
         dplyr::filter(grepl("^OMEGA\\(", param)) |>
         dplyr::arrange(dplyr::desc(risk_score))
@@ -556,7 +933,9 @@ mod_sse_analysis_server <- function(id,
     output$eta_risk_table <- renderDT({
       eta <- eta_risk_data()
       req(eta)
-      if (nrow(eta) == 0L) return(NULL)
+      if (nrow(eta) == 0L) {
+        return(NULL)
+      }
 
       display <- eta |>
         dplyr::select(
@@ -572,19 +951,31 @@ mod_sse_analysis_server <- function(id,
       numeric_cols <- vapply(display, is.numeric, logical(1))
       display[numeric_cols] <- lapply(display[numeric_cols], round, digits = 2)
 
-      datatable(display, rownames = FALSE,
-                class = "stripe hover compact",
-                options = list(pageLength = 20, dom = "t",
-                               scrollX = TRUE,
-                               order = list(list(7, "desc")))) |>
-        formatStyle("Mean shrinkage (%)",
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(
+          pageLength = 20,
+          dom = "t",
+          scrollX = TRUE,
+          order = list(list(7, "desc"))
+        )
+      ) |>
+        formatStyle(
+          "Mean shrinkage (%)",
           backgroundColor = styleInterval(
-            c(20, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
-          )) |>
-        formatStyle("Empirical RSE (%)",
+            c(20, 30),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        ) |>
+        formatStyle(
+          "Empirical RSE (%)",
           backgroundColor = styleInterval(
-            c(30, 50, 100), c("#dcfce7", "#fef3c7", "#fed7aa", "#fee2e2")
-          ))
+            c(30, 50, 100),
+            c("#dcfce7", "#fef3c7", "#fed7aa", "#fee2e2")
+          )
+        )
     })
 
     output$export_eta_risk_csv <- downloadHandler(
@@ -596,7 +987,9 @@ mod_sse_analysis_server <- function(id,
         req(eta)
         tryCatch(
           write.csv(eta, file, row.names = FALSE),
-          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
         )
       }
     )
@@ -604,7 +997,7 @@ mod_sse_analysis_server <- function(id,
     # --- Per-parameter diagnostics table ---
     diag_data <- reactive({
       dat <- sse_all()
-      tv  <- true_vals()
+      tv <- true_vals()
       req(dat, tv)
       compute_param_diagnostics(dat, tv, param_labels())
     })
@@ -615,36 +1008,49 @@ mod_sse_analysis_server <- function(id,
 
       display <- diag |>
         dplyr::select(
-          Parameter    = param_label,
-          Type         = param_type,
-          `N runs`     = n_runs,
-          `SE = NA`    = n_se_na,
-          `% SE NA`    = pct_se_na,
+          Parameter = param_label,
+          Type = param_type,
+          `N runs` = n_runs,
+          `SE = NA` = n_se_na,
+          `% SE NA` = pct_se_na,
           `RSE > 100%` = n_rse_over_100,
-          `% RSE>100`  = pct_rse_over_100,
-          `Est. = 0`   = n_zero_estimate,
-          `% Zero`     = pct_zero_estimate
+          `% RSE>100` = pct_rse_over_100,
+          `Est. = 0` = n_zero_estimate,
+          `% Zero` = pct_zero_estimate
         )
 
-      datatable(display, rownames = FALSE,
-                class = "stripe hover compact",
-                options = list(
-                  pageLength = 20, dom = "t",
-                  scrollX = TRUE,
-                  order = list(list(4, "desc"))
-                )) |>
-        formatStyle("% SE NA",
+      datatable(
+        display,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(
+          pageLength = 20,
+          dom = "t",
+          scrollX = TRUE,
+          order = list(list(4, "desc"))
+        )
+      ) |>
+        formatStyle(
+          "% SE NA",
           backgroundColor = styleInterval(
-            c(10, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
-          )) |>
-        formatStyle("% RSE>100",
+            c(10, 30),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        ) |>
+        formatStyle(
+          "% RSE>100",
           backgroundColor = styleInterval(
-            c(10, 30), c("#dcfce7", "#fef3c7", "#fee2e2")
-          )) |>
-        formatStyle("% Zero",
+            c(10, 30),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        ) |>
+        formatStyle(
+          "% Zero",
           backgroundColor = styleInterval(
-            c(5, 20), c("#dcfce7", "#fef3c7", "#fee2e2")
-          ))
+            c(5, 20),
+            c("#dcfce7", "#fef3c7", "#fee2e2")
+          )
+        )
     })
 
     # --- Export diagnostics CSV ---
@@ -657,7 +1063,9 @@ mod_sse_analysis_server <- function(id,
         req(diag)
         tryCatch(
           write.csv(diag, file, row.names = FALSE),
-          error = function(e) warning("CSV export failed: ", conditionMessage(e))
+          error = function(e) {
+            warning("CSV export failed: ", conditionMessage(e))
+          }
         )
       }
     )
