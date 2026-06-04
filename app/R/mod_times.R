@@ -37,7 +37,8 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
                              cmt_labels = reactive(NULL),
                              ext_data = reactive(NULL),
                              ctl_lines = reactive(NULL),
-                             theta_labels = reactive(NULL)) {
+                             theta_labels = reactive(NULL),
+                             mrgsolve_state = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -134,13 +135,17 @@ mod_times_server <- function(id, tab_data, all_runs = reactive(list()),
         )
     }
 
-    # -- mrgsolve sub-module (nested) ------------------------------------------
-    mrg_sim <- mod_mrgsolve_server("mrgsolve",
-      ext_data     = ext_data,
-      tab_data     = tab_data,
-      ctl_lines    = ctl_lines,
-      theta_labels = theta_labels
-    )
+    # -- Shared mrgsolve state -------------------------------------------------
+    mrg_sim <- mrgsolve_state
+    if (is.null(mrg_sim)) {
+      mrg_sim <- list(
+        sim_data       = reactive(NULL),
+        is_available   = reactive(FALSE),
+        dose_times     = reactive(NULL),
+        tier           = reactive("unavailable"),
+        warning_reason = reactive(NULL)
+      )
+    }
 
     # -- Tab effectif : tab_data() ou premier run secondaire ayant un .tab ------
     effective_tab_data <- reactive({

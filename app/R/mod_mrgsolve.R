@@ -104,6 +104,36 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       NULL
     })
 
+    model_hash_reactive <- reactive({
+      code <- mrg_code_text()
+      if (is.null(code)) return(NULL)
+      mrgsolve_code_hash(code)
+    })
+
+    param_names_reactive <- reactive({
+      mod <- compiled_model()
+      if (is.null(mod) || !requireNamespace("mrgsolve", quietly = TRUE)) {
+        return(character())
+      }
+      tryCatch(names(mrgsolve::param(mod)), error = function(e) character())
+    })
+
+    capture_names_reactive <- reactive({
+      mod <- compiled_model()
+      if (is.null(mod) || !requireNamespace("mrgsolve", quietly = TRUE)) {
+        return(character())
+      }
+      tryCatch(as.character(mrgsolve::outvars(mod)), error = function(e) character())
+    })
+
+    cmt_names_reactive <- reactive({
+      mod <- compiled_model()
+      if (is.null(mod) || !requireNamespace("mrgsolve", quietly = TRUE)) {
+        return(character())
+      }
+      tryCatch(as.character(mrgsolve::cmt(mod)), error = function(e) character())
+    })
+
     # -- Compile model ---------------------------------------------------------
     observeEvent(input$compile, {
       code <- mrg_code_text()
@@ -207,6 +237,28 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       any(is.na(ds$amt))
     })
 
+    dose_config <- reactive({
+      ds <- dose_schedule()
+      if (!needs_dose_input() || is.null(ds)) return(NULL)
+      arm_ids <- sort(unique(ds$id))
+      stats::setNames(lapply(arm_ids, function(aid) {
+        list(
+          amt  = input[[paste0("amt_", aid)]] %||% 100,
+          rate = input[[paste0("rate_", aid)]] %||% 0
+        )
+      }), as.character(arm_ids))
+    })
+
+    dose_events <- reactive({
+      ds <- dose_schedule()
+      if (is.null(ds)) return(NULL)
+      events <- build_dosing_events(ds, dose_config())
+      if (is.null(events) || nrow(events) == 0L) return(NULL)
+      events <- events[!is.na(events$amt), , drop = FALSE]
+      if (nrow(events) == 0L) return(NULL)
+      events
+    })
+
     # -- Dose config UI (only when AMT missing) --------------------------------
     output$dose_config <- renderUI({
       mod <- compiled_model()
@@ -283,29 +335,8 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
         return()
       }
 
-      # Build dosing events
-      ds <- dose_schedule()
-      dose_config <- NULL
-
-      if (needs_dose_input() && !is.null(ds)) {
-        arm_ids <- sort(unique(ds$id))
-        dose_config <- setNames(lapply(arm_ids, function(aid) {
-          list(
-            amt  = input[[paste0("amt_", aid)]] %||% 100,
-            rate = input[[paste0("rate_", aid)]] %||% 0
-          )
-        }), as.character(arm_ids))
-      }
-
-      events <- build_dosing_events(ds, dose_config)
+      events <- dose_events()
       if (is.null(events) || nrow(events) == 0L) {
-        sim_result(NULL)
-        return()
-      }
-
-      # Remove rows where AMT is still NA
-      events <- events[!is.na(events$amt), , drop = FALSE]
-      if (nrow(events) == 0L) {
         sim_result(NULL)
         return()
       }
@@ -341,6 +372,13 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
       "mrgsolve"
     })
 
+    status_reactive <- reactive({
+      if (!mrg_status$available) return("unavailable")
+      if (!is.null(compile_error())) return("compile_failed")
+      if (!is.null(compiled_model())) return("compiled")
+      "not_compiled"
+    })
+
     # -- Warning reason reactive -----------------------------------------------
     warning_reason_reactive <- reactive({
       switch(tier_reactive(),
@@ -356,8 +394,18 @@ mod_mrgsolve_server <- function(id, ext_data, tab_data, ctl_lines = reactive(NUL
 
     # -- Return named list of reactives ----------------------------------------
     list(
+      model          = reactive({ compiled_model() }),
+      compile_error  = reactive({ compile_error() }),
+      model_code     = reactive({ mrg_code_text() }),
+      model_hash     = model_hash_reactive,
+      param_names    = param_names_reactive,
+      capture_names  = capture_names_reactive,
+      cmt_names      = cmt_names_reactive,
+      is_compiled    = reactive({ !is.null(compiled_model()) }),
+      status         = status_reactive,
       sim_data       = reactive({ sim_result() }),
       is_available   = reactive({ identical(tier_reactive(), "mrgsolve") }),
+      dose_events    = dose_events,
       dose_times     = reactive({
         ds <- dose_schedule()
         if (is.null(ds)) return(NULL)

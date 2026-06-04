@@ -159,7 +159,8 @@ ui <- navbarPage(
 
   # -- Decision (dropdown) ---------------------------------------------------
   navbarMenu("Decision",
-    tabPanel("Power / NSN", value = "power", mod_power_ui("power"))
+    tabPanel("Power / NSN", value = "power", mod_power_ui("power")),
+    tabPanel("Covariates", value = "covariates", mod_covariates_ui("covariates"))
   ),
 
   # -- Diagnostic (dropdown) -------------------------------------------------
@@ -467,12 +468,23 @@ server <- function(input, output, session) {
 
   mod_fim_server("fim",
     ext_data = merged_ext, coi_data = merged_coi, clt_data = merged_clt,
-    tbl_no = tbl_no, param_labels = param_labels_r, all_runs = all_runs)
+    tbl_no = tbl_no, param_labels = param_labels_r, all_runs = all_runs,
+    ctl_lines = merged_ctl_lines)
+
+  mod_covariates_server("covariates",
+    ext_data = merged_ext, tbl_no = tbl_no, param_labels = param_labels_r)
+
+  shared_mrgsolve <- mod_mrgsolve_server("times-mrgsolve",
+    ext_data     = merged_ext,
+    tab_data     = merged_tab,
+    ctl_lines    = merged_ctl_lines,
+    theta_labels = param_labels_r)
 
   mod_times_server("times",
     tab_data = merged_tab, all_runs = all_runs, cmt_labels = cmt_labels_r,
     ext_data = merged_ext, ctl_lines = merged_ctl_lines,
-    theta_labels = param_labels_r)
+    theta_labels = param_labels_r,
+    mrgsolve_state = shared_mrgsolve)
 
   mod_prior_server("prior",
     summary_data = merged_summary, ctl_data = merged_ctl,
@@ -512,7 +524,8 @@ server <- function(input, output, session) {
     name_b       = sse_upload$name_b,
     true_vals    = merged_true_vals,
     param_labels = param_labels_r,
-    individual_pk_shared = sse_upload$individual_pk_data)
+    individual_pk_shared = sse_upload$individual_pk_data,
+    mrgsolve_state = shared_mrgsolve)
 
   mod_sse_comparison_server("sse_comparison",
     sse_orig         = sse_upload$sse_a_data,

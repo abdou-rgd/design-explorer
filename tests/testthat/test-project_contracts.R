@@ -85,7 +85,8 @@ test_that("primary NONMEM ownership stays in upload, examples, and compare", {
 
   file_input_files <- names(txt)[vapply(txt, grepl, logical(1), pattern = "\\bfileInput\\s*\\(")]
   expect_setequal(file_input_files, c(
-    "mod_compare.R", "mod_mrgsolve.R", "mod_sse_upload.R", "mod_upload.R"
+    "mod_compare.R", "mod_covariates.R", "mod_mrgsolve.R",
+    "mod_sse_upload.R", "mod_upload.R"
   ))
 })
 

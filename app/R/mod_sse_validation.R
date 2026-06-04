@@ -44,6 +44,7 @@ mod_sse_validation_ui <- function(id) {
             "REE boxplot" = "ree",
             "RSE bar chart" = "rse",
             "Matrix diagnostics" = "matrix",
+            "Pediatric readout" = "pediatric",
             "Comparison table" = "table"
           ),
           selected = "scatter",
@@ -142,7 +143,12 @@ mod_sse_validation_server <- function(id, ext_data,
     # --- Compare ---
     comparison <- reactive({
       req(sse_metrics(), fim_rse())
-      compare_fim_sse(sse_metrics(), fim_rse())
+      comp <- compare_fim_sse(sse_metrics(), fim_rse())
+      comp$parameter_family <- classify_parameter_family(
+        comp$param,
+        label = comp$param_label
+      )
+      comp
     })
 
     validation_param_sets <- reactive({
@@ -157,6 +163,10 @@ mod_sse_validation_server <- function(id, ext_data,
         theta = comp$param[comp$param_type == "THETA"],
         omega = comp$param[grepl("^OMEGA", comp$param_type)],
         sigma = comp$param[grepl("^SIGMA", comp$param_type)],
+        base = comp$param[comp$parameter_family == "base"],
+        covariate = comp$param[comp$parameter_family == "covariate"],
+        iiv = comp$param[comp$parameter_family == "iiv"],
+        residual = comp$param[comp$parameter_family == "residual"],
         hidden_high_rse = comp$param[!is.na(rse_max) & rse_max > 100]
       )
     })
@@ -179,6 +189,22 @@ mod_sse_validation_server <- function(id, ext_data,
     observeEvent(input$params_sigma, {
       sets <- validation_param_sets()
       updateCheckboxGroupInput(session, "selected_params", selected = sets$sigma)
+    })
+    observeEvent(input$params_base, {
+      sets <- validation_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$base)
+    })
+    observeEvent(input$params_covariate, {
+      sets <- validation_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$covariate)
+    })
+    observeEvent(input$params_iiv, {
+      sets <- validation_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$iiv)
+    })
+    observeEvent(input$params_residual, {
+      sets <- validation_param_sets()
+      updateCheckboxGroupInput(session, "selected_params", selected = sets$residual)
     })
     observeEvent(input$params_readable, {
       sets <- validation_param_sets()
@@ -226,7 +252,11 @@ mod_sse_validation_server <- function(id, ext_data,
           params_none = "None",
           params_theta = "THETA",
           params_omega = "OMEGA",
-          params_sigma = "SIGMA"
+          params_sigma = "SIGMA",
+          params_base = "Base",
+          params_covariate = "Covariate",
+          params_iiv = "IIV",
+          params_residual = "Residual"
         )
       )
     })
@@ -404,6 +434,7 @@ mod_sse_validation_server <- function(id, ext_data,
       if (active == "matrix") {
         return(analysis_workspace(
           "Matrix conditioning diagnostics",
+          uiOutput(session$ns("fim_risk_card")),
           uiOutput(session$ns("d_criterion_card")),
           plotOutput(session$ns("eigenvalue_spectrum"), height = "320px"),
           tags$p(class = "workspace-note",
@@ -413,9 +444,18 @@ mod_sse_validation_server <- function(id, ext_data,
           subtitle = "Raw and correlation-based diagnostics are shown together."
         ))
       }
+      if (active == "pediatric") {
+        return(table_panel(
+          "Pediatric scenario readout",
+          uiOutput(session$ns("pediatric_cards")),
+          DTOutput(session$ns("pediatric_table")),
+          subtitle = "Lightweight post-processing summary from the currently selected SSE/design metrics."
+        ))
+      }
       if (active == "table") {
         return(table_panel(
           "Comparison table",
+          DTOutput(session$ns("family_summary_table")),
           DTOutput(session$ns("comp_table")),
           actions = downloadButton(session$ns("export_csv"), "Export CSV",
                                    class = "btn-sm btn-default"),
@@ -484,6 +524,7 @@ mod_sse_validation_server <- function(id, ext_data,
         dplyr::select(
           Parameter = param_label,
           Type = param_type,
+          Family = parameter_family,
           `RSE FIM (%)` = rse_fim,
           `RSE SSE (%)` = rse_sse,
           `RRMSE SSE (%)` = rmse_sse,
@@ -505,7 +546,7 @@ mod_sse_validation_server <- function(id, ext_data,
                   pageLength = 20, dom = "t",
                   scrollX = TRUE,
                   columnDefs = list(
-                    list(className = "dt-center", targets = 8:9)
+                    list(className = "dt-center", targets = 9:10)
                   )
                 )) |>
         formatStyle(which(names(display) == "±20%"),
@@ -513,6 +554,107 @@ mod_sse_validation_server <- function(id, ext_data,
             c("OK", "Out of band"),
             c("#d4edda", "#f8d7da")
           ))
+    })
+
+    output$family_summary_table <- renderDT({
+      comp <- comparison_filtered()
+      req(comp)
+      fam <- summarise_precision_by_family(comp)
+      if (nrow(fam) == 0L) return(NULL)
+      display <- fam |>
+        dplyr::transmute(
+          Family = .data$parameter_family,
+          Parameters = .data$n_params,
+          Matched = .data$n_matched,
+          `Median FIM RSE` = round(.data$median_rse_fim, 1),
+          `Median SSE RSE` = round(.data$median_rse_sse, 1),
+          `Within +/-20%` = scales::percent(.data$within_20_pct, accuracy = 1),
+          `High RSE hidden` = .data$hidden_high_rse
+        )
+      datatable(display, rownames = FALSE,
+                class = "stripe hover compact",
+                options = list(pageLength = 5, dom = "t", scrollX = TRUE))
+    })
+
+    output$fim_risk_card <- renderUI({
+      prov <- parse_design_provenance(shared_ctl_lines())
+      comp <- comparison()
+      agreement <- mean(comp$pass_20pct[comp$status == "matched"], na.rm = TRUE)
+      if (is.nan(agreement)) agreement <- NA_real_
+      risk <- score_fim_approximation_risk(
+        prov,
+        has_sse = !is.null(sse_data()),
+        fim_sse_agreement = agreement
+      )
+      cls <- switch(
+        risk$level,
+        low_risk = "alert alert-success",
+        needs_validation = "alert alert-warning",
+        context_only = "alert alert-info",
+        "alert alert-info"
+      )
+      div(class = cls, style = "border-radius:8px; margin-bottom:10px;",
+          tags$strong(risk$label),
+          tags$p(style = "margin:4px 0 0;", risk$message))
+    })
+
+    pediatric_summary <- reactive({
+      comp <- comparison_filtered()
+      req(comp)
+      dat <- sse_data()
+      failed_pct <- if (!is.null(dat)) {
+        n_total <- nrow(dat)
+        n_conv <- sum(dat$converged, na.rm = TRUE)
+        if (n_total > 0L) (n_total - n_conv) / n_total * 100 else NA_real_
+      } else {
+        NA_real_
+      }
+      scenario <- input$which_design %||% "a"
+      scenario_name <- if (scenario == "b") name_b() else name_a()
+      met <- comp |>
+        dplyr::filter(.data$status == "matched") |>
+        dplyr::transmute(
+          scenario = scenario_name,
+          rse_sse = .data$rse_sse,
+          relative_bias = .data$relative_bias,
+          rmse_sse = .data$rmse_sse,
+          failed_pct = failed_pct
+        )
+      summarise_pediatric_scenarios(met)
+    })
+
+    output$pediatric_cards <- renderUI({
+      ps <- pediatric_summary()
+      if (is.null(ps) || nrow(ps) == 0L) return(NULL)
+      tone <- switch(ps$readiness[1],
+        ready = "success",
+        caution = "warning",
+        weak = "danger",
+        "neutral"
+      )
+      fact_strip(
+        fact_item("Readiness", ps$readiness[1], "precision/bias/failures", tone),
+        fact_item("Median RSE", sprintf("%.1f%%", ps$rse_sse[1]), "target <= 30%"),
+        fact_item("Median bias", sprintf("%.1f%%", ps$relative_bias[1]), "ready <= 20%"),
+        fact_item("Failed runs", sprintf("%.1f%%", ps$failed_pct[1]), "ready <= 5%")
+      )
+    })
+
+    output$pediatric_table <- renderDT({
+      ps <- pediatric_summary()
+      if (is.null(ps) || nrow(ps) == 0L) return(NULL)
+      display <- ps |>
+        dplyr::transmute(
+          Scenario = .data$scenario,
+          Readiness = .data$readiness,
+          `Median RSE (%)` = round(.data$rse_sse, 1),
+          `Median bias (%)` = round(.data$relative_bias, 1),
+          `Median RRMSE (%)` = round(.data$rmse_sse, 1),
+          `Failed runs (%)` = round(.data$failed_pct, 1)
+        )
+      datatable(display, rownames = FALSE,
+                class = "stripe hover compact",
+                options = list(pageLength = 5, dom = "t", scrollX = TRUE))
     })
 
     # --- Export CSV ---

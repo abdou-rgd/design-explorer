@@ -37,8 +37,12 @@ run_testthat_file(file.path("tests", "testthat", "test-tab_dispatch.R"))
 run_testthat_file(file.path("tests", "testthat", "test-parser_hardening.R"))
 run_testthat_file(file.path("tests", "testthat", "test-pk_templates.R"))
 run_testthat_file(file.path("tests", "testthat", "test-mrgsolve_bridge.R"))
+run_testthat_file(file.path("tests", "testthat", "test-mrgsolve_shared_contract.R"))
+run_testthat_file(file.path("tests", "testthat", "test-sse_mrgsolve_exposure_preflight.R"))
+run_testthat_file(file.path("tests", "testthat", "test-sse_mrgsolve_exposure_app_server.R"))
 run_testthat_file(file.path("tests", "testthat", "test-project_contracts.R"))
 run_testthat_file(file.path("tests", "testthat", "test-times_integration.R"))
+run_testthat_file(file.path("tests", "testthat", "test-post_processing_roadmap.R"))
 
 run_local_smoke <- function(script, required_paths) {
   missing <- required_paths[!file.exists(file.path(PROJECT_ROOT, required_paths))]

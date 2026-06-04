@@ -391,6 +391,61 @@ mod_documentation_ui <- function(id) {
             ". The Individual PK views compare ",
             "estimated subject-level values against the corresponding simulated ",
             "values by table, sample, and ID."
+          ),
+          tags$p(
+            tags$strong("PK Exposure"),
+            " extends the individual PK workflow by simulating concentration-time ",
+            "profiles with the shared mrgsolve model compiled in the Optimal Times ",
+            "panel. The production path is intentionally generic: upload or paste a ",
+            tags$code(".cpp"),
+            " mrgsolve model and map its ",
+            tags$code("$PARAM"),
+            " names to numeric columns from the PsN individual PK tables. ",
+            "Closed-form ADVAN examples are useful for validation scripts, but are ",
+            "not the app contract for arbitrary project models."
+          ),
+          tags$ul(
+            tags$li(
+              "Required SSE inputs: ",
+              tags$code("raw_results.csv"),
+              " for run status and a PsN table archive such as ",
+              tags$code("m1.zip"),
+              " or the zipped SSE directory containing ",
+              tags$code("pk_individuals"),
+              " / ",
+              tags$code("patab"),
+              " outputs."
+            ),
+            tags$li(
+              "Required simulation input: a mrgsolve-compatible ",
+              tags$code(".cpp"),
+              " model. Compile it once from Sampling Times; SSE PK Exposure reuses ",
+              "that same compiled model state."
+            ),
+            tags$li(
+              "Required mapping: choose the concentration capture column, then map ",
+              "the model inputs that should vary by individual and run, such as ",
+              tags$code("CL"),
+              ", ",
+              tags$code("V"),
+              ", ",
+              tags$code("KA"),
+              ", or project-specific covariate-driven parameters."
+            ),
+            tags$li(
+              "Before the full computation, run the mrgsolve sanity check. The full ",
+              "exposure table is calculated behind an explicit button and cached for ",
+              "the current model, mapping, PsN table, dose events, and compute limits."
+            )
+          ),
+          tags$p(
+            "The first app-level output is a downloadable long table comparing ",
+            "simulation and estimation exposures by ",
+            tags$code("sample"),
+            ", ",
+            tags$code("ID"),
+            ", and metric. Start with small limits, for example 20 samples and a ",
+            "subset of IDs, before scaling to 200+ simulations."
           )
         ),
 

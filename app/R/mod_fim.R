@@ -9,7 +9,9 @@ mod_fim_ui <- function(id) {
   )
 }
 
-mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_labels, all_runs = reactive(list())) {
+mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no,
+                           param_labels, all_runs = reactive(list()),
+                           ctl_lines = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -137,6 +139,7 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
         ),
         popkin_tabs(ns,
           tabPanel("Criteria Summary",
+            uiOutput(ns("risk_card")),
             uiOutput(ns("cards")),
             if (length(all_runs()) > 1) {
               table_panel(
@@ -149,6 +152,14 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
             table_panel(
               "Correlation matrix eigenvalues",
               DTOutput(ns("eigen_table"))
+            ),
+            plot_panel(
+              "Identifiability direction",
+              tags$p(class = "workspace-note",
+                "Approximate post-processing diagnostic: parameters with the largest loading in the weakest matrix direction."
+              ),
+              plotOutput(ns("identifiability_plot"), height = "320px"),
+              DTOutput(ns("identifiability_table"))
             )
           ),
           tabPanel("Correlation Heatmap",
@@ -180,6 +191,21 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
       ext <- selected_ext()
       if (is.null(ext)) return(NULL)
       robust_cards_ui(ext, tbl_no()) %||% criteria_cards_ui(ext, tbl_no())
+    })
+
+    output$risk_card <- renderUI({
+      prov <- parse_design_provenance(ctl_lines())
+      risk <- score_fim_approximation_risk(prov, has_sse = FALSE)
+      cls <- switch(
+        risk$level,
+        low_risk = "alert alert-success",
+        needs_validation = "alert alert-warning",
+        context_only = "alert alert-info",
+        "alert alert-info"
+      )
+      div(class = cls, style = "border-radius:8px; margin-bottom:12px;",
+          tags$strong(risk$label),
+          tags$p(style = "margin:4px 0 0;", risk$message))
     })
 
     # Multi-run comparison table
@@ -225,6 +251,51 @@ mod_fim_server <- function(id, ext_data, coi_data, clt_data, tbl_no, param_label
         rownames = FALSE, class = "stripe hover compact",
         options = list(pageLength = 20, dom = "tip")
       )
+    })
+
+    identifiability_direction <- reactive({
+      fim <- fim_matrix()
+      if (is.null(fim)) return(tibble::tibble())
+      corr <- tryCatch(get_cor_matrix(fim), error = function(e) NULL)
+      if (is.null(corr)) return(tibble::tibble())
+      labs <- param_labels()
+      dir <- compute_identifiability_directions(corr, top_n = 5)
+      if (!is.null(labs) && nrow(dir) > 0L) {
+        dir$label <- dplyr::if_else(
+          dir$param %in% names(labs) & !is.na(labs[dir$param]),
+          unname(labs[dir$param]),
+          dir$param
+        )
+      } else if (nrow(dir) > 0L) {
+        dir$label <- dir$param
+      }
+      dir
+    })
+
+    identifiability_plot <- reactive({
+      dir <- identifiability_direction()
+      if (nrow(dir) > 0L) {
+        plot_identifiability_direction(dir |> dplyr::mutate(param = .data$label))
+      } else {
+        plot_identifiability_direction(dir)
+      }
+    })
+
+    output$identifiability_plot <- renderPlot({ identifiability_plot() }, res = 110)
+
+    output$identifiability_table <- renderDT({
+      dir <- identifiability_direction()
+      if (nrow(dir) == 0L) return(NULL)
+      display <- dir |>
+        dplyr::transmute(
+          Parameter = .data$label,
+          `Eigenvalue` = signif(.data$eigenvalue, 5),
+          Loading = signif(.data$loading, 4),
+          `Contribution (%)` = round(.data$contribution_pct, 1)
+        )
+      datatable(display, rownames = FALSE,
+                class = "stripe hover compact",
+                options = list(pageLength = 5, dom = "t"))
     })
 
     # Heatmap run selector (multi-run only)

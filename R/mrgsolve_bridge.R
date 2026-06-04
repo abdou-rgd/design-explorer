@@ -297,13 +297,34 @@ build_dosing_events <- function(dose_schedule, dose_config = NULL) {
 #' @param code_text   Code mrgsolve en texte (contenu d'un fichier .cpp)
 #' @param model_name  Nom unique pour le modele (defaut: hash du code)
 #' @return Objet modele mrgsolve, ou character (message d'erreur)
+mrgsolve_code_hash <- function(code_text) {
+  if (is.null(code_text)) code_text <- ""
+  code_text <- paste(code_text, collapse = "\n")
+  tmp <- tempfile(fileext = ".cpp")
+  con <- file(tmp, open = "wb")
+  on.exit({
+    try(close(con), silent = TRUE)
+    unlink(tmp)
+  }, add = TRUE)
+  writeBin(charToRaw(enc2utf8(code_text)), con)
+  close(con)
+  unname(substr(tools::md5sum(tmp), 1L, 8L))
+}
+
+mrgsolve_sim_to_data_frame <- function(sim) {
+  if (inherits(sim, "mrgsims") && methods::is(sim, "mrgsims")) {
+    return(as.data.frame(sim@data))
+  }
+  as.data.frame(sim)
+}
+
 compile_mrgsolve_model <- function(code_text, model_name = NULL) {
   if (!has_mrgsolve()$available) {
     return(has_mrgsolve()$reason)
   }
 
   if (is.null(model_name)) {
-    model_name <- paste0("mod_", substr(digest::digest(code_text, "md5"), 1, 8))
+    model_name <- paste0("mod_", mrgsolve_code_hash(code_text))
   }
 
   tryCatch({
@@ -368,7 +389,7 @@ simulate_pk_profile <- function(mod, params, omega = NULL, sigma = NULL,
         carry_out = "cmt,evid",
         recover = "ID"
       )
-      out <- as.data.frame(sim)
+      out <- mrgsolve_sim_to_data_frame(sim)
       # Keep only observation rows (evid == 0 in mrgsolve output)
       out <- out[out$evid == 0, , drop = FALSE]
       # Detect Y variable: prefer IPRED, then DV, then first CMT column

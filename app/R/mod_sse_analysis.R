@@ -80,6 +80,7 @@ mod_sse_analysis_ui <- function(id) {
             "Individual PK intervals" = "indiv_pk_intervals",
             "Individual PK outliers" = "indiv_pk_outliers",
             "Individual PK heatmap" = "indiv_pk_heatmap",
+            "PK Exposure" = "pk_exposure",
             "OFV distribution" = "ofv",
             "Shrinkage boxplot" = "shrink_box",
             "Exploratory RSE-shrinkage map" = "shrink_scatter",
@@ -120,7 +121,8 @@ mod_sse_analysis_server <- function(
   name_b = reactive("Design B"),
   true_vals,
   param_labels = reactive(NULL),
-  individual_pk_shared = reactive(NULL)
+  individual_pk_shared = reactive(NULL),
+  mrgsolve_state = NULL
 ) {
   moduleServer(id, function(input, output, session) {
     # --- Design selector (show only when B is loaded) ---
@@ -548,6 +550,20 @@ mod_sse_analysis_server <- function(
             "individual_pk_heatmap_export",
             default_fname = "individual_pk_error_heatmap"
           )
+        ))
+      }
+      if (active == "pk_exposure") {
+        return(analysis_workspace(
+          "PK Exposure",
+          uiOutput(session$ns("pk_exposure_status")),
+          uiOutput(session$ns("pk_exposure_controls")),
+          uiOutput(session$ns("pk_exposure_mapping_controls")),
+          DTOutput(session$ns("pk_exposure_mapping_table")),
+          uiOutput(session$ns("pk_exposure_preflight_summary")),
+          uiOutput(session$ns("pk_exposure_sanity_check")),
+          DTOutput(session$ns("pk_exposure_sanity_table")),
+          uiOutput(session$ns("pk_exposure_compute_controls")),
+          DTOutput(session$ns("pk_exposure_results_table"))
         ))
       }
       if (active == "ofv") {
@@ -1059,6 +1075,540 @@ mod_sse_analysis_server <- function(
       session,
       "individual_pk_heatmap_export",
       individual_pk_heatmap_plot
+    )
+
+    pk_exposure_model_meta <- reactive({
+      if (is.null(mrgsolve_state)) return(NULL)
+      compiled <- tryCatch(
+        isTRUE(mrgsolve_state$is_compiled()),
+        error = function(e) FALSE
+      )
+      if (!compiled) return(NULL)
+
+      list(
+        param_names = tryCatch(mrgsolve_state$param_names(), error = function(e) character()),
+        capture_names = tryCatch(mrgsolve_state$capture_names(), error = function(e) character()),
+        cmt_names = tryCatch(mrgsolve_state$cmt_names(), error = function(e) character())
+      )
+    })
+
+    pk_exposure_patab <- reactive({
+      dat <- individual_pk_shared()
+      if (is.null(dat) || !is.data.frame(dat) || nrow(dat) == 0L) {
+        return(NULL)
+      }
+      dat
+    })
+
+    pk_exposure_auto_mapping <- reactive({
+      meta <- pk_exposure_model_meta()
+      dat <- pk_exposure_patab()
+      if (is.null(meta) || is.null(dat)) {
+        return(tibble::tibble(
+          model_param = character(),
+          patab_column = character(),
+          status = character(),
+          source = character()
+        ))
+      }
+      build_sse_mrgsolve_parameter_mapping(
+        individual_pk_data = dat,
+        model_param_names = meta$param_names
+      )
+    })
+
+    pk_exposure_selected_mapping <- reactive({
+      params <- input$pk_exposure_params %||% character()
+      if (length(params) == 0L) {
+        return(stats::setNames(character(), character()))
+      }
+
+      values <- vapply(seq_along(params), function(i) {
+        input[[paste0("pk_map_", i)]] %||% ""
+      }, character(1L))
+      keep <- nzchar(values)
+      stats::setNames(values[keep], params[keep])
+    })
+
+    pk_exposure_preflight <- reactive({
+      meta <- pk_exposure_model_meta()
+      if (is.null(meta)) return(NULL)
+
+      build_sse_mrgsolve_exposure_preflight(
+        individual_pk_data = pk_exposure_patab(),
+        model_param_names = meta$param_names,
+        capture_names = meta$capture_names,
+        concentration_output = input$pk_exposure_output,
+        selected_mapping = pk_exposure_selected_mapping(),
+        required_params = input$pk_exposure_params %||% character()
+      )
+    })
+
+    pk_exposure_cache <- reactiveVal(NULL)
+
+    output$pk_exposure_status <- renderUI({
+      if (is.null(mrgsolve_state)) {
+        return(status_panel(
+          "PK exposure unavailable",
+          tags$p("No shared mrgsolve model state is registered for this session."),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
+        ))
+      }
+
+      compiled <- tryCatch(
+        isTRUE(mrgsolve_state$is_compiled()),
+        error = function(e) FALSE
+      )
+      if (!compiled) {
+        err <- tryCatch(mrgsolve_state$compile_error(), error = function(e) NULL)
+        return(status_panel(
+          "PK exposure requires a compiled mrgsolve model",
+          tagList(
+            tags$p("Compile the shared mrgsolve model from the Sampling Times tab before running exposure diagnostics."),
+            if (!is.null(err) && nzchar(err)) {
+              tags$p(tags$strong("Last error: "), err)
+            }
+          ),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
+        ))
+      }
+
+      meta <- pk_exposure_model_meta()
+      if (is.null(meta)) {
+        return(NULL)
+      }
+      patab <- pk_exposure_patab()
+      if (is.null(patab)) {
+        return(status_panel(
+          "PK exposure requires individual PK tables",
+          tags$p("Upload a PsN output archive with pk_individuals/patab tables in SSE Upload before configuring exposure diagnostics."),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
+        ))
+      }
+
+      status_panel(
+        "mrgsolve model ready for PK exposure setup",
+        tagList(
+          tags$p(sprintf(
+            "Compiled model detected: %d parameters, %d outputs, %d compartments.",
+            length(meta$param_names), length(meta$capture_names), length(meta$cmt_names)
+          )),
+          tags$p(sprintf(
+            "Individual PK archive detected: %d rows, %d samples, %d IDs.",
+            nrow(patab),
+            if ("sample" %in% names(patab)) length(unique(stats::na.omit(patab$sample))) else 0L,
+            if ("ID" %in% names(patab)) length(unique(stats::na.omit(patab$ID))) else 0L
+          ))
+        ),
+        tone = "success",
+        icon_name = "check-circle"
+      )
+    })
+
+    output$pk_exposure_controls <- renderUI({
+      meta <- pk_exposure_model_meta()
+      patab <- pk_exposure_patab()
+      if (is.null(meta) || is.null(patab)) return(NULL)
+
+      auto_mapping <- pk_exposure_auto_mapping()
+      mapped_params <- auto_mapping$model_param[auto_mapping$status == "mapped"]
+      selected_params <- isolate(input$pk_exposure_params) %||% mapped_params
+      selected_params <- selected_params[selected_params %in% meta$param_names]
+
+      selected_output <- isolate(input$pk_exposure_output)
+      if (is.null(selected_output) || !selected_output %in% meta$capture_names) {
+        selected_output <- build_sse_mrgsolve_exposure_preflight(
+          individual_pk_data = patab,
+          model_param_names = meta$param_names,
+          capture_names = meta$capture_names
+        )$concentration_output
+      }
+
+      tagList(
+        fluidRow(
+          column(
+            4,
+            selectInput(
+              session$ns("pk_exposure_output"),
+              "Concentration output",
+              choices = meta$capture_names,
+              selected = selected_output
+            )
+          ),
+          column(
+            8,
+            selectizeInput(
+              session$ns("pk_exposure_params"),
+              "Individual model inputs to map",
+              choices = meta$param_names,
+              selected = selected_params,
+              multiple = TRUE,
+              options = list(plugins = list("remove_button"))
+            )
+          )
+        )
+      )
+    })
+
+    output$pk_exposure_mapping_controls <- renderUI({
+      meta <- pk_exposure_model_meta()
+      patab <- pk_exposure_patab()
+      if (is.null(meta) || is.null(patab)) return(NULL)
+
+      params <- input$pk_exposure_params %||% character()
+      if (length(params) == 0L) {
+        return(status_panel(
+          "No individual model inputs selected",
+          tags$p("Select the mrgsolve parameters that should receive individual values from the PsN tables."),
+          tone = "neutral",
+          icon_name = "circle-info"
+        ))
+      }
+
+      candidate_columns <- sse_mrgsolve_candidate_columns(patab)
+      auto_mapping <- pk_exposure_auto_mapping()
+
+      tags$div(
+        style = "margin-top: 12px;",
+        tags$p(
+          style = "font-weight: 600; margin-bottom: 8px;",
+          "patab to mrgsolve mapping"
+        ),
+        fluidRow(lapply(seq_along(params), function(i) {
+          param <- params[[i]]
+          auto_col <- auto_mapping$patab_column[match(param, auto_mapping$model_param)]
+          selected <- input[[paste0("pk_map_", i)]] %||% auto_col
+          if (is.na(selected) || !selected %in% candidate_columns) selected <- ""
+          column(
+            4,
+            selectInput(
+              session$ns(paste0("pk_map_", i)),
+              param,
+              choices = c("Unmapped" = "", candidate_columns),
+              selected = selected
+            )
+          )
+        }))
+      )
+    })
+
+    output$pk_exposure_mapping_table <- renderDT({
+      preflight <- pk_exposure_preflight()
+      req(preflight)
+
+      mapping <- preflight$mapping
+      selected <- input$pk_exposure_params %||% character()
+      mapping$required <- mapping$model_param %in% selected
+      mapping <- mapping[mapping$required | mapping$status == "mapped", , drop = FALSE]
+      if (nrow(mapping) == 0L) {
+        mapping <- preflight$mapping
+      }
+
+      datatable(
+        mapping,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 15, dom = "t", scrollX = TRUE)
+      )
+    })
+
+    output$pk_exposure_preflight_summary <- renderUI({
+      preflight <- pk_exposure_preflight()
+      if (is.null(preflight)) return(NULL)
+
+      if (identical(preflight$status, "ready")) {
+        return(status_panel(
+          "PK exposure preflight ready",
+          tags$p(sprintf(
+            "%d required inputs mapped. Concentration output: %s.",
+            preflight$n_mapped_required,
+            preflight$concentration_output
+          )),
+          tone = "success",
+          icon_name = "check-circle"
+        ))
+      }
+
+      if (identical(preflight$status, "needs_mapping")) {
+        return(status_panel(
+          "PK exposure mapping incomplete",
+          tags$p(paste(
+            "Missing required inputs:",
+            paste(preflight$missing_required_params, collapse = ", ")
+          )),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
+        ))
+      }
+
+      if (identical(preflight$status, "needs_output")) {
+        return(status_panel(
+          "PK exposure output not selected",
+          tags$p("Select a valid mrgsolve output column to use as concentration."),
+          tone = "warning",
+          icon_name = "exclamation-triangle"
+        ))
+      }
+
+      status_panel(
+        "PK exposure preflight unavailable",
+        tags$p("Compile a model and upload individual PK tables before configuring exposure diagnostics."),
+        tone = "warning",
+        icon_name = "exclamation-triangle"
+      )
+    })
+
+    pk_exposure_sanity <- eventReactive(input$pk_exposure_run_sanity, {
+      if (is.null(mrgsolve_state)) {
+        return(list(status = "model_unavailable", message = "No shared mrgsolve model state is registered."))
+      }
+
+      run_sse_mrgsolve_sanity_check(
+        mod = tryCatch(mrgsolve_state$model(), error = function(e) NULL),
+        individual_pk_data = pk_exposure_patab(),
+        preflight = pk_exposure_preflight(),
+        dosing_events = tryCatch(mrgsolve_state$dose_events(), error = function(e) NULL),
+        kind = "estimation",
+        max_ids = 3L,
+        delta = 1
+      )
+    }, ignoreInit = TRUE)
+
+    output$pk_exposure_sanity_check <- renderUI({
+      preflight <- pk_exposure_preflight()
+      if (is.null(preflight) || !identical(preflight$status, "ready")) {
+        return(NULL)
+      }
+
+      result <- tryCatch(pk_exposure_sanity(), error = function(e) NULL)
+      tone <- "neutral"
+      title <- "mrgsolve sanity check"
+      body <- tags$p("Run a small simulation on the first sample and up to three IDs before computing full SSE exposures.")
+
+      if (!is.null(result)) {
+        if (identical(result$status, "ok")) {
+          tone <- "success"
+          title <- "mrgsolve sanity check passed"
+          body <- tags$p(sprintf(
+            "%d rows simulated for %d IDs. %s range: %.4g to %.4g.",
+            result$n_rows,
+            result$n_ids,
+            result$output,
+            result$value_range[[1]],
+            result$value_range[[2]]
+          ))
+        } else {
+          tone <- "warning"
+          title <- "mrgsolve sanity check needs attention"
+          body <- tags$p(result$message %||% result$status)
+        }
+      }
+
+      status_panel(
+        title,
+        tagList(
+          body,
+          actionButton(
+            session$ns("pk_exposure_run_sanity"),
+            "Run sanity check",
+            class = "btn-sm btn-primary"
+          )
+        ),
+        tone = tone,
+        icon_name = if (identical(tone, "success")) "check-circle" else "circle-info"
+      )
+    })
+
+    output$pk_exposure_sanity_table <- renderDT({
+      result <- pk_exposure_sanity()
+      req(result, identical(result$status, "ok"), result$preview)
+
+      datatable(
+        result$preview,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 10, dom = "t", scrollX = TRUE)
+      )
+    })
+
+    .pk_exposure_positive_limit <- function(x) {
+      if (is.null(x) || is.na(x) || x <= 0) return(NULL)
+      as.integer(x)
+    }
+
+    .pk_exposure_trough_times <- function(x) {
+      if (is.null(x) || is.na(x) || !is.finite(x)) return(numeric(0L))
+      as.numeric(x)
+    }
+
+    pk_exposure_compute_key <- reactive({
+      preflight <- pk_exposure_preflight()
+      events <- tryCatch(mrgsolve_state$dose_events(), error = function(e) NULL)
+      dat <- pk_exposure_patab()
+      model_hash <- tryCatch(mrgsolve_state$model_hash(), error = function(e) NA_character_)
+
+      mrgsolve_code_hash(paste(
+        c(
+          model_hash,
+          preflight$concentration_output,
+          paste(preflight$required_params, collapse = "|"),
+          paste(preflight$mapping$model_param, preflight$mapping$patab_column, collapse = "|"),
+          nrow(dat %||% data.frame()),
+          nrow(events %||% data.frame()),
+          input$pk_exposure_max_samples %||% "",
+          input$pk_exposure_max_ids %||% "",
+          input$pk_exposure_delta %||% "",
+          input$pk_exposure_trough_time %||% ""
+        ),
+        collapse = "\n"
+      ))
+    })
+
+    output$pk_exposure_compute_controls <- renderUI({
+      preflight <- pk_exposure_preflight()
+      sanity <- tryCatch(pk_exposure_sanity(), error = function(e) NULL)
+      if (is.null(preflight) || !identical(preflight$status, "ready")) {
+        return(NULL)
+      }
+      if (is.null(sanity) || !identical(sanity$status, "ok")) {
+        return(status_panel(
+          "Run sanity check before full exposure computation",
+          tags$p("The full SSE exposure computation is available after the mini-simulation passes."),
+          tone = "neutral",
+          icon_name = "circle-info"
+        ))
+      }
+
+      tagList(
+        tags$hr(),
+        fluidRow(
+          column(
+            3,
+            numericInput(
+              session$ns("pk_exposure_max_samples"),
+              "Max samples",
+              value = 20,
+              min = 0,
+              step = 1
+            )
+          ),
+          column(
+            3,
+            numericInput(
+              session$ns("pk_exposure_max_ids"),
+              "Max IDs",
+              value = 0,
+              min = 0,
+              step = 1
+            )
+          ),
+          column(
+            3,
+            numericInput(
+              session$ns("pk_exposure_delta"),
+              "Time step",
+              value = 1,
+              min = 0.001,
+              step = 0.5
+            )
+          ),
+          column(
+            3,
+            numericInput(
+              session$ns("pk_exposure_trough_time"),
+              "Ctrough time",
+              value = NA,
+              min = 0,
+              step = 1
+            )
+          )
+        ),
+        tags$div(
+          style = "display:flex; gap:8px; align-items:center; margin: 8px 0 12px;",
+          actionButton(
+            session$ns("pk_exposure_compute"),
+            "Compute exposures",
+            class = "btn-sm btn-primary"
+          ),
+          downloadButton(
+            session$ns("export_pk_exposure_csv"),
+            "Export CSV",
+            class = "btn-sm btn-default"
+          )
+        ),
+        uiOutput(session$ns("pk_exposure_compute_status"))
+      )
+    })
+
+    observeEvent(input$pk_exposure_compute, {
+      key <- pk_exposure_compute_key()
+      cached <- pk_exposure_cache()
+      if (!is.null(cached) && identical(cached$key, key)) {
+        return()
+      }
+
+      withProgress(message = "Computing PK exposures", value = 0, {
+        incProgress(0.2, detail = "Preparing individual simulations")
+        result <- compute_sse_mrgsolve_exposure_recovery(
+          mod = tryCatch(mrgsolve_state$model(), error = function(e) NULL),
+          individual_pk_data = pk_exposure_patab(),
+          preflight = pk_exposure_preflight(),
+          dosing_events = tryCatch(mrgsolve_state$dose_events(), error = function(e) NULL),
+          max_samples = .pk_exposure_positive_limit(input$pk_exposure_max_samples),
+          max_ids = .pk_exposure_positive_limit(input$pk_exposure_max_ids),
+          delta = input$pk_exposure_delta %||% 1,
+          trough_times = .pk_exposure_trough_times(input$pk_exposure_trough_time)
+        )
+        incProgress(0.9, detail = "Caching exposure table")
+        pk_exposure_cache(list(
+          key = key,
+          result = result,
+          created = Sys.time()
+        ))
+      })
+    }, ignoreInit = TRUE)
+
+    output$pk_exposure_compute_status <- renderUI({
+      cache <- pk_exposure_cache()
+      if (is.null(cache)) {
+        return(NULL)
+      }
+      status_panel(
+        "PK exposure table ready",
+        tags$p(sprintf(
+          "%d rows computed at %s.",
+          nrow(cache$result),
+          format(cache$created, "%H:%M:%S")
+        )),
+        tone = "success",
+        icon_name = "check-circle"
+      )
+    })
+
+    output$pk_exposure_results_table <- renderDT({
+      cache <- pk_exposure_cache()
+      req(cache, cache$result)
+
+      datatable(
+        cache$result,
+        rownames = FALSE,
+        class = "stripe hover compact",
+        options = list(pageLength = 20, dom = "tip", scrollX = TRUE)
+      )
+    })
+
+    output$export_pk_exposure_csv <- downloadHandler(
+      filename = function() {
+        paste0("sse_pk_exposure_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        cache <- pk_exposure_cache()
+        req(cache, cache$result)
+        write.csv(cache$result, file, row.names = FALSE)
+      }
     )
 
     # --- Shrinkage: long-format data per replicate ---
