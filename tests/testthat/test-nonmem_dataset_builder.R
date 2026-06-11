@@ -216,3 +216,55 @@ test_that("dataset builder Shiny module contract is present", {
   expect_true(grepl("write_nonmem_csv", module_text, fixed = TRUE))
   expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
 })
+
+test_that("dataset builder Shiny module tracks generation state", {
+  module_path <- file.path(PROJECT_ROOT, "app", "R", "mod_dataset_builder.R")
+  module_source <- readLines(module_path, warn = FALSE)
+  module_text <- paste(module_source, collapse = "\n")
+
+  expect_false(grepl("circle-info", module_text, fixed = TRUE))
+
+  suppressWarnings(library(shiny))
+  suppressWarnings(library(DT))
+  source(file.path(PROJECT_ROOT, "app", "R", "helpers_ui.R"))
+  source(module_path)
+
+  shiny::testServer(mod_dataset_builder_server, {
+    expect_null(dataset())
+    expect_null(current_dataset())
+    expect_false(can_download())
+    expect_false(is_current())
+
+    session$setInputs(
+      n_prototypes = 2,
+      dose = 100,
+      dose_unit = "mg",
+      dose_interval = 24,
+      n_administrations = 2,
+      dose_cmt = 1,
+      observation_cmt = 2,
+      rate = 0,
+      sampling_times = "1, 2"
+    )
+    session$setInputs(generate_preview = 1)
+
+    dat <- current_dataset()
+    expect_equal(names(dat), NONMEM_ELEMENTARY_COLUMNS)
+    expect_equal(nrow(dat), 8)
+    expect_true(is_current())
+    expect_true(can_download())
+    expect_null(build_error())
+
+    session$setInputs(dose = 200)
+    expect_false(is_current())
+    expect_null(current_dataset())
+    expect_false(can_download())
+
+    session$setInputs(dose = 100, sampling_times = "1, abc", generate_preview = 2)
+    expect_null(dataset())
+    expect_null(generated_signature())
+    expect_null(current_dataset())
+    expect_false(can_download())
+    expect_match(build_error(), "Invalid sampling time")
+  })
+})

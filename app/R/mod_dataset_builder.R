@@ -127,6 +127,43 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
     defaults <- dataset_builder_defaults()
     dataset <- reactiveVal(NULL)
     build_error <- reactiveVal(NULL)
+    generated_signature <- reactiveVal(NULL)
+
+    input_signature <- reactive({
+      list(
+        n_prototypes = input$n_prototypes,
+        dose = input$dose,
+        dose_unit = input$dose_unit,
+        dose_interval = input$dose_interval,
+        n_administrations = input$n_administrations,
+        dose_cmt = input$dose_cmt,
+        observation_cmt = input$observation_cmt,
+        rate = input$rate,
+        sampling_times = input$sampling_times
+      )
+    })
+
+    is_current <- reactive({
+      !is.null(dataset()) &&
+        !is.null(generated_signature()) &&
+        identical(generated_signature(), input_signature())
+    })
+
+    current_dataset <- reactive({
+      if (isTRUE(is_current())) {
+        dataset()
+      } else {
+        NULL
+      }
+    })
+
+    can_download <- reactive({
+      dat <- current_dataset()
+      if (is.null(dat)) {
+        return(FALSE)
+      }
+      isTRUE(validate_nonmem_dataset(dat)$valid)
+    })
 
     reset_inputs <- function() {
       updateNumericInput(session, "n_prototypes", value = defaults$n_prototypes)
@@ -149,6 +186,7 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
       )
       dataset(NULL)
       build_error(NULL)
+      generated_signature(NULL)
     }
 
     if (!is.null(reset_trigger)) {
@@ -173,17 +211,19 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
       }, error = function(e) {
         build_error(conditionMessage(e))
         dataset(NULL)
+        generated_signature(NULL)
         NULL
       })
 
       if (!is.null(built)) {
         dataset(built)
+        generated_signature(input_signature())
         build_error(NULL)
       }
     }, ignoreInit = TRUE)
 
     validation <- reactive({
-      dat <- dataset()
+      dat <- current_dataset()
       if (is.null(dat)) {
         return(NULL)
       }
@@ -203,11 +243,19 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
 
       val <- validation()
       if (is.null(val)) {
+        if (!is.null(dataset()) && !isTRUE(is_current())) {
+          return(status_panel(
+            "Preview needs regeneration",
+            tags$p("Inputs changed after the last preview. Generate again before previewing or downloading."),
+            tone = "warning",
+            icon_name = "exclamation-triangle"
+          ))
+        }
         return(status_panel(
           "No dataset generated",
           tags$p("Set the elementary design inputs and generate a preview."),
           tone = "info",
-          icon_name = "circle-info"
+          icon_name = "info-circle"
         ))
       }
 
@@ -229,8 +277,16 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
     })
 
     output$dataset_summary <- renderUI({
-      dat <- dataset()
+      dat <- current_dataset()
       if (is.null(dat)) {
+        if (!is.null(dataset()) && !isTRUE(is_current())) {
+          return(status_panel(
+            "Summary needs regeneration",
+            tags$p("Inputs changed after the last preview."),
+            tone = "warning",
+            icon_name = "exclamation-triangle"
+          ))
+        }
         return(status_panel(
           "Summary unavailable",
           tags$p("Generate a preview to inspect row counts."),
@@ -250,7 +306,7 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
     })
 
     output$dataset_preview <- renderDT({
-      dat <- dataset()
+      dat <- current_dataset()
       req(dat)
       val <- validate_nonmem_dataset(dat)
       req(isTRUE(val$valid))
@@ -268,7 +324,8 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
         paste0("nonmem_elementary_dataset_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
       },
       content = function(file) {
-        dat <- dataset()
+        req(can_download())
+        dat <- current_dataset()
         req(dat)
         write_nonmem_csv(dat, file)
       }
