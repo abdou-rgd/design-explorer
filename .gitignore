@@ -1,14 +1,17 @@
 # Documentation / notes non vitales pour l'app
 *.md
+!/README.md
+!/CHANGELOG.md
 /docs/
-audits/
-logs/
-.vscode/
+/audits/
+/logs/
+/.claude/
+/.github/
+/.vscode/
 
-# Markdown — AI/dev only
+# Markdown - AI/dev only
 CLAUDE.md
 GEMINI.md
-.claude/rules/*.md
 
 # R
 .Rhistory
@@ -18,8 +21,6 @@ GEMINI.md
 
 # Fichiers temporaires Claude/superpowers
 .superpowers/
-.claude/*
-!.claude/rules/
 
 # Données sensibles (jamais committer)
 *.csv
@@ -55,12 +56,28 @@ GEMINI.md
 *.ctl
 
 # Exception : exemples intégrés dans l'app Shiny (Bauer 2021)
-!app/examples/**/*.ext
-!app/examples/**/*.shk
-!app/examples/**/*.coi
 !app/examples/**/*.clt
+!app/examples/**/*.coi
+!app/examples/**/*.cor
+!app/examples/**/*.cov
+!app/examples/**/*.cpu
+!app/examples/**/*.csv
+!app/examples/**/*.ctl
+!app/examples/**/*.ext
+!app/examples/**/*.phi
+!app/examples/**/*.prm
+!app/examples/**/*.res
+!app/examples/**/*.shk
+!app/examples/**/*.shm
+!app/examples/**/*.sum
 !app/examples/**/*.tab
-!app/www/styles.css
+!app/www/**
+
+# Outputs locaux / artefacts de calcul
+/outputs/
+/sse_dir*/
+*.zip
+*.rds
 
 # Dossiers lourds / non essentiels
 autoresearch/

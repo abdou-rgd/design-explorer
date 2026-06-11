@@ -2,6 +2,19 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## [En cours] — 2026-06-04 — Audit repo + nettoyage GitHub
+
+### Audit branches / git
+- [audit] `main` est alignée avec `origin/main` au commit `e2212c7` (`Add mrgsolve-backed SSE exposure diagnostics`).
+- [audit] Branche locale restante `codex/post-processing-roadmap` au commit `ae02e78`; elle est en retard sur `main` et retirerait les diagnostics SSE/mrgsolve récents si elle était mergée sans rebase.
+
+### Nettoyage repository
+- [chore] Suppression du suivi Git des fichiers non applicatifs: notes Claude, template PR, config VSCode, rapports `audits/`, script exploratoire et documents racine hors changelog.
+- [chore] `.gitignore` durci pour exclure `outputs/`, archives/extractions SSE, logs, dossiers docs/audit/config locale et artefacts binaires.
+- [chore] Exceptions `.gitignore` explicites pour les exemples intégrés à l'app Shiny (`app/examples/**`) et les assets web de l'app (`app/www/**`).
+
+---
+
 ## [En cours] — Times-tab redesign (V5.8)
 
 ### Architecture (`R/tab_dispatch.R`, `R/pk_templates.R`, `app/R/mod_times.R`)
