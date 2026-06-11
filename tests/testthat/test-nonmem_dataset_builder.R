@@ -80,6 +80,37 @@ test_that("build_nonmem_elementary_dataset creates strict evaluation columns", {
   expect_true(all(obs_rows$CMT == 2))
 })
 
+test_that("build_nonmem_elementary_dataset rejects fractional row counts and negative times", {
+  expect_error(
+    build_nonmem_elementary_dataset(
+      n_prototypes = 1.9,
+      dose = 100,
+      dose_interval = 24,
+      n_administrations = 1,
+      observation_times = c(1)
+    ),
+    "n_prototypes"
+  )
+  expect_error(
+    build_nonmem_elementary_dataset(
+      dose = 100,
+      dose_interval = 24,
+      n_administrations = 2.9,
+      observation_times = c(1)
+    ),
+    "n_administrations"
+  )
+  expect_error(
+    build_nonmem_elementary_dataset(
+      dose = 100,
+      dose_interval = 24,
+      n_administrations = 1,
+      observation_times = c(-1, 1)
+    ),
+    "observation_times"
+  )
+})
+
 test_that("rows sort by ID, TIME, then dose before observation at the same time", {
   dat <- build_nonmem_elementary_dataset(
     n_prototypes = 1,

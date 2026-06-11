@@ -38,6 +38,13 @@ validate_compartment <- function(x, name) {
   as.integer(x)
 }
 
+validate_positive_integer <- function(x, name) {
+  if (length(x) != 1L || !is_integerish(x) || x < 1) {
+    stop(name, " must be a positive integer.", call. = FALSE)
+  }
+  as.integer(x)
+}
+
 build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
                                             dose,
                                             dose_interval,
@@ -47,15 +54,11 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
                                             observation_cmt = 1L,
                                             rate = 0,
                                             arm_values = NULL) {
-  n_prototypes <- as.integer(n_prototypes)
-  n_administrations <- as.integer(n_administrations)
-
-  if (is.na(n_prototypes) || n_prototypes < 1L) {
-    stop("n_prototypes must be at least 1.", call. = FALSE)
-  }
-  if (is.na(n_administrations) || n_administrations < 1L) {
-    stop("n_administrations must be at least 1.", call. = FALSE)
-  }
+  n_prototypes <- validate_positive_integer(n_prototypes, "n_prototypes")
+  n_administrations <- validate_positive_integer(
+    n_administrations,
+    "n_administrations"
+  )
   if (!is.numeric(dose) || length(dose) != 1L || !is.finite(dose) || dose <= 0) {
     stop("dose must be a positive number.", call. = FALSE)
   }
@@ -69,6 +72,9 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
       "observation_times must contain at least one finite time.",
       call. = FALSE
     )
+  }
+  if (any(observation_times < 0)) {
+    stop("observation_times must contain only non-negative times.", call. = FALSE)
   }
   if (!is.numeric(rate) || length(rate) != 1L || !is.finite(rate) || rate < 0) {
     stop("rate must be a non-negative number.", call. = FALSE)
