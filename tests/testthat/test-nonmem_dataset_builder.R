@@ -198,3 +198,21 @@ test_that("write_nonmem_csv writes comma CSV with dot missing values", {
   expect_equal(names(roundtrip), names(dat))
   expect_true(is.na(roundtrip$RATE[1]))
 })
+
+test_that("dataset builder Shiny module contract is present", {
+  module_path <- file.path(PROJECT_ROOT, "app", "R", "mod_dataset_builder.R")
+
+  expect_true(file.exists(module_path))
+  if (!file.exists(module_path)) {
+    return(invisible())
+  }
+
+  module_source <- readLines(module_path, warn = FALSE)
+  module_text <- paste(module_source, collapse = "\n")
+
+  expect_true(grepl("mod_dataset_builder_ui <- function(id)", module_text, fixed = TRUE))
+  expect_true(grepl("mod_dataset_builder_server <- function(id, reset_trigger = NULL)", module_text, fixed = TRUE))
+  expect_true(grepl("downloadHandler", module_text, fixed = TRUE))
+  expect_true(grepl("write_nonmem_csv", module_text, fixed = TRUE))
+  expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
+})
