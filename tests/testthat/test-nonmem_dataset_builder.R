@@ -1,18 +1,30 @@
 project_root <- Sys.getenv("DESIGN_EXPLORER_ROOT", unset = NA_character_)
 if (is.na(project_root) || !nzchar(project_root)) {
+  find_project_root <- function(start) {
+    if (is.null(start) || is.na(start) || !nzchar(start)) {
+      return(NA_character_)
+    }
+    d <- if (dir.exists(start)) start else dirname(start)
+    for (i in seq_len(6)) {
+      if (file.exists(file.path(d, "DESCRIPTION"))) {
+        return(d)
+      }
+      parent <- dirname(d)
+      if (identical(parent, d)) {
+        break
+      }
+      d <- parent
+    }
+    NA_character_
+  }
+
   this_file <- tryCatch(
     normalizePath(sys.frame(0)$ofile),
     error = function(e) NULL
   )
-  if (!is.null(this_file)) {
-    d <- dirname(this_file)
-    for (i in seq_len(6)) {
-      if (file.exists(file.path(d, "CLAUDE.md"))) {
-        project_root <- d
-        break
-      }
-      d <- dirname(d)
-    }
+  project_root <- find_project_root(this_file)
+  if (is.na(project_root) || !nzchar(project_root)) {
+    project_root <- find_project_root(getwd())
   }
   if (is.na(project_root) || !nzchar(project_root)) {
     project_root <- getwd()
@@ -113,6 +125,49 @@ test_that("validate_nonmem_dataset reports schema and row problems", {
   bad_obs_validation <- validate_nonmem_dataset(bad_obs)
   expect_false(bad_obs_validation$valid)
   expect_true(any(grepl("Observation rows", bad_obs_validation$errors)))
+
+  bad_evid <- valid
+  bad_evid$EVID[which(bad_evid$EVID == 0)[1]] <- 2
+  bad_evid_validation <- validate_nonmem_dataset(bad_evid)
+  expect_false(bad_evid_validation$valid)
+  expect_true(any(grepl("EVID", bad_evid_validation$errors)))
+
+  bad_time <- valid
+  bad_time$TIME[1] <- NA_real_
+  bad_time_validation <- validate_nonmem_dataset(bad_time)
+  expect_false(bad_time_validation$valid)
+  expect_true(any(grepl("TIME", bad_time_validation$errors)))
+
+  bad_cmt <- valid
+  bad_cmt$CMT[which(bad_cmt$EVID == 0)[1]] <- 0
+  bad_cmt_validation <- validate_nonmem_dataset(bad_cmt)
+  expect_false(bad_cmt_validation$valid)
+  expect_true(any(grepl("CMT", bad_cmt_validation$errors)))
+})
+
+test_that("build_nonmem_elementary_dataset rejects invalid compartments", {
+  expect_error(
+    build_nonmem_elementary_dataset(
+      dose = 100,
+      dose_interval = 24,
+      n_administrations = 1,
+      observation_times = c(1),
+      dose_cmt = 0,
+      observation_cmt = 1
+    ),
+    "dose_cmt"
+  )
+  expect_error(
+    build_nonmem_elementary_dataset(
+      dose = 100,
+      dose_interval = 24,
+      n_administrations = 1,
+      observation_times = c(1),
+      dose_cmt = 1,
+      observation_cmt = 1.5
+    ),
+    "observation_cmt"
+  )
 })
 
 test_that("write_nonmem_csv writes comma CSV with dot missing values", {
@@ -127,6 +182,7 @@ test_that("write_nonmem_csv writes comma CSV with dot missing values", {
   dat$RATE[1] <- NA_real_
 
   tmp <- tempfile(fileext = ".csv")
+  on.exit(unlink(tmp), add = TRUE)
   write_nonmem_csv(dat, tmp)
   raw <- readLines(tmp, warn = FALSE)
 

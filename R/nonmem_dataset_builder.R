@@ -27,6 +27,17 @@ parse_sampling_times <- function(text) {
   sort(unique(times))
 }
 
+is_integerish <- function(x) {
+  is.numeric(x) && all(is.finite(x)) && all(x == floor(x))
+}
+
+validate_compartment <- function(x, name) {
+  if (length(x) != 1L || !is_integerish(x) || x < 1) {
+    stop(name, " must be a positive integer.", call. = FALSE)
+  }
+  as.integer(x)
+}
+
 build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
                                             dose,
                                             dose_interval,
@@ -62,6 +73,8 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
   if (!is.numeric(rate) || length(rate) != 1L || !is.finite(rate) || rate < 0) {
     stop("rate must be a non-negative number.", call. = FALSE)
   }
+  dose_cmt <- validate_compartment(dose_cmt, "dose_cmt")
+  observation_cmt <- validate_compartment(observation_cmt, "observation_cmt")
 
   if (is.null(arm_values)) {
     arm_values <- seq_len(n_prototypes)
@@ -84,7 +97,7 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
       DV = 0,
       MDV = 1,
       EVID = 1,
-      CMT = as.integer(dose_cmt),
+      CMT = dose_cmt,
       ARM = arm_values[id]
     )
     observation_rows <- tibble::tibble(
@@ -96,7 +109,7 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
       DV = 1,
       MDV = 0,
       EVID = 0,
-      CMT = as.integer(observation_cmt),
+      CMT = observation_cmt,
       ARM = arm_values[id]
     )
     rows[[id]] <- dplyr::bind_rows(dose_rows, observation_rows)
@@ -137,6 +150,42 @@ validate_nonmem_dataset <- function(dat) {
   }
 
   if (all(NONMEM_ELEMENTARY_COLUMNS %in% names(dat))) {
+    numeric_cols <- NONMEM_ELEMENTARY_COLUMNS
+    numeric_ok <- vapply(numeric_cols, function(col) {
+      values <- dat[[col]]
+      ok <- is.numeric(values) && all(is.finite(values))
+      if (!ok) {
+        errors <<- c(errors, paste("Column", col, "must be numeric and finite."))
+      }
+      ok
+    }, logical(1))
+
+    if (isTRUE(numeric_ok[["ID"]]) && any(dat$ID <= 0)) {
+      errors <- c(errors, "Column ID must contain positive values.")
+    }
+    if (isTRUE(numeric_ok[["TIME"]]) && any(dat$TIME < 0)) {
+      errors <- c(errors, "Column TIME must contain non-negative values.")
+    }
+    if (isTRUE(numeric_ok[["DOSE"]]) && any(dat$DOSE <= 0)) {
+      errors <- c(errors, "Column DOSE must contain positive values.")
+    }
+    if (isTRUE(numeric_ok[["AMT"]]) && any(dat$AMT < 0)) {
+      errors <- c(errors, "Column AMT must contain non-negative values.")
+    }
+    if (isTRUE(numeric_ok[["RATE"]]) && any(dat$RATE < 0)) {
+      errors <- c(errors, "Column RATE must contain non-negative values.")
+    }
+    if (isTRUE(numeric_ok[["MDV"]]) && any(!dat$MDV %in% c(0, 1))) {
+      errors <- c(errors, "Column MDV must contain only 0 or 1.")
+    }
+    if (isTRUE(numeric_ok[["EVID"]]) && any(!dat$EVID %in% c(0, 1))) {
+      errors <- c(errors, "Column EVID must contain only 0 or 1.")
+    }
+    if (isTRUE(numeric_ok[["CMT"]]) &&
+        any(dat$CMT < 1 | dat$CMT != floor(dat$CMT))) {
+      errors <- c(errors, "Column CMT must contain positive integers.")
+    }
+
     dose_rows <- dat[dat$EVID == 1, , drop = FALSE]
     observation_rows <- dat[dat$EVID == 0, , drop = FALSE]
 
