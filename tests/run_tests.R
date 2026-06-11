@@ -30,6 +30,7 @@ run_testthat_file <- function(rel_path) {
   invisible(res)
 }
 
+run_testthat_file(file.path("tests", "testthat", "test-nonmem_dataset_builder.R"))
 run_testthat_file(file.path("tests", "testthat", "test-parse_design_outputs.R"))
 run_testthat_file(file.path("tests", "testthat", "test-fim_metrics.R"))
 run_testthat_file(file.path("tests", "testthat", "test-sse_metrics.R"))

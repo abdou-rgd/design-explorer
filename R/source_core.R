@@ -5,6 +5,7 @@
 source_core <- function(root = ".", local = parent.frame()) {
   core_files <- c(
     "design_utils.R",
+    "nonmem_dataset_builder.R",
     "design_io.R",
     "design_metrics.R",
     "design_summary.R",
