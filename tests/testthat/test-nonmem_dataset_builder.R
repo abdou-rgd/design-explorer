@@ -217,6 +217,29 @@ test_that("dataset builder Shiny module contract is present", {
   expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
 })
 
+test_that("dataset builder is wired into the Shiny app", {
+  app_path <- file.path(PROJECT_ROOT, "app", "app.R")
+
+  expect_true(file.exists(app_path))
+  app_text <- paste(readLines(app_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl(
+    "tabPanel(\"Dataset Builder\", value = \"dataset_builder\"",
+    app_text,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "mod_dataset_builder_ui(\"dataset_builder\")",
+    app_text,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "mod_dataset_builder_server(\"dataset_builder\", reset_trigger = reset_trigger)",
+    app_text,
+    fixed = TRUE
+  ))
+})
+
 test_that("dataset builder Shiny module tracks generation state", {
   module_path <- file.path(PROJECT_ROOT, "app", "R", "mod_dataset_builder.R")
   module_source <- readLines(module_path, warn = FALSE)

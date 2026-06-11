@@ -154,7 +154,8 @@ ui <- navbarPage(
   navbarMenu("Design",
     tabPanel("FIM Diagnostics", value = "fim",   mod_fim_ui("fim")),
     tabPanel("Sampling Times",  value = "times", mod_times_ui("times")),
-    tabPanel("Robust Design",   value = "prior", mod_prior_ui("prior"))
+    tabPanel("Robust Design",   value = "prior", mod_prior_ui("prior")),
+    tabPanel("Dataset Builder", value = "dataset_builder", mod_dataset_builder_ui("dataset_builder"))
   ),
 
   # -- Decision (dropdown) ---------------------------------------------------
@@ -489,6 +490,8 @@ server <- function(input, output, session) {
   mod_prior_server("prior",
     summary_data = merged_summary, ctl_data = merged_ctl,
     all_runs = all_runs)
+
+  mod_dataset_builder_server("dataset_builder", reset_trigger = reset_trigger)
 
   mod_convergence_server("conv",
     ext_data = merged_ext, all_runs = all_runs,
