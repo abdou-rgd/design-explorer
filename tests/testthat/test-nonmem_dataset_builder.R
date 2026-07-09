@@ -47,6 +47,84 @@ test_that("parse_schedule_times accepts common protocol schedule separators", {
   )
 })
 
+test_that("parse_dose_events accepts per-event amount, rate, and compartment overrides", {
+  events <- parse_dose_events(
+    "0:1800:1800:2; 672:1200:1200:2; 1344:1200",
+    default_rate = 0,
+    default_cmt = 3
+  )
+
+  expect_equal(names(events), c("TIME", "AMT", "RATE", "CMT"))
+  expect_equal(events$TIME, c(0, 672, 1344))
+  expect_equal(events$AMT, c(1800, 1200, 1200))
+  expect_equal(events$RATE, c(1800, 1200, 0))
+  expect_equal(events$CMT, c(2L, 2L, 3L))
+  expect_error(parse_dose_events("0:1800;bad", default_rate = 0, default_cmt = 1), "Invalid dose event")
+})
+
+test_that("schedule table builder reproduces psm_eval-style per-design schedules", {
+  schedule <- paste(
+    "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT,RATE",
+    "1,0,\"0:1800:1800:2;672:1200:1200:2;1344:1200:1200:2;2016:1200:1200:2;2688:1200:1200:2;3360:1200:1200:2;4032:1200:1200:2\",\"1,671.9,2015.9,3359.9,3361,3528,3696,4031.9,4033\",2,2,0",
+    "2,1,\"0:1800:1800:1;336:1800:1800:1;672:1800:1800:1;1344:1800:1800:1;2016:1800:1800:1;2688:1800:1800:1;3360:1800:1800:1;4032:1800:1800:1\",\"335.9,671.9,2015.9,3359.9,3528,3696,3864,4031.9\",1,2,0",
+    sep = "\n"
+  )
+
+  dat <- build_nonmem_dataset_from_schedule_table(schedule)
+
+  expect_equal(names(dat), c(NONMEM_ELEMENTARY_COLUMNS, "DESIGN", "ARM"))
+  expect_equal(nrow(dat), 32)
+  expect_equal(sum(dat$ID == 1 & dat$EVID == 1), 7)
+  expect_equal(sum(dat$ID == 1 & dat$EVID == 0), 9)
+  expect_equal(sum(dat$ID == 2 & dat$EVID == 1), 8)
+  expect_equal(sum(dat$ID == 2 & dat$EVID == 0), 8)
+
+  id1_doses <- dat[dat$ID == 1 & dat$EVID == 1, ]
+  expect_equal(id1_doses$TIME, c(0, 672, 1344, 2016, 2688, 3360, 4032))
+  expect_equal(id1_doses$AMT, c(1800, rep(1200, 6)))
+  expect_true(all(id1_doses$CMT == 2))
+
+  id2_doses <- dat[dat$ID == 2 & dat$EVID == 1, ]
+  expect_equal(id2_doses$TIME, c(0, 336, 672, 1344, 2016, 2688, 3360, 4032))
+  expect_true(all(id2_doses$AMT == 1800))
+  expect_true(all(id2_doses$CMT == 1))
+
+  id1_obs <- dat[dat$ID == 1 & dat$EVID == 0, ]
+  expect_equal(id1_obs$TIME, c(1, 671.9, 2015.9, 3359.9, 3361, 3528, 3696, 4031.9, 4033))
+  expect_equal(id1_obs$DOSE, c(1800, 1800, 1200, 1200, 1200, 1200, 1200, 1200, 1200))
+  expect_true(all(id1_obs$ARM == "0"))
+  expect_true(all(id2_doses$ARM == "1"))
+})
+
+test_that("schedule table validation separates errors from warnings", {
+  invalid <- paste(
+    "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT",
+    "1,A,\"0:0\",\"0,1\",1,2",
+    sep = "\n"
+  )
+  invalid_validation <- validate_design_schedule_table(invalid)
+  expect_false(invalid_validation$valid)
+  expect_true(any(grepl("positive", invalid_validation$errors)))
+
+  warning_schedule <- paste(
+    "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT",
+    "1,A,\"0:100\",\"0,-1\",1,2",
+    sep = "\n"
+  )
+  warning_validation <- validate_design_schedule_table(warning_schedule)
+  expect_false(warning_validation$valid)
+  expect_true(any(grepl("non-negative", warning_validation$errors)))
+
+  near_dose <- paste(
+    "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT",
+    "1,A,\"0:100;24:100\",\"0,1,24\",1,2",
+    sep = "\n"
+  )
+  near_dose_validation <- validate_design_schedule_table(near_dose)
+  expect_true(near_dose_validation$valid)
+  expect_true(any(grepl("same time as a dose", near_dose_validation$warnings)))
+})
+
 test_that("build_nonmem_elementary_dataset creates strict evaluation columns", {
   dat <- build_nonmem_elementary_dataset(
     n_elementary_designs = 2,
