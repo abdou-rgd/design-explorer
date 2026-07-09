@@ -73,6 +73,37 @@ parse_dose_events <- function(text, default_rate = 0, default_cmt = 1L) {
   dplyr::arrange(out, .data$TIME)
 }
 
+parse_sampling_events <- function(text) {
+  if (is.null(text) || !nzchar(trimws(text))) {
+    return(tibble::tibble(TIME = numeric(), DOSE = numeric()))
+  }
+
+  tokens <- unlist(strsplit(text, "[,;[:space:]]+", perl = TRUE))
+  tokens <- trimws(tokens[nzchar(trimws(tokens))])
+  rows <- lapply(tokens, function(token) {
+    parts <- trimws(strsplit(token, ":", fixed = TRUE)[[1]])
+    if (!length(parts) %in% c(1L, 2L) || any(!nzchar(parts))) {
+      stop("Invalid sampling event: ", token, call. = FALSE)
+    }
+    values <- suppressWarnings(as.numeric(parts))
+    if (any(is.na(values)) || any(!is.finite(values))) {
+      stop("Invalid sampling event: ", token, call. = FALSE)
+    }
+    time <- values[[1L]]
+    dose <- if (length(values) == 2L) values[[2L]] else NA_real_
+    if (time < 0) {
+      stop("SAMPLING_TIMES must contain only non-negative times.", call. = FALSE)
+    }
+    if (!is.na(dose) && dose <= 0) {
+      stop("Sampling event dose annotations must be positive.", call. = FALSE)
+    }
+    tibble::tibble(TIME = time, DOSE = dose)
+  })
+
+  out <- dplyr::bind_rows(rows)
+  dplyr::arrange(out, .data$TIME)
+}
+
 read_schedule_table <- function(text) {
   if (is.null(text) || !nzchar(trimws(text))) {
     stop("Schedule table must not be empty.", call. = FALSE)
@@ -96,6 +127,10 @@ read_schedule_table <- function(text) {
 
 required_schedule_columns <- function() {
   c("DESIGN", "ARM", "DOSE_EVENTS", "SAMPLING_TIMES", "OBS_CMT")
+}
+
+schedule_control_columns <- function() {
+  c("ID", "N_SUBJECTS", "DOSE_EVENTS", "SAMPLING_TIMES", "DOSE_CMT", "OBS_CMT", "RATE")
 }
 
 scalar_or_default <- function(row, name, default) {
@@ -137,15 +172,9 @@ parse_design_schedule_table <- function(text) {
       default_rate = rate,
       default_cmt = dose_cmt
     )
-    sampling_times <- parse_schedule_times(
-      as.character(row[["SAMPLING_TIMES"]]),
-      "sampling time"
-    )
-    if (length(sampling_times) == 0L) {
+    sampling_events <- parse_sampling_events(as.character(row[["SAMPLING_TIMES"]]))
+    if (nrow(sampling_events) == 0L) {
       stop("SAMPLING_TIMES must contain at least one sampling time.", call. = FALSE)
-    }
-    if (any(sampling_times < 0)) {
-      stop("SAMPLING_TIMES must contain only non-negative times.", call. = FALSE)
     }
     obs_cmt <- validate_compartment(obs_cmt, "OBS_CMT")
     n_subjects <- validate_positive_integer(n_subjects, "N_SUBJECTS")
@@ -154,10 +183,11 @@ parse_design_schedule_table <- function(text) {
     }
 
     metadata <- list()
-    for (col in intersect(c("DESIGN", "ARM", "DOSE_UNIT"), names(row))) {
+    metadata_cols <- setdiff(names(row), schedule_control_columns())
+    for (col in metadata_cols) {
       value <- row[[col]]
       if (!is.na(value) && nzchar(trimws(as.character(value)))) {
-        metadata[[col]] <- as.character(value)
+        metadata[[col]] <- value
       }
     }
 
@@ -165,7 +195,7 @@ parse_design_schedule_table <- function(text) {
       id = id,
       n_subjects = n_subjects,
       dose_events = dose_events,
-      sampling_times = sampling_times,
+      sampling_events = sampling_events,
       obs_cmt = obs_cmt,
       metadata = metadata
     )
@@ -179,6 +209,13 @@ current_dose_at_time <- function(time, dose_events) {
     return(dose_events$AMT[[1L]])
   }
   dose_events$AMT[[prior[[length(prior)]]]]
+}
+
+observation_dose_at_time <- function(time, dose_events, dose_override = NA_real_) {
+  if (!is.na(dose_override)) {
+    return(dose_override)
+  }
+  current_dose_at_time(time, dose_events)
 }
 
 build_nonmem_dataset_from_schedule_table <- function(text, id_start = 1L) {
@@ -209,12 +246,17 @@ build_nonmem_dataset_from_schedule_table <- function(text, id_start = 1L) {
       )
       observation_rows <- tibble::tibble(
         ID = id,
-        TIME = spec$sampling_times,
+        TIME = spec$sampling_events$TIME,
         DOSE = vapply(
-          spec$sampling_times,
-          current_dose_at_time,
-          numeric(1),
-          dose_events = spec$dose_events
+          seq_len(nrow(spec$sampling_events)),
+          function(i) {
+            observation_dose_at_time(
+              spec$sampling_events$TIME[[i]],
+              spec$dose_events,
+              spec$sampling_events$DOSE[[i]]
+            )
+          },
+          numeric(1)
         ),
         AMT = 0,
         RATE = 0,
@@ -253,7 +295,8 @@ validate_design_schedule_table <- function(text) {
 
   for (i in seq_along(specs)) {
     spec <- specs[[i]]
-    same_time <- intersect(spec$dose_events$TIME, spec$sampling_times)
+    sampling_times <- spec$sampling_events$TIME
+    same_time <- intersect(spec$dose_events$TIME, sampling_times)
     if (length(same_time) > 0L) {
       warnings <- c(
         warnings,
@@ -261,10 +304,10 @@ validate_design_schedule_table <- function(text) {
                paste(same_time, collapse = ", "))
       )
     }
-    if (any(spec$sampling_times < min(spec$dose_events$TIME))) {
+    if (any(sampling_times < min(spec$dose_events$TIME))) {
       warnings <- c(warnings, paste0("Design ", i, " has sampling before the first dose."))
     }
-    if (!any(spec$sampling_times > min(spec$dose_events$TIME))) {
+    if (!any(sampling_times > min(spec$dose_events$TIME))) {
       warnings <- c(warnings, paste0("Design ", i, " has no observation after the first dose."))
     }
   }
@@ -422,6 +465,17 @@ validate_nonmem_dataset <- function(dat) {
     errors <- c(
       errors,
       paste("Missing required columns:", paste(missing_cols, collapse = ", "))
+    )
+  }
+  if (length(missing_cols) == 0L &&
+      !identical(names(dat)[seq_along(NONMEM_ELEMENTARY_COLUMNS)],
+                 NONMEM_ELEMENTARY_COLUMNS)) {
+    errors <- c(
+      errors,
+      paste(
+        "Core columns must appear first in this order:",
+        paste(NONMEM_ELEMENTARY_COLUMNS, collapse = ", ")
+      )
     )
   }
   if (!identical(names(dat), toupper(names(dat)))) {

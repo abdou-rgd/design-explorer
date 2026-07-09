@@ -62,10 +62,19 @@ test_that("parse_dose_events accepts per-event amount, rate, and compartment ove
   expect_error(parse_dose_events("0:1800;bad", default_rate = 0, default_cmt = 1), "Invalid dose event")
 })
 
+test_that("parse_sampling_events accepts optional observation dose annotations", {
+  events <- parse_sampling_events("1:1800, 671.9:1200, 2015.9")
+
+  expect_equal(names(events), c("TIME", "DOSE"))
+  expect_equal(events$TIME, c(1, 671.9, 2015.9))
+  expect_equal(events$DOSE, c(1800, 1200, NA_real_))
+  expect_error(parse_sampling_events("1:100:bad"), "Invalid sampling event")
+})
+
 test_that("schedule table builder reproduces psm_eval-style per-design schedules", {
   schedule <- paste(
     "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT,RATE",
-    "1,0,\"0:1800:1800:2;672:1200:1200:2;1344:1200:1200:2;2016:1200:1200:2;2688:1200:1200:2;3360:1200:1200:2;4032:1200:1200:2\",\"1,671.9,2015.9,3359.9,3361,3528,3696,4031.9,4033\",2,2,0",
+    "1,0,\"0:1800:1800:2;672:1200:1200:2;1344:1200:1200:2;2016:1200:1200:2;2688:1200:1200:2;3360:1200:1200:2;4032:1200:1200:2\",\"1:1800,671.9:1200,2015.9:1200,3359.9:1200,3361:1200,3528:1200,3696:1200,4031.9:1200,4033:1200\",2,2,0",
     "2,1,\"0:1800:1800:1;336:1800:1800:1;672:1800:1800:1;1344:1800:1800:1;2016:1800:1800:1;2688:1800:1800:1;3360:1800:1800:1;4032:1800:1800:1\",\"335.9,671.9,2015.9,3359.9,3528,3696,3864,4031.9\",1,2,0",
     sep = "\n"
   )
@@ -91,9 +100,32 @@ test_that("schedule table builder reproduces psm_eval-style per-design schedules
 
   id1_obs <- dat[dat$ID == 1 & dat$EVID == 0, ]
   expect_equal(id1_obs$TIME, c(1, 671.9, 2015.9, 3359.9, 3361, 3528, 3696, 4031.9, 4033))
-  expect_equal(id1_obs$DOSE, c(1800, 1800, 1200, 1200, 1200, 1200, 1200, 1200, 1200))
+  expect_equal(id1_obs$DOSE, c(1800, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200))
   expect_true(all(id1_obs$ARM == "0"))
   expect_true(all(id2_doses$ARM == "1"))
+
+  fixture_path <- file.path(PROJECT_ROOT, "docs", "results", "psm_eval", "psm_eval.csv")
+  if (file.exists(fixture_path)) {
+    fixture <- read.csv(fixture_path, stringsAsFactors = FALSE)
+    expect_equal(as.data.frame(dat[names(fixture)]), fixture)
+  }
+})
+
+test_that("schedule table builder preserves arbitrary metadata after core columns", {
+  schedule <- paste(
+    "DESIGN,COHORT,ARM,DOSE_EVENTS,SAMPLING_TIMES,OBS_CMT,SCENARIO",
+    "1,adult,A,\"0:100\",\"1\",2,reference",
+    sep = "\n"
+  )
+
+  dat <- build_nonmem_dataset_from_schedule_table(schedule)
+
+  expect_equal(
+    names(dat),
+    c(NONMEM_ELEMENTARY_COLUMNS, "DESIGN", "COHORT", "ARM", "SCENARIO")
+  )
+  expect_true(all(dat$COHORT == "adult"))
+  expect_true(all(dat$SCENARIO == "reference"))
 })
 
 test_that("schedule table validation separates errors from warnings", {
@@ -215,6 +247,11 @@ test_that("validate_nonmem_dataset reports schema and row problems", {
   validation <- validate_nonmem_dataset(valid)
   expect_true(validation$valid)
   expect_equal(validation$errors, character())
+
+  reordered <- valid[c("TIME", "ID", setdiff(names(valid), c("TIME", "ID")))]
+  reordered_validation <- validate_nonmem_dataset(reordered)
+  expect_false(reordered_validation$valid)
+  expect_true(any(grepl("Core columns", reordered_validation$errors)))
 
   lower <- valid
   names(lower)[1] <- "id"
