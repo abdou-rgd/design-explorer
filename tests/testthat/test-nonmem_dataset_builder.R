@@ -320,7 +320,8 @@ test_that("dataset builder Shiny module contract is present", {
   expect_true(grepl("downloadHandler", module_text, fixed = TRUE))
   expect_true(grepl("write_nonmem_csv", module_text, fixed = TRUE))
   expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
-  expect_true(grepl("Elementary designs", module_text, fixed = TRUE))
+  expect_true(grepl("schedule_table", module_text, fixed = TRUE))
+  expect_true(grepl("load_psm_eval_example", module_text, fixed = TRUE))
   expect_false(grepl("Prototypes", module_text, fixed = TRUE))
   expect_false(grepl("Dose interval", module_text, fixed = TRUE))
 })
@@ -366,37 +367,44 @@ test_that("dataset builder Shiny module tracks generation state", {
     expect_false(can_download())
     expect_false(is_current())
 
+    schedule <- paste(
+      "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT,RATE",
+      "1,A,\"0:100:100:1;24:100:100:1\",\"1,2\",1,2,0",
+      "2,B,\"0:200:200:1\",\"4,8,12\",1,2,0",
+      sep = "\n"
+    )
     session$setInputs(
-      n_elementary_designs = 2,
-      dose = 100,
-      dose_unit = "mg",
-      dose_times = "0, 12, 24",
-      dose_cmt = 1,
-      observation_cmt = 2,
-      rate = 0,
-      sampling_times = "1, 2",
-      optional_column = "Cohort"
+      schedule_table = schedule
     )
     session$setInputs(generate_preview = 1)
 
     dat <- current_dataset()
-    expect_equal(names(dat), c(NONMEM_ELEMENTARY_COLUMNS, "COHORT"))
-    expect_equal(nrow(dat), 10)
-    expect_true(all(is.na(dat$COHORT)))
+    expect_equal(names(dat), c(NONMEM_ELEMENTARY_COLUMNS, "DESIGN", "ARM"))
+    expect_equal(nrow(dat), 8)
+    expect_equal(unique(dat$ARM), c("A", "B"))
     expect_true(is_current())
     expect_true(can_download())
     expect_null(build_error())
 
-    session$setInputs(dose = 200)
+    session$setInputs(schedule_table = paste0(schedule, "\n"))
     expect_false(is_current())
     expect_null(current_dataset())
     expect_false(can_download())
 
-    session$setInputs(dose = 100, sampling_times = "1, abc", generate_preview = 2)
+    session$setInputs(
+      schedule_table = paste(
+        "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT",
+        "1,A,\"bad\",\"1,2\",1,2",
+        sep = "\n"
+      ),
+      generate_preview = 2
+    )
     expect_null(dataset())
     expect_null(generated_signature())
     expect_null(current_dataset())
     expect_false(can_download())
-    expect_match(build_error(), "Invalid sampling time")
+    expect_match(build_error(), "Invalid dose event")
+
+    expect_match(dataset_builder_psm_eval_example(), "4032:1800:1800:1")
   })
 })
