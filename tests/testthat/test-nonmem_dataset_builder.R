@@ -357,8 +357,11 @@ test_that("dataset builder Shiny module contract is present", {
   expect_true(grepl("downloadHandler", module_text, fixed = TRUE))
   expect_true(grepl("write_nonmem_csv", module_text, fixed = TRUE))
   expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
-  expect_true(grepl("schedule_table", module_text, fixed = TRUE))
+  expect_true(grepl("n_designs", module_text, fixed = TRUE))
+  expect_true(grepl("dose_events_", module_text, fixed = TRUE))
+  expect_true(grepl("sampling_times_", module_text, fixed = TRUE))
   expect_true(grepl("load_psm_eval_example", module_text, fixed = TRUE))
+  expect_false(grepl("textAreaInput(\n          ns(\"schedule_table\")", module_text, fixed = TRUE))
   expect_false(grepl("Prototypes", module_text, fixed = TRUE))
   expect_false(grepl("Dose interval", module_text, fixed = TRUE))
 })
@@ -404,14 +407,22 @@ test_that("dataset builder Shiny module tracks generation state", {
     expect_false(can_download())
     expect_false(is_current())
 
-    schedule <- paste(
-      "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT,RATE",
-      "1,A,\"0:100:100:1;24:100:100:1\",\"1,2\",1,2,0",
-      "2,B,\"0:200:200:1\",\"4,8,12\",1,2,0",
-      sep = "\n"
-    )
     session$setInputs(
-      schedule_table = schedule
+      n_designs = 2,
+      design_1 = "1",
+      arm_1 = "A",
+      dose_events_1 = "0:100:100:1;24:100:100:1",
+      sampling_times_1 = "1,2",
+      dose_cmt_1 = 1,
+      obs_cmt_1 = 2,
+      rate_1 = 0,
+      design_2 = "2",
+      arm_2 = "B",
+      dose_events_2 = "0:200:200:1",
+      sampling_times_2 = "4,8,12",
+      dose_cmt_2 = 1,
+      obs_cmt_2 = 2,
+      rate_2 = 0
     )
     session$setInputs(generate_preview = 1)
 
@@ -423,17 +434,13 @@ test_that("dataset builder Shiny module tracks generation state", {
     expect_true(can_download())
     expect_null(build_error())
 
-    session$setInputs(schedule_table = paste0(schedule, "\n"))
+    session$setInputs(sampling_times_2 = "4,8,12,16")
     expect_false(is_current())
     expect_null(current_dataset())
     expect_false(can_download())
 
     session$setInputs(
-      schedule_table = paste(
-        "DESIGN,ARM,DOSE_EVENTS,SAMPLING_TIMES,DOSE_CMT,OBS_CMT",
-        "1,A,\"bad\",\"1,2\",1,2",
-        sep = "\n"
-      ),
+      dose_events_1 = "bad",
       generate_preview = 2
     )
     expect_null(dataset())
