@@ -34,37 +34,41 @@ PROJECT_ROOT <- project_root
 
 source(file.path(PROJECT_ROOT, "R", "nonmem_dataset_builder.R"))
 
-test_that("parse_sampling_times accepts common protocol schedule separators", {
+test_that("parse_schedule_times accepts common protocol schedule separators", {
   expect_equal(
-    parse_sampling_times("1, 24; 168\n671.9 672"),
+    parse_schedule_times("1, 24; 168\n671.9 672", "sampling time"),
     c(1, 24, 168, 671.9, 672)
   )
-  expect_equal(parse_sampling_times("672, 1, 1, 24"), c(1, 24, 672))
-  expect_equal(parse_sampling_times(""), numeric())
-  expect_error(parse_sampling_times("1, abc, 24"), "Invalid sampling time")
+  expect_equal(parse_schedule_times("672, 1, 1, 24", "sampling time"), c(1, 24, 672))
+  expect_equal(parse_schedule_times("", "sampling time"), numeric())
+  expect_error(
+    parse_schedule_times("0, abc, 24", "dose time"),
+    "Invalid dose time"
+  )
 })
 
 test_that("build_nonmem_elementary_dataset creates strict evaluation columns", {
   dat <- build_nonmem_elementary_dataset(
-    n_prototypes = 2,
+    n_elementary_designs = 2,
     dose = 1800,
-    dose_interval = 672,
-    n_administrations = 2,
+    dose_times = c(0, 336, 672),
     observation_times = c(1, 24, 671.9),
     dose_cmt = 2,
     observation_cmt = 2,
-    rate = 0
+    rate = 0,
+    optional_column = "GROUP"
   )
 
   expect_equal(
     names(dat),
-    c("ID", "TIME", "DOSE", "AMT", "RATE", "DV", "MDV", "EVID", "CMT", "ARM")
+    c("ID", "TIME", "DOSE", "AMT", "RATE", "DV", "MDV", "EVID", "CMT", "GROUP")
   )
   expect_equal(unique(dat$ID), c(1, 2))
-  expect_true(all(dat$ARM == dat$ID))
+  expect_true(all(is.na(dat$GROUP)))
 
   dose_rows <- dat[dat$EVID == 1, , drop = FALSE]
-  expect_equal(nrow(dose_rows), 4)
+  expect_equal(nrow(dose_rows), 6)
+  expect_equal(unique(dose_rows$TIME), c(0, 336, 672))
   expect_true(all(dose_rows$MDV == 1))
   expect_true(all(dose_rows$DV == 0))
   expect_true(all(dose_rows$AMT == 1800))
@@ -83,28 +87,25 @@ test_that("build_nonmem_elementary_dataset creates strict evaluation columns", {
 test_that("build_nonmem_elementary_dataset rejects fractional row counts and negative times", {
   expect_error(
     build_nonmem_elementary_dataset(
-      n_prototypes = 1.9,
+      n_elementary_designs = 1.9,
       dose = 100,
-      dose_interval = 24,
-      n_administrations = 1,
+      dose_times = 0,
       observation_times = c(1)
     ),
-    "n_prototypes"
+    "n_elementary_designs"
   )
   expect_error(
     build_nonmem_elementary_dataset(
       dose = 100,
-      dose_interval = 24,
-      n_administrations = 2.9,
+      dose_times = c(-1, 24),
       observation_times = c(1)
     ),
-    "n_administrations"
+    "dose_times"
   )
   expect_error(
     build_nonmem_elementary_dataset(
       dose = 100,
-      dose_interval = 24,
-      n_administrations = 1,
+      dose_times = 0,
       observation_times = c(-1, 1)
     ),
     "observation_times"
@@ -113,10 +114,9 @@ test_that("build_nonmem_elementary_dataset rejects fractional row counts and neg
 
 test_that("rows sort by ID, TIME, then dose before observation at the same time", {
   dat <- build_nonmem_elementary_dataset(
-    n_prototypes = 1,
+    n_elementary_designs = 1,
     dose = 100,
-    dose_interval = 24,
-    n_administrations = 2,
+    dose_times = c(0, 24),
     observation_times = c(0, 24),
     dose_cmt = 1,
     observation_cmt = 2
@@ -129,8 +129,7 @@ test_that("rows sort by ID, TIME, then dose before observation at the same time"
 test_that("validate_nonmem_dataset reports schema and row problems", {
   valid <- build_nonmem_elementary_dataset(
     dose = 100,
-    dose_interval = 24,
-    n_administrations = 1,
+    dose_times = 0,
     observation_times = c(1, 2),
     dose_cmt = 1,
     observation_cmt = 2
@@ -180,8 +179,7 @@ test_that("build_nonmem_elementary_dataset rejects invalid compartments", {
   expect_error(
     build_nonmem_elementary_dataset(
       dose = 100,
-      dose_interval = 24,
-      n_administrations = 1,
+      dose_times = 0,
       observation_times = c(1),
       dose_cmt = 0,
       observation_cmt = 1
@@ -191,8 +189,7 @@ test_that("build_nonmem_elementary_dataset rejects invalid compartments", {
   expect_error(
     build_nonmem_elementary_dataset(
       dose = 100,
-      dose_interval = 24,
-      n_administrations = 1,
+      dose_times = 0,
       observation_times = c(1),
       dose_cmt = 1,
       observation_cmt = 1.5
@@ -204,8 +201,7 @@ test_that("build_nonmem_elementary_dataset rejects invalid compartments", {
 test_that("write_nonmem_csv writes comma CSV with dot missing values", {
   dat <- build_nonmem_elementary_dataset(
     dose = 100,
-    dose_interval = 24,
-    n_administrations = 1,
+    dose_times = 0,
     observation_times = c(1),
     dose_cmt = 1,
     observation_cmt = 2
@@ -217,7 +213,7 @@ test_that("write_nonmem_csv writes comma CSV with dot missing values", {
   write_nonmem_csv(dat, tmp)
   raw <- readLines(tmp, warn = FALSE)
 
-  expect_equal(raw[1], "ID,TIME,DOSE,AMT,RATE,DV,MDV,EVID,CMT,ARM")
+  expect_equal(raw[1], "ID,TIME,DOSE,AMT,RATE,DV,MDV,EVID,CMT")
   expect_true(any(grepl(",\\.,", raw, fixed = FALSE)))
 
   roundtrip <- readr::read_csv(
@@ -246,6 +242,9 @@ test_that("dataset builder Shiny module contract is present", {
   expect_true(grepl("downloadHandler", module_text, fixed = TRUE))
   expect_true(grepl("write_nonmem_csv", module_text, fixed = TRUE))
   expect_true(grepl("DTOutput(ns(\"dataset_preview\"))", module_text, fixed = TRUE))
+  expect_true(grepl("Elementary designs", module_text, fixed = TRUE))
+  expect_false(grepl("Prototypes", module_text, fixed = TRUE))
+  expect_false(grepl("Dose interval", module_text, fixed = TRUE))
 })
 
 test_that("dataset builder is wired into the Shiny app", {
@@ -290,21 +289,22 @@ test_that("dataset builder Shiny module tracks generation state", {
     expect_false(is_current())
 
     session$setInputs(
-      n_prototypes = 2,
+      n_elementary_designs = 2,
       dose = 100,
       dose_unit = "mg",
-      dose_interval = 24,
-      n_administrations = 2,
+      dose_times = "0, 12, 24",
       dose_cmt = 1,
       observation_cmt = 2,
       rate = 0,
-      sampling_times = "1, 2"
+      sampling_times = "1, 2",
+      optional_column = "Cohort"
     )
     session$setInputs(generate_preview = 1)
 
     dat <- current_dataset()
-    expect_equal(names(dat), NONMEM_ELEMENTARY_COLUMNS)
-    expect_equal(nrow(dat), 8)
+    expect_equal(names(dat), c(NONMEM_ELEMENTARY_COLUMNS, "COHORT"))
+    expect_equal(nrow(dat), 10)
+    expect_true(all(is.na(dat$COHORT)))
     expect_true(is_current())
     expect_true(can_download())
     expect_null(build_error())

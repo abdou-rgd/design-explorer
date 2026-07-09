@@ -4,15 +4,15 @@
 
 dataset_builder_defaults <- function() {
   list(
-    n_prototypes = 1,
+    n_elementary_designs = 1,
     dose = 1800,
     dose_unit = "mg",
-    dose_interval = 672,
-    n_administrations = 1,
+    dose_times = "0",
     dose_cmt = 1,
     observation_cmt = 1,
     rate = 0,
-    sampling_times = "1, 24, 168, 671.9"
+    sampling_times = "1, 24, 168, 671.9",
+    optional_column = ""
   )
 }
 
@@ -34,8 +34,8 @@ mod_dataset_builder_ui <- function(id) {
           column(
             3,
             numericInput(
-              ns("n_prototypes"), "Prototypes",
-              value = defaults$n_prototypes, min = 1, step = 1
+              ns("n_elementary_designs"), "Elementary designs",
+              value = defaults$n_elementary_designs, min = 1, step = 1
             )
           ),
           column(
@@ -54,20 +54,19 @@ mod_dataset_builder_ui <- function(id) {
           ),
           column(
             3,
-            numericInput(
-              ns("dose_interval"), "Dose interval",
-              value = defaults$dose_interval, min = 0, step = 24
+            textInput(
+              ns("optional_column"), "Blank column name",
+              value = defaults$optional_column
             )
           )
         ),
+        textAreaInput(
+          ns("dose_times"), "Dose schedule",
+          value = defaults$dose_times,
+          rows = 2,
+          width = "100%"
+        ),
         fluidRow(
-          column(
-            3,
-            numericInput(
-              ns("n_administrations"), "Administrations",
-              value = defaults$n_administrations, min = 1, step = 1
-            )
-          ),
           column(
             3,
             numericInput(
@@ -131,15 +130,15 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
 
     input_signature <- reactive({
       list(
-        n_prototypes = input$n_prototypes,
+        n_elementary_designs = input$n_elementary_designs,
         dose = input$dose,
         dose_unit = input$dose_unit,
-        dose_interval = input$dose_interval,
-        n_administrations = input$n_administrations,
+        dose_times = input$dose_times,
         dose_cmt = input$dose_cmt,
         observation_cmt = input$observation_cmt,
         rate = input$rate,
-        sampling_times = input$sampling_times
+        sampling_times = input$sampling_times,
+        optional_column = input$optional_column
       )
     })
 
@@ -166,14 +165,14 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
     })
 
     reset_inputs <- function() {
-      updateNumericInput(session, "n_prototypes", value = defaults$n_prototypes)
+      updateNumericInput(
+        session,
+        "n_elementary_designs",
+        value = defaults$n_elementary_designs
+      )
       updateNumericInput(session, "dose", value = defaults$dose)
       updateTextInput(session, "dose_unit", value = defaults$dose_unit)
-      updateNumericInput(session, "dose_interval", value = defaults$dose_interval)
-      updateNumericInput(
-        session, "n_administrations",
-        value = defaults$n_administrations
-      )
+      updateTextAreaInput(session, "dose_times", value = defaults$dose_times)
       updateNumericInput(session, "dose_cmt", value = defaults$dose_cmt)
       updateNumericInput(
         session, "observation_cmt",
@@ -184,6 +183,7 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
         session, "sampling_times",
         value = defaults$sampling_times
       )
+      updateTextInput(session, "optional_column", value = defaults$optional_column)
       dataset(NULL)
       build_error(NULL)
       generated_signature(NULL)
@@ -197,16 +197,20 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
 
     observeEvent(input$generate_preview, {
       built <- tryCatch({
-        observation_times <- parse_sampling_times(input$sampling_times)
+        dose_times <- parse_schedule_times(input$dose_times, "dose time")
+        observation_times <- parse_schedule_times(
+          input$sampling_times,
+          "sampling time"
+        )
         build_nonmem_elementary_dataset(
-          n_prototypes = input$n_prototypes,
+          n_elementary_designs = input$n_elementary_designs,
           dose = input$dose,
-          dose_interval = input$dose_interval,
-          n_administrations = input$n_administrations,
+          dose_times = dose_times,
           observation_times = observation_times,
           dose_cmt = input$dose_cmt,
           observation_cmt = input$observation_cmt,
-          rate = input$rate
+          rate = input$rate,
+          optional_column = input$optional_column
         )
       }, error = function(e) {
         build_error(conditionMessage(e))
@@ -298,7 +302,7 @@ mod_dataset_builder_server <- function(id, reset_trigger = NULL) {
       observation_rows <- sum(dat$EVID == 0)
 
       fact_strip(
-        fact_item("Prototypes", length(unique(dat$ID))),
+        fact_item("Elementary designs", length(unique(dat$ID))),
         fact_item("Dose rows", dose_rows),
         fact_item("Observation rows", observation_rows),
         fact_item("Total rows", nrow(dat))

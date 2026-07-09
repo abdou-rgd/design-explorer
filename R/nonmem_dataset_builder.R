@@ -3,10 +3,10 @@
 # =============================================================================
 
 NONMEM_ELEMENTARY_COLUMNS <- c(
-  "ID", "TIME", "DOSE", "AMT", "RATE", "DV", "MDV", "EVID", "CMT", "ARM"
+  "ID", "TIME", "DOSE", "AMT", "RATE", "DV", "MDV", "EVID", "CMT"
 )
 
-parse_sampling_times <- function(text) {
+parse_schedule_times <- function(text, label = "time") {
   if (is.null(text) || !nzchar(trimws(text))) {
     return(numeric())
   }
@@ -18,13 +18,17 @@ parse_sampling_times <- function(text) {
 
   if (any(invalid)) {
     stop(
-      "Invalid sampling time: ",
+      "Invalid ", label, ": ",
       tokens[which(invalid)[1L]],
       call. = FALSE
     )
   }
 
   sort(unique(times))
+}
+
+parse_sampling_times <- function(text) {
+  parse_schedule_times(text, "sampling time")
 }
 
 is_integerish <- function(x) {
@@ -45,26 +49,48 @@ validate_positive_integer <- function(x, name) {
   as.integer(x)
 }
 
-build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
+normalize_optional_column <- function(optional_column) {
+  if (is.null(optional_column) || !nzchar(trimws(optional_column))) {
+    return(NULL)
+  }
+  name <- toupper(trimws(optional_column))
+  if (!grepl("^[A-Z][A-Z0-9_]*$", name)) {
+    stop(
+      "optional_column must start with a letter and contain only letters, numbers, or underscores.",
+      call. = FALSE
+    )
+  }
+  if (name %in% NONMEM_ELEMENTARY_COLUMNS) {
+    stop("optional_column must not duplicate a required column.", call. = FALSE)
+  }
+  name
+}
+
+is_blank_column <- function(x) {
+  all(is.na(x) | trimws(as.character(x)) == "")
+}
+
+build_nonmem_elementary_dataset <- function(n_elementary_designs = 1L,
                                             dose,
-                                            dose_interval,
-                                            n_administrations,
+                                            dose_times,
                                             observation_times,
                                             dose_cmt = 1L,
                                             observation_cmt = 1L,
                                             rate = 0,
-                                            arm_values = NULL) {
-  n_prototypes <- validate_positive_integer(n_prototypes, "n_prototypes")
-  n_administrations <- validate_positive_integer(
-    n_administrations,
-    "n_administrations"
+                                            optional_column = NULL) {
+  n_elementary_designs <- validate_positive_integer(
+    n_elementary_designs,
+    "n_elementary_designs"
   )
   if (!is.numeric(dose) || length(dose) != 1L || !is.finite(dose) || dose <= 0) {
     stop("dose must be a positive number.", call. = FALSE)
   }
-  if (!is.numeric(dose_interval) || length(dose_interval) != 1L ||
-      !is.finite(dose_interval) || dose_interval < 0) {
-    stop("dose_interval must be a non-negative number.", call. = FALSE)
+  if (!is.numeric(dose_times) || length(dose_times) == 0L ||
+      any(!is.finite(dose_times))) {
+    stop("dose_times must contain at least one finite time.", call. = FALSE)
+  }
+  if (any(dose_times < 0)) {
+    stop("dose_times must contain only non-negative times.", call. = FALSE)
   }
   if (!is.numeric(observation_times) || length(observation_times) == 0L ||
       any(!is.finite(observation_times))) {
@@ -81,19 +107,13 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
   }
   dose_cmt <- validate_compartment(dose_cmt, "dose_cmt")
   observation_cmt <- validate_compartment(observation_cmt, "observation_cmt")
+  optional_column <- normalize_optional_column(optional_column)
 
-  if (is.null(arm_values)) {
-    arm_values <- seq_len(n_prototypes)
-  }
-  if (length(arm_values) != n_prototypes) {
-    stop("arm_values length must equal n_prototypes.", call. = FALSE)
-  }
-
-  dose_times <- (seq_len(n_administrations) - 1L) * dose_interval
+  dose_times <- sort(unique(dose_times))
   observation_times <- sort(unique(observation_times))
-  rows <- vector("list", n_prototypes)
+  rows <- vector("list", n_elementary_designs)
 
-  for (id in seq_len(n_prototypes)) {
+  for (id in seq_len(n_elementary_designs)) {
     dose_rows <- tibble::tibble(
       ID = id,
       TIME = dose_times,
@@ -103,8 +123,7 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
       DV = 0,
       MDV = 1,
       EVID = 1,
-      CMT = dose_cmt,
-      ARM = arm_values[id]
+      CMT = dose_cmt
     )
     observation_rows <- tibble::tibble(
       ID = id,
@@ -115,15 +134,18 @@ build_nonmem_elementary_dataset <- function(n_prototypes = 1L,
       DV = 1,
       MDV = 0,
       EVID = 0,
-      CMT = observation_cmt,
-      ARM = arm_values[id]
+      CMT = observation_cmt
     )
     rows[[id]] <- dplyr::bind_rows(dose_rows, observation_rows)
   }
 
   out <- dplyr::bind_rows(rows)
   out <- dplyr::arrange(out, .data$ID, .data$TIME, dplyr::desc(.data$EVID))
-  dplyr::select(out, dplyr::all_of(NONMEM_ELEMENTARY_COLUMNS))
+  out <- dplyr::select(out, dplyr::all_of(NONMEM_ELEMENTARY_COLUMNS))
+  if (!is.null(optional_column)) {
+    out[[optional_column]] <- NA_character_
+  }
+  out
 }
 
 validate_nonmem_dataset <- function(dat) {
@@ -146,10 +168,13 @@ validate_nonmem_dataset <- function(dat) {
     )
   }
   if (length(extra_cols) > 0L) {
-    errors <- c(
-      errors,
-      paste("Unexpected columns:", paste(extra_cols, collapse = ", "))
-    )
+    bad_extra <- extra_cols[!vapply(dat[extra_cols], is_blank_column, logical(1))]
+    if (length(bad_extra) > 0L) {
+      errors <- c(
+        errors,
+        paste("Unexpected populated columns:", paste(bad_extra, collapse = ", "))
+      )
+    }
   }
   if (!identical(names(dat), toupper(names(dat)))) {
     errors <- c(errors, "Column names must be uppercase.")
