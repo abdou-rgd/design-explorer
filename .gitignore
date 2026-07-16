@@ -1,7 +1,6 @@
 # Documentation / notes non vitales pour l'app
 *.md
 !/README.md
-!/CHANGELOG.md
 /docs/
 /audits/
 /logs/

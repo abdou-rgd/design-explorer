@@ -34,7 +34,6 @@ applicatifs. La CI execute cette suite sous R 4.2.0.
 - `R/` - helpers partages pour parsing, metriques, diagnostics, plots et
   logique commune.
 - `tests/` - tests unitaires et smoke tests locaux.
-- `CHANGELOG.md` - suivi des changements utiles a la reprise du contexte.
 
 ## Donnees et artefacts locaux
 
