@@ -120,9 +120,24 @@ read_sse_patab_outputs <- function(
   if (grepl("\\.zip$", path, ignore.case = TRUE) || .is_zip_archive(path)) {
     root <- tempfile("sse-patab-")
     dir.create(root, recursive = TRUE, showWarnings = FALSE)
-    utils::unzip(path, exdir = root)
     cleanup <- root
     on.exit(unlink(cleanup, recursive = TRUE, force = TRUE), add = TRUE)
+    tryCatch(
+      safe_extract_zip(
+        path,
+        exdir = root,
+        pattern = .PATAB_ARCHIVE_PATTERN
+      ),
+      error = function(e) {
+        stop(
+          "Unable to extract patab archive '",
+          basename(path),
+          "': ",
+          conditionMessage(e),
+          call. = FALSE
+        )
+      }
+    )
   }
 
   files <- list.files(
@@ -368,7 +383,7 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
   )
 
   p <- ggplot(df, aes(x = sim, y = est)) +
-    geom_abline(slope = 1, intercept = 0, color = "grey55", linewidth = 0.4) +
+    geom_abline(slope = 1, intercept = 0, color = "grey55", size = 0.4) +
     geom_point(aes(color = error_capped), alpha = 0.45, size = 1.25) +
     geom_label(
       data = summary_df,
@@ -376,7 +391,7 @@ plot_individual_pk_recovery <- function(recovery_data, log_axes = FALSE) {
       inherit.aes = FALSE,
       hjust = -0.05,
       vjust = 1.08,
-      linewidth = 0,
+      label.size = 0,
       fill = "white",
       alpha = 0.82,
       size = 2.45,
@@ -464,18 +479,18 @@ plot_individual_pk_error_distribution <- function(recovery_data) {
   df$param_ordered <- stats::reorder(df$param, df$median_abs_error)
 
   ggplot(df, aes(x = param_ordered, y = relative_error)) +
-    geom_hline(yintercept = 0, color = "grey55", linewidth = 0.35) +
+    geom_hline(yintercept = 0, color = "grey55", size = 0.35) +
     geom_hline(
       yintercept = c(-20, 20),
       linetype = "dashed",
       color = "#d97706",
-      linewidth = 0.35
+      size = 0.35
     ) +
     geom_hline(
       yintercept = c(-50, 50),
       linetype = "dotted",
       color = "#dc2626",
-      linewidth = 0.35
+      size = 0.35
     ) +
     geom_jitter(
       width = 0.12,

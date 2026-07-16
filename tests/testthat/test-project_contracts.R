@@ -111,7 +111,8 @@ test_that("SSE raw_results upload is centralized and injected into consumers", {
 
   expect_match(app_txt, "sse_a_data\\s*=\\s*sse_upload\\$sse_a_data")
   expect_match(app_txt, "sse_b_data\\s*=\\s*sse_upload\\$sse_b_data")
-  expect_match(app_txt, "sse_a_shared\\s*=\\s*sse_upload\\$sse_a_data")
+  expect_match(app_txt, "design_a_shared\\s*=\\s*sse_upload\\$design_a")
+  expect_match(app_txt, "design_b_shared\\s*=\\s*sse_upload\\$design_b")
   expect_match(app_txt, "sse_orig\\s*=\\s*sse_upload\\$sse_a_data")
 })
 
@@ -161,14 +162,16 @@ test_that("global TABLE NO selection is app-owned and injected", {
   expect_false(grepl('selectInput\\(ns\\("table_no"\\)', validation_txt))
 })
 
-test_that("merged primary reactives prefer uploads over examples", {
+test_that("primary run consumers read one atomic context", {
   app_txt <- paste(readLines(file.path(PROJECT_ROOT, "app", "app.R"),
                              warn = FALSE), collapse = "\n")
 
-  expect_match(app_txt, 'merged_ext\\s*<-\\s*reactive\\(\\{ if \\(upload_has\\("ext"\\)\\) upload\\$ext_data\\(\\) else example_ext\\(\\) \\}\\)')
-  expect_match(app_txt, 'merged_shk\\s*<-\\s*reactive\\(\\{ if \\(upload_has\\("shk"\\)\\) upload\\$shk_data\\(\\) else example_shk\\(\\) \\}\\)')
-  expect_match(app_txt, 'merged_ctl_lines\\s*<-\\s*reactive\\(\\{ if \\(upload_has\\("ctl"\\)\\) upload\\$ctl_lines\\(\\) else example_ctl_lines\\(\\) \\}\\)')
-  expect_match(app_txt, 'merged_summary\\s*<-\\s*reactive\\(\\{ if \\(upload_has\\("tab"\\)\\) upload_summary\\(\\) else examples\\$summary_data\\(\\) \\}\\)')
+  expect_match(app_txt, "primary_context <- reactiveVal\\(empty_primary_run_context\\(\\)\\)")
+  expect_match(app_txt, "merged_ext <- reactive\\(primary_context\\(\\)\\$ext_data\\)")
+  expect_match(app_txt, "merged_ctl_lines <- reactive\\(primary_context\\(\\)\\$ctl_lines\\)")
+  expect_match(app_txt, "merged_summary <- reactive\\(primary_context\\(\\)\\$summary_data\\)")
+  expect_match(app_txt, "ex_comp <- primary_context\\(\\)\\$comparison")
+  expect_false(grepl("upload_has", app_txt, fixed = TRUE))
 })
 
 test_that("universal reset reaches state owners", {

@@ -498,6 +498,180 @@ read_true_values <- function(ctl_lines) {
     vals[!is.na(vals)]
   }
 
+  max_covariance_values <- 10000L
+
+  .block_spec <- function(
+    line,
+    keyword,
+    current_count = 0L,
+    max_values = max_covariance_values
+  ) {
+    stripped <- sub(
+      paste0("^\\s*\\$", keyword, "\\s*"),
+      "",
+      line,
+      ignore.case = TRUE
+    )
+    if (!grepl("(?i)\\bBLOCK\\b", stripped, perl = TRUE)) {
+      return(NULL)
+    }
+
+    match <- regexec(
+      "(?i)^\\s*BLOCK\\s*\\(\\s*([0-9]+)\\s*\\)",
+      stripped,
+      perl = TRUE
+    )
+    parts <- regmatches(stripped, match)[[1L]]
+    if (length(parts) == 0L) {
+      stop(
+        sprintf(
+          "$%s BLOCK dimension must be a positive integer written as BLOCK(n).",
+          keyword
+        ),
+        call. = FALSE
+      )
+    }
+
+    dimension <- suppressWarnings(as.numeric(parts[[2L]]))
+    if (
+      !is.finite(dimension) ||
+        dimension < 1 ||
+        dimension != floor(dimension)
+    ) {
+      stop(
+        sprintf("$%s BLOCK dimension must be a positive integer.", keyword),
+        call. = FALSE
+      )
+    }
+
+    max_dimension <- floor((sqrt(8 * max_values + 1) - 1) / 2)
+    if (dimension > max_dimension) {
+      stop(
+        sprintf(
+          "$%s BLOCK dimension exceeds the %d lower-triangular value limit.",
+          keyword,
+          max_values
+        ),
+        call. = FALSE
+      )
+    }
+
+    dimension <- as.integer(dimension)
+    value_count <- as.integer(dimension * (dimension + 1L) / 2L)
+    if (current_count > max_values - value_count) {
+      stop(
+        sprintf(
+          "$%s covariance specifications exceed the cumulative %d-value limit.",
+          keyword,
+          max_values
+        ),
+        call. = FALSE
+      )
+    }
+
+    list(dimension = dimension, value_count = value_count)
+  }
+
+  .diagonal_values <- function(
+    line,
+    current_count = 0L,
+    max_values = max_covariance_values
+  ) {
+    values <- numeric(0L)
+    line <- gsub(
+      "(?i)\\b(?:DIAGONAL|BLOCK)\\s*\\(\\s*[0-9]+\\s*\\)",
+      " ",
+      line,
+      perl = TRUE
+    )
+    compact_line <- gsub("[[:space:]]+", "", line)
+    candidate_locs <- gregexpr(
+      "(?<=\\)|[0-9.])[xX]",
+      compact_line,
+      perl = TRUE
+    )[[1]]
+    valid_locs <- gregexpr(
+      "(?<=\\)|[0-9.])[xX][0-9]+(?![A-Za-z0-9_.])",
+      compact_line,
+      perl = TRUE
+    )[[1]]
+    candidate_count <- if (candidate_locs[[1L]] < 0L) {
+      0L
+    } else {
+      length(candidate_locs)
+    }
+    valid_count <- if (valid_locs[[1L]] < 0L) 0L else length(valid_locs)
+    if (candidate_count != valid_count) {
+      stop(
+        "Malformed covariance repetition; expected X followed by an integer.",
+        call. = FALSE
+      )
+    }
+
+    repetition_count <- function(spec) {
+      if (!grepl("[xX]\\s*[0-9]+\\s*$", spec)) {
+        return(1L)
+      }
+      count_text <- sub(".*[xX]\\s*([0-9]+)\\s*$", "\\1", spec)
+      count <- suppressWarnings(as.numeric(count_text))
+      if (!is.finite(count) || count != floor(count) || count < 1) {
+        stop(
+          "Covariance repetition count must be a positive integer.",
+          call. = FALSE
+        )
+      }
+      if (count > max_values) {
+        stop(
+          sprintf(
+            "Covariance repetition count exceeds the %.0f-value limit.",
+            max_values
+          ),
+          call. = FALSE
+        )
+      }
+      as.integer(count)
+    }
+
+    number_pattern <- "-?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?"
+    spec_pattern <- paste0(
+      "\\([^)]*\\)\\s*(?:[xX]\\s*[0-9]+)?|",
+      number_pattern,
+      "(?:\\s*[xX]\\s*[0-9]+)?"
+    )
+    spec_locs <- gregexpr(spec_pattern, line, perl = TRUE)[[1]]
+    if (spec_locs[1] < 0L) {
+      return(values)
+    }
+
+    specs <- regmatches(line, list(spec_locs))[[1]]
+    for (spec in specs) {
+      if (grepl("^\\s*\\(", spec)) {
+        inner <- sub("^\\(([^)]*)\\).*$", "\\1", spec, perl = TRUE)
+        nums <- .numeric_tokens(inner)
+        if (length(nums) == 0L) {
+          next
+        }
+        value <- if (length(nums) >= 2L) nums[[2L]] else nums[[1L]]
+        times <- repetition_count(spec)
+      } else {
+        value_text <- trimws(sub("\\s*[xX].*$", "", spec, perl = TRUE))
+        value <- as.numeric(gsub("[dD]", "E", value_text))
+        times <- repetition_count(spec)
+      }
+      if (current_count + length(values) + times > max_values) {
+        stop(
+          sprintf(
+            "Covariance specification expands above the %.0f-value limit.",
+            max_values
+          ),
+          call. = FALSE
+        )
+      }
+      values <- c(values, rep(value, times))
+    }
+    values[!is.na(values)]
+  }
+
   .block_inline_values <- function(line, keyword) {
     stripped <- sub(
       paste0("^\\s*\\$", keyword, "\\s*"),
@@ -539,44 +713,46 @@ read_true_values <- function(ctl_lines) {
   omega_vals <- numeric(0L)
   omega_names <- character(0L)
   omega_row <- 0L # global row counter across blocks
+  omega_value_count <- 0L
 
   for (rng in .block_range("OMEGA")) {
     first_line <- lines_clean[rng[1]]
-    is_block <- grepl("BLOCK\\s*\\(", first_line, ignore.case = TRUE)
+    block_spec <- .block_spec(first_line, "OMEGA", omega_value_count)
 
-    if (is_block) {
+    if (!is.null(block_spec)) {
       # BLOCK(n): lower-triangular values
-      n <- as.integer(sub(
-        ".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*",
-        "\\1",
-        first_line
-      ))
+      n <- block_spec$dimension
+      omega_value_count <- omega_value_count + block_spec$value_count
       all_nums <- .block_inline_values(first_line, "OMEGA")
+      all_nums <- head(all_nums, block_spec$value_count)
       idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
       for (i in idx_lines) {
+        if (length(all_nums) >= block_spec$value_count) {
+          break
+        }
         ln <- lines_clean[i]
         if (grepl("^\\s*$", ln)) {
           next
         }
-        all_nums <- c(all_nums, .numeric_tokens(ln))
+        remaining <- block_spec$value_count - length(all_nums)
+        all_nums <- c(all_nums, head(.numeric_tokens(ln), remaining))
       }
       # Lower-triangular: row 1 has 1 element, row 2 has 2, etc.
-      idx <- 1L
-      for (row in seq_len(n)) {
-        for (col in seq_len(row)) {
-          if (idx > length(all_nums)) {
-            break
-          }
-          val <- all_nums[idx]
-          r_global <- omega_row + row
-          c_global <- omega_row + col
-          omega_vals <- c(omega_vals, val)
-          omega_names <- c(
-            omega_names,
-            paste0("OMEGA(", r_global, ",", c_global, ")")
+      if (length(all_nums) > 0L) {
+        rows <- rep(seq_len(n), times = seq_len(n))
+        cols <- sequence(seq_len(n))
+        keep <- seq_along(all_nums)
+        omega_vals <- c(omega_vals, all_nums)
+        omega_names <- c(
+          omega_names,
+          paste0(
+            "OMEGA(",
+            omega_row + rows[keep],
+            ",",
+            omega_row + cols[keep],
+            ")"
           )
-          idx <- idx + 1L
-        }
+        )
       }
       omega_row <- omega_row + n
     } else {
@@ -588,28 +764,16 @@ read_true_values <- function(ctl_lines) {
         if (nchar(stripped) == 0L) {
           next
         }
-        # Handle bounded (lower, init, upper) or standalone
-        if (grepl("\\(", stripped)) {
-          inner <- sub("^\\(([^)]+)\\).*", "\\1", stripped)
-          nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
-          nums <- nums[!is.na(nums)]
-          val <- if (length(nums) >= 2L) {
-            nums[2]
-          } else if (length(nums) == 1L) {
-            nums[1]
-          } else {
-            next
-          }
-        } else {
-          val <- as.numeric(sub("^(-?[0-9.eEdD]+).*", "\\1", stripped))
-          if (is.na(val)) next
+        diagonal_values <- .diagonal_values(stripped, omega_value_count)
+        omega_value_count <- omega_value_count + length(diagonal_values)
+        for (val in diagonal_values) {
+          omega_row <- omega_row + 1L
+          omega_vals <- c(omega_vals, val)
+          omega_names <- c(
+            omega_names,
+            paste0("OMEGA(", omega_row, ",", omega_row, ")")
+          )
         }
-        omega_row <- omega_row + 1L
-        omega_vals <- c(omega_vals, val)
-        omega_names <- c(
-          omega_names,
-          paste0("OMEGA(", omega_row, ",", omega_row, ")")
-        )
       }
     }
   }
@@ -618,42 +782,44 @@ read_true_values <- function(ctl_lines) {
   sigma_vals <- numeric(0L)
   sigma_names <- character(0L)
   sigma_row <- 0L
+  sigma_value_count <- 0L
 
   for (rng in .block_range("SIGMA")) {
     first_line <- lines_clean[rng[1]]
-    is_block <- grepl("BLOCK\\s*\\(", first_line, ignore.case = TRUE)
+    block_spec <- .block_spec(first_line, "SIGMA", sigma_value_count)
 
-    if (is_block) {
-      n <- as.integer(sub(
-        ".*BLOCK\\s*\\(\\s*(\\d+)\\s*\\).*",
-        "\\1",
-        first_line
-      ))
+    if (!is.null(block_spec)) {
+      n <- block_spec$dimension
+      sigma_value_count <- sigma_value_count + block_spec$value_count
       all_nums <- .block_inline_values(first_line, "SIGMA")
+      all_nums <- head(all_nums, block_spec$value_count)
       idx_lines <- if (rng[1] < rng[2]) (rng[1] + 1L):rng[2] else integer(0L)
       for (i in idx_lines) {
+        if (length(all_nums) >= block_spec$value_count) {
+          break
+        }
         ln <- lines_clean[i]
         if (grepl("^\\s*$", ln)) {
           next
         }
-        all_nums <- c(all_nums, .numeric_tokens(ln))
+        remaining <- block_spec$value_count - length(all_nums)
+        all_nums <- c(all_nums, head(.numeric_tokens(ln), remaining))
       }
-      idx <- 1L
-      for (row in seq_len(n)) {
-        for (col in seq_len(row)) {
-          if (idx > length(all_nums)) {
-            break
-          }
-          val <- all_nums[idx]
-          r_global <- sigma_row + row
-          c_global <- sigma_row + col
-          sigma_vals <- c(sigma_vals, val)
-          sigma_names <- c(
-            sigma_names,
-            paste0("SIGMA(", r_global, ",", c_global, ")")
+      if (length(all_nums) > 0L) {
+        rows <- rep(seq_len(n), times = seq_len(n))
+        cols <- sequence(seq_len(n))
+        keep <- seq_along(all_nums)
+        sigma_vals <- c(sigma_vals, all_nums)
+        sigma_names <- c(
+          sigma_names,
+          paste0(
+            "SIGMA(",
+            sigma_row + rows[keep],
+            ",",
+            sigma_row + cols[keep],
+            ")"
           )
-          idx <- idx + 1L
-        }
+        )
       }
       sigma_row <- sigma_row + n
     } else {
@@ -664,27 +830,16 @@ read_true_values <- function(ctl_lines) {
         if (nchar(stripped) == 0L) {
           next
         }
-        if (grepl("\\(", stripped)) {
-          inner <- sub("^\\(([^)]+)\\).*", "\\1", stripped)
-          nums <- as.numeric(trimws(strsplit(inner, ",")[[1]]))
-          nums <- nums[!is.na(nums)]
-          val <- if (length(nums) >= 2L) {
-            nums[2]
-          } else if (length(nums) == 1L) {
-            nums[1]
-          } else {
-            next
-          }
-        } else {
-          val <- as.numeric(sub("^(-?[0-9.eEdD]+).*", "\\1", stripped))
-          if (is.na(val)) next
+        diagonal_values <- .diagonal_values(stripped, sigma_value_count)
+        sigma_value_count <- sigma_value_count + length(diagonal_values)
+        for (val in diagonal_values) {
+          sigma_row <- sigma_row + 1L
+          sigma_vals <- c(sigma_vals, val)
+          sigma_names <- c(
+            sigma_names,
+            paste0("SIGMA(", sigma_row, ",", sigma_row, ")")
+          )
         }
-        sigma_row <- sigma_row + 1L
-        sigma_vals <- c(sigma_vals, val)
-        sigma_names <- c(
-          sigma_names,
-          paste0("SIGMA(", sigma_row, ",", sigma_row, ")")
-        )
       }
     }
   }

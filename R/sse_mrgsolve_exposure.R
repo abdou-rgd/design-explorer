@@ -26,6 +26,17 @@ sse_mrgsolve_candidate_columns <- function(individual_pk_data) {
   toupper(gsub("[^A-Za-z0-9]", "", .sse_mrgsolve_or(x, "")))
 }
 
+.sse_mrgsolve_mapping_input_id <- function(model_param) {
+  model_param <- as.character(model_param)
+  valid <- length(model_param) == 1L &&
+    !is.na(model_param) &&
+    grepl("^[A-Za-z][A-Za-z0-9_]*$", model_param)
+  if (!valid) {
+    stop("mrgsolve parameter names must be valid identifiers.", call. = FALSE)
+  }
+  paste0("pk_map_", model_param)
+}
+
 .sse_mrgsolve_pick_auto_column <- function(model_param, candidate_columns) {
   if (length(candidate_columns) == 0L) return(NA_character_)
 
@@ -84,6 +95,62 @@ build_sse_mrgsolve_parameter_mapping <- function(
   })
 
   tibble::as_tibble(do.call(rbind, rows))
+}
+
+.sse_mrgsolve_object_hash <- function(x) {
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path), add = TRUE)
+  saveRDS(x, path, ascii = FALSE, version = 2, compress = FALSE)
+  unname(tools::md5sum(path))
+}
+
+build_sse_mrgsolve_exposure_cache_key <- function(
+  model_hash,
+  preflight,
+  individual_pk_data,
+  dosing_events,
+  samples = NULL,
+  ids = NULL,
+  max_samples = NULL,
+  max_ids = NULL,
+  end_time = NULL,
+  delta = 0.5,
+  trough_times = numeric(0L)
+) {
+  required_params <- sort(unique(as.character(.sse_mrgsolve_or(
+    preflight$required_params,
+    character()
+  ))))
+  mapping <- .sse_mrgsolve_or(preflight$mapping, data.frame())
+  mapping <- mapping[
+    mapping$model_param %in% required_params & mapping$status == "mapped",
+    c("model_param", "patab_column"),
+    drop = FALSE
+  ]
+  mapping <- mapping[order(mapping$model_param, mapping$patab_column), , drop = FALSE]
+  rownames(mapping) <- NULL
+
+  key_data <- list(
+    version = 1L,
+    model_hash = .sse_mrgsolve_or(model_hash, NA_character_),
+    concentration_output = .sse_mrgsolve_or(
+      preflight$concentration_output,
+      NA_character_
+    ),
+    required_params = required_params,
+    mapping = mapping,
+    individual_pk_data = individual_pk_data,
+    dosing_events = dosing_events,
+    samples = samples,
+    ids = ids,
+    max_samples = max_samples,
+    max_ids = max_ids,
+    end_time = end_time,
+    delta = delta,
+    trough_times = trough_times
+  )
+
+  .sse_mrgsolve_object_hash(key_data)
 }
 
 .sse_mrgsolve_default_output <- function(capture_names) {

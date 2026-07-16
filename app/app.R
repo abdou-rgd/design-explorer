@@ -86,11 +86,6 @@ ui <- navbarPage(
         });
       "))
     ),
-    div(style = "display:none;",
-      textInput("primary_run_name", NULL, value = "Primary"),
-      textAreaInput("param_labels", NULL, placeholder = "THETA1=CL\nTHETA2=V\nTHETA3=KA", rows = 3),
-      textAreaInput("cmt_labels", NULL, placeholder = "1=Depot\n2=Central (PK)\n3=Effet (PD)", rows = 3)
-    ),
     div(class = "app-command-deck",
       div(class = "command-deck__intro",
         div(class = "command-deck__eyebrow", "NONMEM $DESIGN workspace"),
@@ -198,14 +193,10 @@ server <- function(input, output, session) {
     })
   }
 
-  # -- Reset trigger (universal) ----------------------------------------------
+  # -- Shared session state ----------------------------------------------------
   reset_trigger <- reactiveVal(0L)
-
-  # -- Suggested groupsize (set by upload/examples, consumed by mod_params) ---
-  suggested_gs <- reactiveVal(1L)
-
-  # -- Shared design table selection ------------------------------------------
   selected_table_no <- reactiveVal(NULL)
+  primary_context <- reactiveVal(empty_primary_run_context())
 
   observeEvent(input$open_doc_section, {
     updateNavbarPage(session, "navbar", selected = "documentation")
@@ -217,128 +208,184 @@ server <- function(input, output, session) {
   compare  <- mod_compare_server("compare", reset_trigger = reset_trigger)
   examples <- mod_examples_server("examples", reset_trigger = reset_trigger)
 
-  # -- Example data loading --------------------------------------------------
-  example_ext      <- reactiveVal(NULL)
-  example_shk      <- reactiveVal(NULL)
-  example_coi      <- reactiveVal(NULL)
-  example_clt      <- reactiveVal(NULL)
-  example_tab      <- reactiveVal(NULL)
-  example_cpu      <- reactiveVal(NA_real_)
-  example_ctl      <- reactiveVal(NULL)
-  example_ctl_lines <- reactiveVal(NULL)
-  example_ext_lines <- reactiveVal(NULL)
-  example_comp_run <- reactiveVal(NULL)
+  .context_source_id <- function(paths) {
+    if (!primary_run_paths_present(paths)) return(NULL)
+    present <- unlist(paths[!vapply(paths, is.null, logical(1L))], use.names = FALSE)
+    paste(sort(unique(basename(present))), collapse = "|")
+  }
 
-  observeEvent(examples$file_paths(), ignoreNULL = FALSE, {
-    paths <- examples$file_paths()
-    if (is.null(paths)) {
-      example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
-      example_ctl(NULL); example_ctl_lines(NULL); example_ext_lines(NULL)
-      example_comp_run(NULL)
-      updateTextAreaInput(session, "param_labels", value = "")
-      updateTextAreaInput(session, "cmt_labels",   value = "")
+  .example_ctl_path <- function(paths) {
+    if (is.null(paths) || is.null(paths$ext)) return(NULL)
+    stem <- tools::file_path_sans_ext(basename(paths$ext))
+    candidates <- file.path(
+      dirname(paths$ext),
+      paste0(stem, c(".ctl", ".mod", ".con"))
+    )
+    candidates <- candidates[file.exists(candidates)]
+    if (length(candidates) == 0L) NULL else candidates[[1L]]
+  }
+
+  .context_cmt_labels <- function(ctl_lines) {
+    if (is.null(ctl_lines)) return(NULL)
+    tryCatch(parse_cmt_labels(ctl_lines), error = function(e) NULL)
+  }
+
+  .context_groupsize <- function(ctl_lines) {
+    if (is.null(ctl_lines)) return(1L)
+    value <- tryCatch(parse_groupsize(ctl_lines), error = function(e) NA_integer_)
+    if (is.na(value) || value < 1L) 1L else as.integer(value)
+  }
+
+  .example_comparison <- function(paths, name) {
+    if (is.null(paths)) return(NULL)
+    list(
+      id = "example_comp",
+      name = name %||% "Run B",
+      ext_data = .safe_load(read_ext, paths$ext, ".ext (comp)"),
+      shk_data = .safe_load(read_shk, paths$shk, ".shk (comp)"),
+      coi_data = .safe_load(read_coi, paths$coi, ".coi (comp)"),
+      clt_data = .safe_load(read_clt, paths$clt, ".clt (comp)"),
+      tab_data = .safe_load(read_tab, paths$tab, ".tab (comp)"),
+      cpu_data = read_cpu(paths$cpu %||% "")
+    )
+  }
+
+  upload_context <- reactive({
+    paths <- upload$file_paths()
+    if (!primary_run_paths_present(paths) || is.null(paths$ext)) return(NULL)
+
+    ext_data <- upload$ext_data()
+    if (is.null(ext_data)) return(NULL)
+    ctl_lines <- upload$ctl_lines()
+    tab_data <- upload$tab_data()
+    run_name <- tryCatch(parse_design_summary(ctl_lines), error = function(e) NULL)
+    summary_data <- if (is.null(tab_data)) {
+      NULL
+    } else {
+      tryCatch(compute_robust_summary(tab_data), error = function(e) NULL)
+    }
+
+    new_primary_run_context(
+      source = "upload",
+      source_id = .context_source_id(paths),
+      name = run_name %||% "Primary",
+      file_paths = paths,
+      ext_data = ext_data,
+      shk_data = upload$shk_data(),
+      coi_data = upload$coi_data(),
+      clt_data = upload$clt_data(),
+      tab_data = tab_data,
+      ctl_data = upload$ctl_data(),
+      cpu_data = upload$cpu_data(),
+      ext_lines = upload$ext_lines(),
+      ctl_lines = ctl_lines,
+      summary_data = summary_data,
+      comparison = NULL,
+      param_labels = NULL,
+      cmt_labels = .context_cmt_labels(ctl_lines),
+      groupsize = .context_groupsize(ctl_lines)
+    )
+  })
+
+  example_context <- reactive({
+    selection <- examples$selection()
+    if (is.null(selection)) return(NULL)
+
+    paths <- selection$file_paths
+    if (!primary_run_paths_present(paths) || is.null(paths$ext)) return(NULL)
+
+    ctl_path <- .example_ctl_path(paths)
+    ctl_lines <- if (is.null(ctl_path)) {
+      NULL
+    } else {
+      tryCatch(readr::read_lines(ctl_path), error = function(e) NULL)
+    }
+    ext_lines <- if (is.null(paths$ext)) {
+      NULL
+    } else {
+      tryCatch(
+        readr::read_lines(paths$ext, progress = FALSE),
+        error = function(e) NULL
+      )
+    }
+
+    ext_data <- .safe_load(read_ext, paths$ext, ".ext")
+    if (is.null(ext_data)) return(NULL)
+
+    new_primary_run_context(
+      source = "example",
+      source_id = paste0(.context_source_id(paths), "@", selection$revision),
+      name = "Primary",
+      file_paths = paths,
+      ext_data = ext_data,
+      shk_data = .safe_load(read_shk, paths$shk, ".shk"),
+      coi_data = .safe_load(read_coi, paths$coi, ".coi"),
+      clt_data = .safe_load(read_clt, paths$clt, ".clt"),
+      tab_data = .safe_load(read_tab, paths$tab, ".tab"),
+      ctl_data = .safe_load(read_prior_nwpri, ctl_path, ".ctl/.mod/.con"),
+      cpu_data = read_cpu(paths$cpu %||% ""),
+      ext_lines = ext_lines,
+      ctl_lines = ctl_lines,
+      summary_data = selection$summary_data,
+      comparison = .example_comparison(
+        selection$compare_paths,
+        selection$compare_name
+      ),
+      table_no_range = selection$table_no_range,
+      param_labels = parse_mapping_text(selection$labels),
+      cmt_labels = .context_cmt_labels(ctl_lines),
+      groupsize = .context_groupsize(ctl_lines)
+    )
+  })
+
+  observeEvent(examples$selection(), {
+    if (is.null(examples$selection())) return()
+
+    context <- example_context()
+    if (is.null(context)) {
+      showNotification(
+        "Example not activated: its primary .ext file could not be read.",
+        type = "error"
+      )
       return()
     }
-    example_ext(.safe_load(read_ext, paths$ext, ".ext"))
-    example_ext_lines(if (!is.null(paths$ext))
-      tryCatch(readr::read_lines(paths$ext, progress = FALSE),
-               error = function(e) NULL) else NULL)
-    example_shk(.safe_load(read_shk, paths$shk, ".shk"))
-    example_coi(.safe_load(read_coi, paths$coi, ".coi"))
-    example_clt(.safe_load(read_clt, paths$clt, ".clt"))
-    example_tab(.safe_load(read_tab, paths$tab, ".tab"))
-    example_cpu(read_cpu(paths$cpu %||% ""))
-    if (!is.null(paths$ext)) {
-      base_name <- tools::file_path_sans_ext(basename(paths$ext))
-      for (ext_try in c(".ctl", ".mod", ".con")) {
-        ctl_path <- file.path(dirname(paths$ext), paste0(base_name, ext_try))
-        if (file.exists(ctl_path)) {
-          example_ctl(.safe_load(read_prior_nwpri, ctl_path, ext_try))
-          example_ctl_lines(tryCatch(readr::read_lines(ctl_path), error = function(e) NULL))
-          break
-        }
-      }
-    }
-    lbl <- examples$labels()
-    if (!is.null(lbl)) updateTextAreaInput(session, "param_labels", value = lbl)
-    # GROUPSIZE depuis le .ctl de l'exemple
-    ctl_ex <- example_ctl_lines()
-    if (!is.null(ctl_ex)) {
-      gs <- tryCatch(parse_groupsize(ctl_ex), error = function(e) NA_integer_)
-      if (!is.na(gs)) suggested_gs(gs)
-    }
-  })
+    primary_context(activate_primary_run_context(
+      isolate(primary_context()),
+      context
+    ))
+    selected_table_no(NULL)
+  }, ignoreNULL = FALSE)
 
-  observeEvent(examples$compare_paths(), {
-    comp_paths <- examples$compare_paths()
-    if (is.null(comp_paths)) return()
-    comp_data <- list(
-      id = "example_comp", name = examples$compare_name() %||% "Run B",
-      ext_data = .safe_load(read_ext, comp_paths$ext, ".ext (comp)"),
-      shk_data = .safe_load(read_shk, comp_paths$shk, ".shk (comp)"),
-      coi_data = .safe_load(read_coi, comp_paths$coi, ".coi (comp)"),
-      clt_data = .safe_load(read_clt, comp_paths$clt, ".clt (comp)"),
-      tab_data = .safe_load(read_tab, comp_paths$tab, ".tab (comp)"),
-      cpu_data = read_cpu(comp_paths$cpu %||% "")
-    )
-    example_comp_run(comp_data)
-  })
+  observeEvent(upload$file_paths(), {
+    paths <- upload$file_paths()
+    if (!primary_run_paths_present(paths)) return()
 
-  # Quand l'user uploade un fichier → effacer les données exemple (upload a priorité)
-  # + auto-remplir labels THETA et suggerer nom de run depuis le .ctl
-  observeEvent(upload$file_paths(), ignoreNULL = FALSE, {
-    fps <- upload$file_paths()
-    if (!is.null(fps$ext)) {
-      example_ext(NULL); example_shk(NULL); example_coi(NULL)
-      example_clt(NULL); example_tab(NULL); example_cpu(NA_real_)
-      example_ctl(NULL); example_ctl_lines(NULL); example_ext_lines(NULL)
-      example_comp_run(NULL)
+    context <- upload_context()
+    if (is.null(context)) {
+      showNotification(
+        "Upload not activated: a readable primary .ext file is required.",
+        type = "warning"
+      )
+      return()
     }
-    # Auto-remplissage depuis le .ctl uploade
-    ctl_lines <- upload$ctl_lines()
-    if (!is.null(ctl_lines)) {
-      # Labels CMT -> textArea cmt_labels (depuis $MODEL COMP=(NOM))
-      cmt_lbl <- tryCatch(parse_cmt_labels(ctl_lines), error = function(e) NULL)
-      if (!is.null(cmt_lbl)) {
-        cmt_text <- paste(paste0(names(cmt_lbl), "=", cmt_lbl), collapse = "\n")
-        updateTextAreaInput(session, "cmt_labels", value = cmt_text)
-      }
-      # Suggestion nom de run -> textInput primary_run_name
-      design_name <- tryCatch(parse_design_summary(ctl_lines), error = function(e) NULL)
-      if (!is.null(design_name)) {
-        updateTextInput(session, "primary_run_name", value = design_name)
-      }
-      # GROUPSIZE -> mod_power via suggested_gs
-      gs <- tryCatch(parse_groupsize(ctl_lines), error = function(e) NA_integer_)
-      if (!is.na(gs)) suggested_gs(gs)
-    }
-  })
+    primary_context(activate_primary_run_context(
+      isolate(primary_context()),
+      context
+    ))
+    selected_table_no(NULL)
+  }, ignoreNULL = FALSE)
 
-  # -- Merged reactives -------------------------------------------------------
-  upload_has <- function(slot) {
-    fps <- upload$file_paths()
-    !is.null(fps[[slot]])
-  }
-  merged_ext     <- reactive({ if (upload_has("ext")) upload$ext_data() else example_ext() })
-  merged_shk     <- reactive({ if (upload_has("shk")) upload$shk_data() else example_shk() })
-  merged_coi     <- reactive({ if (upload_has("coi")) upload$coi_data() else example_coi() })
-  merged_clt     <- reactive({ if (upload_has("clt")) upload$clt_data() else example_clt() })
-  merged_tab     <- reactive({ if (upload_has("tab")) upload$tab_data() else example_tab() })
-  merged_ctl     <- reactive({ if (upload_has("ctl")) upload$ctl_data() else example_ctl() })
-  merged_cpu     <- reactive({
-    if (upload_has("cpu")) return(upload$cpu_data())
-    example_cpu()
-  })
-  # Robust summary: built-in example (pre-computed) or computed from uploaded .tab
-  upload_summary <- reactive({
-    tab <- upload$tab_data()
-    if (is.null(tab)) return(NULL)
-    compute_robust_summary(tab)
-  })
-  merged_summary   <- reactive({ if (upload_has("tab")) upload_summary() else examples$summary_data() })
-  merged_ctl_lines <- reactive({ if (upload_has("ctl")) upload$ctl_lines() else example_ctl_lines() })
-  merged_ext_lines <- reactive({ if (upload_has("ext")) upload$ext_lines() else example_ext_lines() })
+  suggested_gs <- reactive(primary_context()$groupsize)
+  merged_ext <- reactive(primary_context()$ext_data)
+  merged_shk <- reactive(primary_context()$shk_data)
+  merged_coi <- reactive(primary_context()$coi_data)
+  merged_clt <- reactive(primary_context()$clt_data)
+  merged_tab <- reactive(primary_context()$tab_data)
+  merged_ctl <- reactive(primary_context()$ctl_data)
+  merged_cpu <- reactive(primary_context()$cpu_data)
+  merged_summary <- reactive(primary_context()$summary_data)
+  merged_ctl_lines <- reactive(primary_context()$ctl_lines)
+  merged_ext_lines <- reactive(primary_context()$ext_lines)
   merged_true_vals <- reactive({
     tryCatch(
       resolve_true_values(
@@ -363,7 +410,7 @@ server <- function(input, output, session) {
     }
 
     tabs <- sort(unique(ext$table_no))
-    tnr  <- examples$table_no_range()
+    tnr  <- primary_context()$table_no_range
     if (!is.null(tnr) && length(tnr) == 2L) {
       tabs <- tabs[tabs >= tnr[1L] & tabs <= tnr[2L]]
       if (length(tabs) == 0L) tabs <- sort(unique(ext$table_no))
@@ -383,7 +430,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   # -- all_runs ---------------------------------------------------------------
-  primary_name <- reactive({ input$primary_run_name %||% "Primary" })
+  primary_name <- reactive(primary_context()$name %||% "Primary")
 
   all_runs <- reactive({
     primary <- new_design_run(
@@ -396,7 +443,7 @@ server <- function(input, output, session) {
       cpu_data = merged_cpu()
     )
     runs <- list(primary = primary)
-    ex_comp <- example_comp_run()
+    ex_comp <- primary_context()$comparison
     if (!is.null(ex_comp) && !is.null(ex_comp$ext_data))
       runs[["example_comp"]] <- ex_comp
     comp <- compare$comp_runs()
@@ -428,15 +475,12 @@ server <- function(input, output, session) {
   # -- Shared reactives -------------------------------------------------------
   # tbl_no is app/run context; groupsize remains exposed by mod_power.
   tbl_no <- reactive(selected_table_no())
-  param_labels_r <- reactive(parse_mapping_text(input$param_labels))
-  cmt_labels_r   <- reactive(parse_mapping_text(input$cmt_labels))
+  param_labels_r <- reactive(primary_context()$param_labels)
+  cmt_labels_r <- reactive(primary_context()$cmt_labels)
   # -- Reset handler (triggered by mod_home) -----------------------------------
   observeEvent(reset_trigger(), {
-    updateTextAreaInput(session, "param_labels", value = "")
-    updateTextAreaInput(session, "cmt_labels",   value = "")
-    updateTextInput(session, "primary_run_name", value = "Primary")
+    primary_context(empty_primary_run_context())
     selected_table_no(NULL)
-    suggested_gs(1L)
   }, ignoreInit = TRUE)
 
   # -- Module servers ---------------------------------------------------------
@@ -454,7 +498,7 @@ server <- function(input, output, session) {
 
   mod_params_server("params",
     ext_data = merged_ext, shk_data = merged_shk,
-    ext_lines = upload$ext_lines,
+    ext_lines = merged_ext_lines,
     param_labels = param_labels_r,
     tbl_no = tbl_no,
     all_runs = all_runs)
@@ -521,13 +565,10 @@ server <- function(input, output, session) {
     tbl_no           = tbl_no)
 
   mod_sse_analysis_server("sse_analysis",
-    sse_a_shared = sse_upload$sse_a_data,
-    sse_b_shared = sse_upload$sse_b_data,
-    name_a       = sse_upload$name_a,
-    name_b       = sse_upload$name_b,
+    design_a_shared = sse_upload$design_a,
+    design_b_shared = sse_upload$design_b,
     true_vals    = merged_true_vals,
     param_labels = param_labels_r,
-    individual_pk_shared = sse_upload$individual_pk_data,
     mrgsolve_state = shared_mrgsolve)
 
   mod_sse_comparison_server("sse_comparison",

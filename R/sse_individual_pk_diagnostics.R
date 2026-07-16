@@ -391,7 +391,7 @@ plot_individual_pk_prediction_diagnostics <- function(patab_data) {
         color = .data$kind
       ),
       alpha = 0.18,
-      linewidth = 0.25
+      size = 0.25
     ) +
     ggplot2::scale_color_manual(
       values = c(simulation = "#2563eb", estimation = "#dc2626"),
@@ -471,12 +471,12 @@ plot_individual_pk_error_forest <- function(
       fill = "#16a34a",
       alpha = 0.06
     ) +
-    ggplot2::geom_hline(yintercept = 0, color = "grey45", linewidth = 0.35) +
+    ggplot2::geom_hline(yintercept = 0, color = "grey45", size = 0.35) +
     ggplot2::geom_hline(
       yintercept = c(-20, 20),
       linetype = "dashed",
       color = "#d97706",
-      linewidth = 0.35
+      size = 0.35
     ) +
     ggplot2::geom_errorbar(
       ggplot2::aes(
@@ -534,7 +534,7 @@ plot_individual_pk_error_heatmap <- function(summary_by_id_param) {
       fill = .data$median_abs_relative_error
     )
   ) +
-    ggplot2::geom_tile(color = "white", linewidth = 0.12) +
+    ggplot2::geom_tile(color = "white", size = 0.12) +
     ggplot2::scale_fill_gradientn(
       colors = c("#e0f2fe", "#fef3c7", "#dc2626"),
       name = "Median |error| (%)"
@@ -679,7 +679,7 @@ plot_individual_pk_recovery_by_status <- function(
       slope = 1,
       intercept = 0,
       color = "grey45",
-      linewidth = 0.35
+      size = 0.35
     ) +
     ggplot2::geom_point(
       ggplot2::aes(color = .data$run_qc_status),

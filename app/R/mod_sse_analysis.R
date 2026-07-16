@@ -6,8 +6,8 @@
 # per-parameter diagnostics.
 # Consumes shared SSE data from mod_sse_upload (centralized upload).
 #
-# Inputs: sse_a_shared, sse_b_shared, individual_pk_shared (reactives),
-#         name_a, name_b, true_vals, param_labels
+# Inputs: design_a_shared and design_b_shared reactive bundles containing id,
+#         name, raw_results, and individual_pk; true_vals; param_labels.
 # =============================================================================
 
 mod_sse_analysis_ui <- function(id) {
@@ -115,25 +115,60 @@ mod_sse_analysis_ui <- function(id) {
 
 mod_sse_analysis_server <- function(
   id,
-  sse_a_shared = reactive(NULL),
-  sse_b_shared = reactive(NULL),
-  name_a = reactive("Design A"),
-  name_b = reactive("Design B"),
+  design_a_shared = reactive(list(
+    id = "a",
+    name = "Design A",
+    raw_results = NULL,
+    individual_pk = NULL
+  )),
+  design_b_shared = reactive(list(
+    id = "b",
+    name = "Design B",
+    raw_results = NULL,
+    individual_pk = NULL
+  )),
   true_vals,
   param_labels = reactive(NULL),
-  individual_pk_shared = reactive(NULL),
   mrgsolve_state = NULL
 ) {
   moduleServer(id, function(input, output, session) {
+    read_design_bundle <- function(shared, expected_id) {
+      bundle <- shared()
+      required_fields <- c("id", "name", "raw_results", "individual_pk")
+      if (!is.list(bundle) || !all(required_fields %in% names(bundle))) {
+        stop(
+          sprintf(
+            "SSE design %s must provide: %s",
+            toupper(expected_id),
+            paste(required_fields, collapse = ", ")
+          ),
+          call. = FALSE
+        )
+      }
+      if (!identical(bundle$id, expected_id)) {
+        stop(
+          sprintf("SSE design bundle id must be '%s'", expected_id),
+          call. = FALSE
+        )
+      }
+      bundle
+    }
+
+    design_a_bundle <- reactive(read_design_bundle(design_a_shared, "a"))
+    design_b_bundle <- reactive(read_design_bundle(design_b_shared, "b"))
+
     # --- Design selector (show only when B is loaded) ---
     output$design_selector <- renderUI({
-      b <- sse_b_shared()
-      if (is.null(b)) {
+      a <- design_a_bundle()
+      b <- design_b_bundle()
+      if (is.null(b$raw_results)) {
         return(NULL)
       }
 
       choices <- c("a" = "a", "b" = "b")
-      names(choices) <- c(name_a(), name_b())
+      names(choices) <- c(a$name, b$name)
+      selected <- isolate(input$which_design) %||% "a"
+      if (!selected %in% unname(choices)) selected <- "a"
 
       control_panel(
         label = "Analyze",
@@ -141,18 +176,52 @@ mod_sse_analysis_server <- function(
           session$ns("which_design"),
           label = NULL,
           choices = choices,
-          selected = "a",
+          selected = selected,
           inline = TRUE
         )
       )
     })
 
+    selected_design_id <- reactive({
+      selection <- input$which_design %||% "a"
+      if (!selection %in% c("a", "b")) {
+        return("a")
+      }
+      if (
+        identical(selection, "b") &&
+          is.null(design_b_bundle()$raw_results)
+      ) {
+        return("a")
+      }
+      selection
+    })
+
+    observeEvent(design_b_bundle()$raw_results, {
+      if (
+        is.null(design_b_bundle()$raw_results) &&
+          identical(isolate(input$which_design), "b")
+      ) {
+        updateRadioButtons(session, "which_design", selected = "a")
+      }
+    }, ignoreInit = FALSE)
+
+    selected_design_bundle <- reactive({
+      if (identical(selected_design_id(), "b")) {
+        design_b_bundle()
+      } else {
+        design_a_bundle()
+      }
+    })
+
     # --- SSE data (switches between A and B) ---
     sse_raw_all <- reactive({
-      sel <- input$which_design %||% "a"
-      dat <- if (sel == "b") sse_b_shared() else sse_a_shared()
+      dat <- selected_design_bundle()$raw_results
       req(dat)
       dat
+    })
+
+    selected_individual_pk <- reactive({
+      selected_design_bundle()$individual_pk
     })
 
     output$hypothesis_filter_ui <- renderUI({
@@ -883,7 +952,7 @@ mod_sse_analysis_server <- function(
 
     # --- Individual PK patab outputs ---
     individual_pk_diagnostics_data <- reactive({
-      dat <- individual_pk_shared()
+      dat <- selected_individual_pk()
       if (is.null(dat) || nrow(dat) == 0L) {
         return(build_individual_pk_diagnostics(NULL, tibble::tibble()))
       }
@@ -904,7 +973,7 @@ mod_sse_analysis_server <- function(
     })
 
     individual_pk_recovery_data <- reactive({
-      dat <- individual_pk_shared()
+      dat <- selected_individual_pk()
       if (is.null(dat) || nrow(dat) == 0L) {
         return(tibble::tibble())
       }
@@ -1093,7 +1162,7 @@ mod_sse_analysis_server <- function(
     })
 
     pk_exposure_patab <- reactive({
-      dat <- individual_pk_shared()
+      dat <- selected_individual_pk()
       if (is.null(dat) || !is.data.frame(dat) || nrow(dat) == 0L) {
         return(NULL)
       }
@@ -1123,8 +1192,8 @@ mod_sse_analysis_server <- function(
         return(stats::setNames(character(), character()))
       }
 
-      values <- vapply(seq_along(params), function(i) {
-        input[[paste0("pk_map_", i)]] %||% ""
+      values <- vapply(params, function(param) {
+        input[[.sse_mrgsolve_mapping_input_id(param)]] %||% ""
       }, character(1L))
       keep <- nzchar(values)
       stats::setNames(values[keep], params[keep])
@@ -1145,6 +1214,25 @@ mod_sse_analysis_server <- function(
     })
 
     pk_exposure_cache <- reactiveVal(NULL)
+
+    pk_exposure_key_context <- reactive({
+      preflight <- pk_exposure_preflight()
+      dat <- pk_exposure_patab()
+      if (is.null(preflight) || is.null(dat)) return(NULL)
+
+      list(
+        model_hash = tryCatch(
+          mrgsolve_state$model_hash(),
+          error = function(e) NA_character_
+        ),
+        preflight = preflight,
+        individual_pk_data = dat,
+        dosing_events = tryCatch(
+          mrgsolve_state$dose_events(),
+          error = function(e) NULL
+        )
+      )
+    })
 
     output$pk_exposure_status <- renderUI({
       if (is.null(mrgsolve_state)) {
@@ -1180,10 +1268,17 @@ mod_sse_analysis_server <- function(
         return(NULL)
       }
       patab <- pk_exposure_patab()
+      selected_bundle <- selected_design_bundle()
       if (is.null(patab)) {
         return(status_panel(
           "PK exposure requires individual PK tables",
-          tags$p("Upload a PsN output archive with pk_individuals/patab tables in SSE Upload before configuring exposure diagnostics."),
+          tags$p(sprintf(
+            paste(
+              "Upload a PsN output archive with pk_individuals/patab tables",
+              "for %s in SSE Upload before configuring exposure diagnostics."
+            ),
+            selected_bundle$name
+          )),
           tone = "warning",
           icon_name = "exclamation-triangle"
         ))
@@ -1197,7 +1292,8 @@ mod_sse_analysis_server <- function(
             length(meta$param_names), length(meta$capture_names), length(meta$cmt_names)
           )),
           tags$p(sprintf(
-            "Individual PK archive detected: %d rows, %d samples, %d IDs.",
+            "Individual PK archive for %s: %d rows, %d samples, %d IDs.",
+            selected_bundle$name,
             nrow(patab),
             if ("sample" %in% names(patab)) length(unique(stats::na.omit(patab$sample))) else 0L,
             if ("ID" %in% names(patab)) length(unique(stats::na.omit(patab$ID))) else 0L
@@ -1264,7 +1360,7 @@ mod_sse_analysis_server <- function(
           "No individual model inputs selected",
           tags$p("Select the mrgsolve parameters that should receive individual values from the PsN tables."),
           tone = "neutral",
-          icon_name = "circle-info"
+          icon_name = "info-circle"
         ))
       }
 
@@ -1279,13 +1375,14 @@ mod_sse_analysis_server <- function(
         ),
         fluidRow(lapply(seq_along(params), function(i) {
           param <- params[[i]]
+          input_id <- .sse_mrgsolve_mapping_input_id(param)
           auto_col <- auto_mapping$patab_column[match(param, auto_mapping$model_param)]
-          selected <- input[[paste0("pk_map_", i)]] %||% auto_col
+          selected <- input[[input_id]] %||% auto_col
           if (is.na(selected) || !selected %in% candidate_columns) selected <- ""
           column(
             4,
             selectInput(
-              session$ns(paste0("pk_map_", i)),
+              session$ns(input_id),
               param,
               choices = c("Unmapped" = "", candidate_columns),
               selected = selected
@@ -1361,12 +1458,23 @@ mod_sse_analysis_server <- function(
       )
     })
 
-    pk_exposure_sanity <- eventReactive(input$pk_exposure_run_sanity, {
-      if (is.null(mrgsolve_state)) {
-        return(list(status = "model_unavailable", message = "No shared mrgsolve model state is registered."))
-      }
+    pk_exposure_sanity_key <- reactive({
+      context <- pk_exposure_key_context()
+      if (is.null(context)) return(NULL)
 
-      run_sse_mrgsolve_sanity_check(
+      build_sse_mrgsolve_exposure_cache_key(
+        model_hash = context$model_hash,
+        preflight = context$preflight,
+        individual_pk_data = context$individual_pk_data,
+        dosing_events = context$dosing_events,
+        max_ids = 3L,
+        delta = 1
+      )
+    })
+
+    pk_exposure_sanity <- eventReactive(input$pk_exposure_run_sanity, {
+      key <- pk_exposure_sanity_key()
+      result <- run_sse_mrgsolve_sanity_check(
         mod = tryCatch(mrgsolve_state$model(), error = function(e) NULL),
         individual_pk_data = pk_exposure_patab(),
         preflight = pk_exposure_preflight(),
@@ -1375,7 +1483,18 @@ mod_sse_analysis_server <- function(
         max_ids = 3L,
         delta = 1
       )
+      result$context_key <- key
+      result
     }, ignoreInit = TRUE)
+
+    pk_exposure_current_sanity <- reactive({
+      result <- tryCatch(pk_exposure_sanity(), error = function(e) NULL)
+      if (is.null(result)) return(NULL)
+
+      key <- pk_exposure_sanity_key()
+      if (is.null(key) || !identical(result$context_key, key)) return(NULL)
+      result
+    })
 
     output$pk_exposure_sanity_check <- renderUI({
       preflight <- pk_exposure_preflight()
@@ -1383,7 +1502,7 @@ mod_sse_analysis_server <- function(
         return(NULL)
       }
 
-      result <- tryCatch(pk_exposure_sanity(), error = function(e) NULL)
+      result <- pk_exposure_current_sanity()
       tone <- "neutral"
       title <- "mrgsolve sanity check"
       body <- tags$p("Run a small simulation on the first sample and up to three IDs before computing full SSE exposures.")
@@ -1418,12 +1537,12 @@ mod_sse_analysis_server <- function(
           )
         ),
         tone = tone,
-        icon_name = if (identical(tone, "success")) "check-circle" else "circle-info"
+        icon_name = if (identical(tone, "success")) "check-circle" else "info-circle"
       )
     })
 
     output$pk_exposure_sanity_table <- renderDT({
-      result <- pk_exposure_sanity()
+      result <- pk_exposure_current_sanity()
       req(result, identical(result$status, "ok"), result$preview)
 
       datatable(
@@ -1445,31 +1564,47 @@ mod_sse_analysis_server <- function(
     }
 
     pk_exposure_compute_key <- reactive({
-      preflight <- pk_exposure_preflight()
-      events <- tryCatch(mrgsolve_state$dose_events(), error = function(e) NULL)
-      dat <- pk_exposure_patab()
-      model_hash <- tryCatch(mrgsolve_state$model_hash(), error = function(e) NA_character_)
+      context <- pk_exposure_key_context()
+      if (is.null(context)) return(NULL)
 
-      mrgsolve_code_hash(paste(
-        c(
-          model_hash,
-          preflight$concentration_output,
-          paste(preflight$required_params, collapse = "|"),
-          paste(preflight$mapping$model_param, preflight$mapping$patab_column, collapse = "|"),
-          nrow(dat %||% data.frame()),
-          nrow(events %||% data.frame()),
-          input$pk_exposure_max_samples %||% "",
-          input$pk_exposure_max_ids %||% "",
-          input$pk_exposure_delta %||% "",
-          input$pk_exposure_trough_time %||% ""
-        ),
-        collapse = "\n"
-      ))
+      build_sse_mrgsolve_exposure_cache_key(
+        model_hash = context$model_hash,
+        preflight = context$preflight,
+        individual_pk_data = context$individual_pk_data,
+        dosing_events = context$dosing_events,
+        max_samples = .pk_exposure_positive_limit(input$pk_exposure_max_samples),
+        max_ids = .pk_exposure_positive_limit(input$pk_exposure_max_ids),
+        delta = input$pk_exposure_delta %||% 1,
+        trough_times = .pk_exposure_trough_times(input$pk_exposure_trough_time)
+      )
     })
+
+    pk_exposure_current_cache <- reactive({
+      cache <- pk_exposure_cache()
+      if (is.null(cache)) return(NULL)
+
+      key <- pk_exposure_compute_key()
+      if (is.null(key) || !identical(cache$key, key)) return(NULL)
+      cache
+    })
+
+    observeEvent(
+      pk_exposure_compute_key(),
+      {
+        key <- pk_exposure_compute_key()
+        cache <- isolate(pk_exposure_cache())
+        if (!is.null(cache) &&
+            (is.null(key) || !identical(cache$key, key))) {
+          pk_exposure_cache(NULL)
+        }
+      },
+      ignoreInit = TRUE,
+      ignoreNULL = FALSE
+    )
 
     output$pk_exposure_compute_controls <- renderUI({
       preflight <- pk_exposure_preflight()
-      sanity <- tryCatch(pk_exposure_sanity(), error = function(e) NULL)
+      sanity <- pk_exposure_current_sanity()
       if (is.null(preflight) || !identical(preflight$status, "ready")) {
         return(NULL)
       }
@@ -1478,7 +1613,7 @@ mod_sse_analysis_server <- function(
           "Run sanity check before full exposure computation",
           tags$p("The full SSE exposure computation is available after the mini-simulation passes."),
           tone = "neutral",
-          icon_name = "circle-info"
+          icon_name = "info-circle"
         ))
       }
 
@@ -1545,10 +1680,9 @@ mod_sse_analysis_server <- function(
 
     observeEvent(input$pk_exposure_compute, {
       key <- pk_exposure_compute_key()
-      cached <- pk_exposure_cache()
-      if (!is.null(cached) && identical(cached$key, key)) {
-        return()
-      }
+      sanity <- pk_exposure_current_sanity()
+      req(key, sanity, identical(sanity$status, "ok"))
+      if (!is.null(pk_exposure_current_cache())) return()
 
       withProgress(message = "Computing PK exposures", value = 0, {
         incProgress(0.2, detail = "Preparing individual simulations")
@@ -1572,7 +1706,7 @@ mod_sse_analysis_server <- function(
     }, ignoreInit = TRUE)
 
     output$pk_exposure_compute_status <- renderUI({
-      cache <- pk_exposure_cache()
+      cache <- pk_exposure_current_cache()
       if (is.null(cache)) {
         return(NULL)
       }
@@ -1589,7 +1723,7 @@ mod_sse_analysis_server <- function(
     })
 
     output$pk_exposure_results_table <- renderDT({
-      cache <- pk_exposure_cache()
+      cache <- pk_exposure_current_cache()
       req(cache, cache$result)
 
       datatable(
@@ -1605,7 +1739,7 @@ mod_sse_analysis_server <- function(
         paste0("sse_pk_exposure_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
       },
       content = function(file) {
-        cache <- pk_exposure_cache()
+        cache <- pk_exposure_current_cache()
         req(cache, cache$result)
         write.csv(cache$result, file, row.names = FALSE)
       }

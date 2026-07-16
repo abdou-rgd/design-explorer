@@ -418,9 +418,9 @@ plot_covariate_forest <- function(effects_tbl) {
       aes(xmin = margin_lower[1], xmax = margin_upper[1], ymin = -Inf, ymax = Inf),
       inherit.aes = FALSE, fill = "#d1fae5", alpha = 0.35
     ) +
-    geom_vline(xintercept = 1, color = "grey45", linetype = "solid", linewidth = 0.35) +
+    geom_vline(xintercept = 1, color = "grey45", linetype = "solid", size = 0.35) +
     geom_errorbar(aes(xmin = ci_lower, xmax = ci_upper), orientation = "y",
-                  height = 0.16, linewidth = 0.7) +
+                  height = 0.16, size = 0.7) +
     geom_point(size = 3) +
     scale_color_manual(
       values = c(

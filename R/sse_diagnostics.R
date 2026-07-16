@@ -1062,17 +1062,16 @@ plot_sse_reliability_map <- function(reliability_df) {
     geom_hline(
       data = rse_thresholds,
       aes(yintercept = rse_empirical, color = threshold_color),
-      inherit.aes = FALSE,
       linetype = "dashed",
-      linewidth = 0.35
+      size = 0.35
     ) +
     geom_vline(
       xintercept = c(-20, 20),
       linetype = "dotted",
       color = "#6b7280",
-      linewidth = 0.35
+      size = 0.35
     ) +
-    geom_vline(xintercept = 0, color = "grey55", linewidth = 0.35) +
+    geom_vline(xintercept = 0, color = "grey55", size = 0.35) +
     geom_point(aes(color = type_group, size = issue_burden), alpha = 0.82) +
     geom_text(
       aes(label = param_label),

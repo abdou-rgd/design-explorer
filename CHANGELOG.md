@@ -2,6 +2,45 @@
 
 Tenu à jour à chaque PR mergée. VSCode Claude lit cette section en début de session pour rattraper le contexte.
 
+## [En cours] — 2026-07-15 — Fiabilisation du cache SSE PK
+
+### Diagnostics d'exposition PK (`R/sse_mrgsolve_exposure.R`, `app/R/mod_sse_analysis.R`)
+- [fix] La clé de cache couvre désormais le contenu complet des tables individuelles, des événements de dose, du mapping, du modèle compilé et des réglages de calcul; une modification à nombre de lignes constant ne peut plus réutiliser un ancien résultat.
+- [fix] Le code et le MD5 complet du modèle sont liés atomiquement à la compilation réussie; modifier le texte sans recompiler ne peut plus étiqueter un calcul de l'ancien modèle avec l'identité du nouveau.
+- [fix] Les résultats d'exposition et sanity checks périmés sont invalidés et ne sont plus affichables, exportables ni réutilisables dès qu'une dépendance de calcul change.
+- [fix] Les contrôles de mapping utilisent des identifiants stables dérivés du nom du paramètre mrgsolve; réordonner `CL`, `V`, etc. ne permute plus silencieusement les colonnes `patab` associées.
+- [test] Ajout de régressions unitaires et serveur Shiny pour les changements de contenu, de dose, de réglage, l'invalidation du cache et le réordonnancement des paramètres.
+
+### État applicatif et association des sources (`app/R/app_state.R`, `app/app.R`)
+- [fix] Le run primaire est désormais remplacé par snapshot atomique : un upload et un exemple ne peuvent plus fournir des fichiers ou métadonnées différents au même écran.
+- [fix] Un upload partiel ou dont le `.ext` est illisible est rejeté sans écraser le dernier contexte valide; le reset installe explicitement un contexte vide.
+- [fix] Les exemples publient une sélection atomique et révisionnée; charger un exemple sans comparaison efface immédiatement la comparaison automatique précédente.
+- [fix] Les lignes `.ext`, labels, plage de tables, résumé, nom et `GROUPSIZE` sont tous dérivés du même snapshot actif.
+- [feat] Les archives PK individuelles SSE sont maintenant associées séparément aux Designs A et B et suivent le même sélecteur que leurs `raw_results`.
+- [test] Le runner découvre automatiquement tous les fichiers `test-*.R`; ajout de régressions sur les transitions de contexte, les lignes `.ext` périmées et le routage des archives PK par design.
+
+### Cohérence des transitions Shiny
+- [fix] Les simulations mrgsolve sont liées au modèle compilé, au snapshot `.ext`/`.tab`, aux labels THETA et aux événements de dose effectifs qui les ont produites; toute modification de `AMT` ou `RATE` les invalide immédiatement sans décharger inutilement le modèle compilé.
+- [fix] Le `RATE` manuel est appliqué par bras uniquement lorsqu'il manque dans la table; les débits NONMEM valides, y compris le bolus `0`, restent prioritaires.
+- [fix] Sous Windows, l'absence de `make` est détectée avant le smoke test mrgsolve afin d'éviter une compilation condamnée et du bruit d'erreur au démarrage.
+- [fix] L'upload principal est construit puis validé localement avant un commit atomique; une erreur de lecture conserve intégralement le contexte précédent.
+- [fix] Le sélecteur SSE revient sur le Design A lorsque B n'est plus disponible, et un remplacement SSE ou patab invalide ne détruit plus le bundle valide précédent.
+- [fix] `read_true_values()` conserve toutes les valeurs diagonales `$OMEGA/$SIGMA`, ignore correctement les dimensions `DIAGONAL(n)` et développe les répétitions NONMEM `Xn`, sans avertissement de conversion.
+- [security] Les répétitions `Xn` et dimensions `BLOCK(n)` sont validées avant expansion, avec des budgets cumulatifs de 10 000 valeurs par type de covariance pour bloquer les allocations et boucles hostiles.
+
+### Sécurité des archives (`R/archive_utils.R`)
+- [security] Les ZIP/TAR uploadés sont inspectés avant extraction, limités en nombre et taille, et seuls les fichiers NONMEM/PsN attendus sont copiés vers des destinations isolées.
+- [security] Rejet des chemins absolus, traversées `..`, doublons normalisés, noms de périphériques Windows, liens et membres TAR non réguliers.
+- [security] Le parsing PAX est linéaire et plafonné à 10 000 enregistrements cumulés; les en-têtes PAX globaux pouvant réécrire chemins ou tailles sont rejetés explicitement.
+- [test] Régressions ZIP/TAR et validation des chemins exécutées sous R 4.2.0.
+
+### Environnement R 4.2.0
+- [chore] Ajout d'un `renv.lock` complet de 91 entrées, généré et restauré avec R 4.2.0 depuis le snapshot Posit Package Manager du 12 mai 2022.
+- [fix] Compatibilité rétablie avec ggplot2 3.3.6, Font Awesome 5 et mrgsolve 1.0.3.
+- [ci] Workflow Windows R 4.2.0: restauration `renv`, assertion des versions, suite complète et chargement de l'application.
+
+---
+
 ## [En cours] — 2026-06-04 — Audit repo + nettoyage GitHub
 
 ### Audit branches / git

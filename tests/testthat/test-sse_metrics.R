@@ -12,29 +12,32 @@ library(ggplot2)
 
 project_root <- Sys.getenv("DESIGN_EXPLORER_ROOT", unset = NA_character_)
 if (is.na(project_root) || !nzchar(project_root)) {
-  this_file <- tryCatch(normalizePath(sys.frame(0)$ofile), error = function(e) {
-    NULL
-  })
-  if (!is.null(this_file)) {
-    d <- dirname(this_file)
-    for (i in seq_len(6)) {
-      if (file.exists(file.path(d, "CLAUDE.md"))) {
-        project_root <- d
-        break
-      }
-      d <- dirname(d)
+  candidate <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
+  for (i in seq_len(6L)) {
+    if (file.exists(file.path(candidate, "DESCRIPTION"))) {
+      project_root <- candidate
+      break
     }
+    parent <- dirname(candidate)
+    if (identical(parent, candidate)) {
+      break
+    }
+    candidate <- parent
   }
-  if (is.na(project_root) || !nzchar(project_root)) project_root <- getwd()
+}
+if (is.na(project_root) || !nzchar(project_root)) {
+  stop("Unable to locate the design-explorer project root.", call. = FALSE)
 }
 proj <- function(...) file.path(project_root, ...)
 
 source(proj("R", "design_utils.R"))
+source(proj("R", "archive_utils.R"))
 source(proj("R", "design_metrics.R"))
 source(proj("R", "report_design.R"))
 source(proj("R", "sse_metrics.R"))
 source(proj("R", "sse_diagnostics.R"))
 source(proj("R", "sse_individual_pk.R"))
+source(proj("tests", "testthat", "helper-archive-fixtures.R"))
 
 make_sse_20_sample_fixture <- function() {
   vals <- function(center, spread = 0.1) {
@@ -257,6 +260,157 @@ test_that("read_true_values() parses inline OMEGA and SIGMA BLOCK values", {
   expect_equal(unname(vals["SIGMA(1,1)"]), 0.01)
   expect_equal(unname(vals["SIGMA(2,1)"]), 0.003)
   expect_equal(unname(vals["SIGMA(2,2)"]), 0.04)
+})
+
+test_that("read_true_values() validates BLOCK dimensions before expansion", {
+  block_error <- function(lines) {
+    tryCatch(
+      {
+        read_true_values(lines)
+        NA_character_
+      },
+      error = function(cnd) conditionMessage(cnd)
+    )
+  }
+
+  malformed <- c(
+    "$OMEGA BLOCK",
+    "$OMEGA BLOCK() 0.1",
+    "$OMEGA BLOCK(-1) 0.1",
+    "$SIGMA BLOCK(0) 0.1",
+    "$SIGMA BLOCK(1.5) 0.1",
+    "$SIGMA BLOCK(1e2) 0.1"
+  )
+  messages <- vapply(malformed, block_error, character(1L))
+  expect_equal(
+    grepl("positive integer", messages, fixed = TRUE),
+    rep(TRUE, length(malformed))
+  )
+
+  expect_match(
+    block_error("$OMEGA BLOCK(141) 0.1"),
+    "10000 lower-triangular value limit",
+    fixed = TRUE
+  )
+  expect_match(
+    block_error("$SIGMA BLOCK(2147483647) 0.1"),
+    "10000 lower-triangular value limit",
+    fixed = TRUE
+  )
+
+  vals <- read_true_values("$OMEGA BLOCK(140) 0.25")
+  expect_equal(vals, c(`OMEGA(1,1)` = 0.25))
+})
+
+test_that("read_true_values() bounds cumulative BLOCK values by covariance type", {
+  block_error <- function(lines) {
+    tryCatch(
+      {
+        read_true_values(lines)
+        NA_character_
+      },
+      error = function(cnd) conditionMessage(cnd)
+    )
+  }
+
+  messages <- vapply(
+    c("OMEGA", "SIGMA"),
+    function(keyword) {
+      block_error(c(
+        sprintf("$%s BLOCK(99) 0.1", keyword),
+        sprintf("$%s BLOCK(100) 0.2", keyword),
+        sprintf("$%s BLOCK(1) 0.3", keyword)
+      ))
+    },
+    character(1L)
+  )
+  expect_equal(
+    grepl("cumulative 10000-value limit", messages, fixed = TRUE),
+    c(TRUE, TRUE)
+  )
+
+  vals <- read_true_values(c(
+    "$OMEGA BLOCK(100) 0.1",
+    "$SIGMA BLOCK(100) 0.2"
+  ))
+  expect_equal(
+    vals,
+    c(`OMEGA(1,1)` = 0.1, `SIGMA(1,1)` = 0.2)
+  )
+})
+
+test_that("read_true_values() parses repeated diagonal covariance values", {
+  expect_warning(
+    vals <- read_true_values(c(
+      "$THETA 0.15 8.0 1.0",
+      "$OMEGA (0.07) (0.02) (0.6)",
+      "$SIGMA 0.01 (0.001 FIXED)",
+      "$OMEGA (0.0225 UNINT)X4",
+      "$SIGMA (0.0225) (0.0001 UNINT)"
+    )),
+    NA
+  )
+
+  expect_equal(
+    unname(vals[paste0("OMEGA(", 1:7, ",", 1:7, ")")]),
+    c(0.07, 0.02, 0.6, rep(0.0225, 4L))
+  )
+  expect_equal(
+    unname(vals[paste0("SIGMA(", 1:4, ",", 1:4, ")")]),
+    c(0.01, 0.001, 0.0225, 0.0001)
+  )
+})
+
+test_that("read_true_values() ignores DIAGONAL dimensions", {
+  vals <- read_true_values(c(
+    "$OMEGA DIAGONAL(3) 0.07 (0.02) (0.6)",
+    "$SIGMA DIAGONAL(4)",
+    "0.01 (0.001 FIXED) (0.0225 UNINT)X2"
+  ))
+
+  expect_equal(
+    unname(vals[paste0("OMEGA(", 1:3, ",", 1:3, ")")]),
+    c(0.07, 0.02, 0.6)
+  )
+  expect_equal(
+    unname(vals[paste0("SIGMA(", 1:4, ",", 1:4, ")")]),
+    c(0.01, 0.001, 0.0225, 0.0225)
+  )
+  expect_false(any(unname(vals) %in% c(3, 4)))
+})
+
+test_that("read_true_values() bounds covariance repetitions", {
+  expect_error(
+    read_true_values("$OMEGA (0.1)X10001"),
+    "repetition count exceeds the 10000-value limit",
+    fixed = TRUE
+  )
+  expect_error(
+    read_true_values("$SIGMA (0.1)Xoops"),
+    "Malformed covariance repetition"
+  )
+  expect_error(
+    read_true_values("$SIGMA 0.1X1.5"),
+    "Malformed covariance repetition"
+  )
+  expect_error(
+    read_true_values("$SIGMA 0.1X0"),
+    "must be a positive integer"
+  )
+  expect_error(
+    read_true_values(c(
+      "$OMEGA (0.1)X6000",
+      "(0.2)X5000"
+    )),
+    "expands above the 10000-value limit",
+    fixed = TRUE
+  )
+
+  vals <- read_true_values(c(
+    "$OMEGA (0.1)X3",
+    "$SIGMA 0.01X2"
+  ))
+  expect_equal(unname(vals), c(rep(0.1, 3L), rep(0.01, 2L)))
 })
 
 test_that("compute_empirical_correlations() returns the SSE correlation matrix", {
@@ -493,9 +647,18 @@ test_that("read_sse_patab_outputs() reads uploaded zip paths without extensions"
   )
 
   zip_path <- tempfile(fileext = ".zip")
-  old_wd <- setwd(root)
-  on.exit(setwd(old_wd), add = TRUE)
-  utils::zip(zipfile = zip_path, files = list.files(root))
+  member_names <- list.files(root)
+  member_paths <- file.path(root, member_names)
+  member_sizes <- file.info(member_paths)$size
+  members <- stats::setNames(
+    Map(
+      function(path, size) readBin(path, what = "raw", n = size),
+      member_paths,
+      member_sizes
+    ),
+    member_names
+  )
+  write_stored_zip(members, zip_path)
   uploaded_path <- tempfile("shiny-upload-")
   file.copy(zip_path, uploaded_path, overwrite = TRUE)
 

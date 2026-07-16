@@ -3,7 +3,7 @@ Title: NONMEM DESIGN Explorer
 Version: 5.8.0
 Description: Shiny application and R helpers for post-processing NONMEM DESIGN outputs, FIM metrics, optimal times, and SSE validation.
 Authors@R: person("Design Explorer", "Contributors", role = c("aut", "cre"), email = "maintainer@example.invalid")
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:
     R (>= 4.2.0)
@@ -17,7 +17,14 @@ Imports:
     stringr,
     purrr,
     readr,
-    tibble
+    tibble,
+    scales,
+    rlang
 Suggests:
     testthat,
-    mrgsolve
+    mrgsolve,
+    withr,
+    digest,
+    fontawesome,
+    jsonlite
+Config/testthat/edition: 3

@@ -238,14 +238,14 @@ mod_covariates_server <- function(id, ext_data, tbl_no,
           "Log-ratio mode",
           tags$p("Without a covariate dataset, ratios use the mapped THETA directly as a log-ratio."),
           tone = "info",
-          icon_name = "sliders"
+          icon_name = "sliders-h"
         ))
       }
       status_panel(
         "Contrast mode",
         tags$p("Using the uploaded covariate dataset to compute P90/P10 vs median for continuous covariates and high vs reference for binary covariates."),
         tone = "success",
-        icon_name = "diagram-3"
+        icon_name = "project-diagram"
       )
     })
 

@@ -2,7 +2,8 @@
 
 library(testthat)
 
-if (!exists("PROJECT_ROOT", inherits = TRUE)) {
+if (!exists("PROJECT_ROOT", inherits = TRUE) ||
+    !file.exists(file.path(PROJECT_ROOT, "DESCRIPTION"))) {
   cwd <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
   PROJECT_ROOT <- if (file.exists(file.path(cwd, "DESCRIPTION"))) {
     cwd
@@ -90,6 +91,87 @@ test_that("build_sse_mrgsolve_parameter_mapping accepts manual overrides", {
 
   expect_equal(mapping$patab_column, c("VC", "ETA1"))
   expect_equal(mapping$source, c("manual", "manual"))
+})
+
+test_that("PK exposure mapping input IDs stay attached to model parameters", {
+  expect_equal(
+    vapply(c("CL", "V"), .sse_mrgsolve_mapping_input_id, character(1L)),
+    c(CL = "pk_map_CL", V = "pk_map_V")
+  )
+})
+
+test_that("PK exposure cache keys cover data, doses, and computation settings", {
+  preflight <- make_preflight_ready()
+  patab <- make_preflight_patab()
+  doses <- make_preflight_doses()
+
+  build_key <- function(
+    data = patab,
+    events = doses,
+    model_hash = "model-v1",
+    cache_preflight = preflight,
+    samples = NULL,
+    ids = NULL,
+    max_samples = 10L,
+    max_ids = 5L,
+    end_time = NULL,
+    delta = 1,
+    trough_times = 24
+  ) {
+    build_sse_mrgsolve_exposure_cache_key(
+      model_hash = model_hash,
+      preflight = cache_preflight,
+      individual_pk_data = data,
+      dosing_events = events,
+      samples = samples,
+      ids = ids,
+      max_samples = max_samples,
+      max_ids = max_ids,
+      end_time = end_time,
+      delta = delta,
+      trough_times = trough_times
+    )
+  }
+
+  original <- build_key()
+  expect_match(original, "^[0-9a-f]{32}$")
+  expect_identical(original, build_key())
+
+  changed_patab <- patab
+  changed_patab$CL[[2L]] <- changed_patab$CL[[2L]] + 0.5
+  expect_false(identical(original, build_key(data = changed_patab)))
+
+  changed_doses <- doses
+  changed_doses$amt[[1L]] <- changed_doses$amt[[1L]] * 2
+  expect_false(identical(original, build_key(events = changed_doses)))
+  expect_false(identical(original, build_key(model_hash = "model-v2")))
+  expect_false(identical(original, build_key(samples = 1L)))
+  expect_false(identical(original, build_key(ids = 101L)))
+  expect_false(identical(original, build_key(max_samples = 5L)))
+  expect_false(identical(original, build_key(max_ids = 1L)))
+  expect_false(identical(original, build_key(end_time = 48)))
+  expect_false(identical(original, build_key(delta = 0.5)))
+  expect_false(identical(original, build_key(trough_times = 12)))
+
+  changed_output <- preflight
+  changed_output$concentration_output <- "OTHER"
+  expect_false(identical(
+    original,
+    build_key(cache_preflight = changed_output)
+  ))
+
+  changed_mapping <- preflight
+  changed_mapping$mapping$patab_column[
+    changed_mapping$mapping$model_param == "V"
+  ] <- "CL"
+  expect_false(identical(
+    original,
+    build_key(cache_preflight = changed_mapping)
+  ))
+
+  reordered <- preflight
+  reordered$required_params <- rev(reordered$required_params)
+  expect_identical(original, build_key(cache_preflight = reordered))
 })
 
 test_that("build_sse_mrgsolve_exposure_preflight reports ready and blocked states", {

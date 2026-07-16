@@ -2,7 +2,8 @@
 
 library(testthat)
 
-if (!exists("PROJECT_ROOT", inherits = TRUE)) {
+if (!exists("PROJECT_ROOT", inherits = TRUE) ||
+    !file.exists(file.path(PROJECT_ROOT, "DESCRIPTION"))) {
   cwd <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
   PROJECT_ROOT <- if (file.exists(file.path(cwd, "DESCRIPTION"))) {
     cwd
@@ -13,7 +14,7 @@ if (!exists("PROJECT_ROOT", inherits = TRUE)) {
 }
 
 source(file.path(PROJECT_ROOT, "R", "source_core.R"))
-source_core(PROJECT_ROOT)
+suppressWarnings(source_core(PROJECT_ROOT, local = globalenv()))
 source(file.path(PROJECT_ROOT, "app", "R", "helpers_ui.R"))
 source(file.path(PROJECT_ROOT, "app", "R", "mod_sse_analysis.R"))
 
@@ -76,28 +77,38 @@ $CAPTURE CP
   )
   skip_if(is.character(mod), mod)
 
+  patab_state <- shiny::reactiveVal(make_app_exposure_patab())
+  dosing_state <- shiny::reactiveVal(make_app_exposure_doses())
+
   mrgsolve_state <- list(
     model = shiny::reactiveVal(mod),
     compile_error = shiny::reactiveVal(NULL),
     model_code = shiny::reactiveVal(code),
-    model_hash = shiny::reactiveVal(mrgsolve_code_hash(code)),
+    model_hash = shiny::reactiveVal(mrgsolve_code_hash(code, n_chars = 32L)),
     param_names = shiny::reactiveVal(c("CL", "V")),
     capture_names = shiny::reactiveVal("CP"),
     cmt_names = shiny::reactiveVal("CENT"),
-    dose_events = shiny::reactiveVal(make_app_exposure_doses()),
+    dose_events = dosing_state,
     is_compiled = shiny::reactiveVal(TRUE)
   )
 
   shiny::testServer(
     mod_sse_analysis_server,
     args = list(
-      sse_a_shared = shiny::reactive(make_app_exposure_sse()),
-      sse_b_shared = shiny::reactive(NULL),
-      name_a = shiny::reactive("Original"),
-      name_b = shiny::reactive("Optimized"),
+      design_a_shared = shiny::reactive(list(
+        id = "a",
+        name = "Original",
+        raw_results = make_app_exposure_sse(),
+        individual_pk = patab_state()
+      )),
+      design_b_shared = shiny::reactive(list(
+        id = "b",
+        name = "Optimized",
+        raw_results = NULL,
+        individual_pk = NULL
+      )),
       true_vals = shiny::reactive(stats::setNames(numeric(), character())),
       param_labels = shiny::reactive(NULL),
-      individual_pk_shared = shiny::reactive(make_app_exposure_patab()),
       mrgsolve_state = mrgsolve_state
     ),
     {
@@ -105,8 +116,8 @@ $CAPTURE CP
         active_view = "pk_exposure",
         pk_exposure_output = "CP",
         pk_exposure_params = c("CL", "V"),
-        pk_map_1 = "CL",
-        pk_map_2 = "VC"
+        pk_map_CL = "CL",
+        pk_map_V = "VC"
       )
       session$flushReact()
 
@@ -116,6 +127,17 @@ $CAPTURE CP
       expect_equal(
         preflight$mapping$patab_column[
           match(c("CL", "V"), preflight$mapping$model_param)
+        ],
+        c("CL", "VC")
+      )
+
+      session$setInputs(pk_exposure_params = c("V", "CL"))
+      session$flushReact()
+      reordered <- pk_exposure_preflight()
+      expect_equal(reordered$status, "ready")
+      expect_equal(
+        reordered$mapping$patab_column[
+          match(c("CL", "V"), reordered$mapping$model_param)
         ],
         c("CL", "VC")
       )
@@ -145,6 +167,22 @@ $CAPTURE CP
         "absolute_error", "relative_error"
       ) %in% names(cache$result)))
       expect_true(any(abs(cache$result$relative_error) > 0))
+
+      session$setInputs(pk_exposure_params = c("CL", "V"))
+      session$flushReact()
+      expect_identical(pk_exposure_compute_key(), cache$key)
+      expect_identical(pk_exposure_current_cache()$key, cache$key)
+      expect_equal(pk_exposure_current_sanity()$status, "ok")
+
+      changed_patab <- patab_state()
+      changed_patab$CL[[2L]] <- changed_patab$CL[[2L]] + 0.5
+      patab_state(changed_patab)
+      session$flushReact()
+
+      expect_false(identical(cache$key, pk_exposure_compute_key()))
+      expect_null(pk_exposure_cache())
+      expect_null(pk_exposure_current_cache())
+      expect_null(pk_exposure_current_sanity())
     }
   )
 })

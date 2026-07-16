@@ -2,7 +2,10 @@
 
 library(testthat)
 
-if (!exists("PROJECT_ROOT", inherits = TRUE)) {
+if (
+  !exists("PROJECT_ROOT", inherits = TRUE) ||
+    !file.exists(file.path(PROJECT_ROOT, "DESCRIPTION"))
+) {
   cwd <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
   PROJECT_ROOT <- if (file.exists(file.path(cwd, "DESCRIPTION"))) {
     cwd
@@ -43,11 +46,57 @@ test_that("mrgsolve_code_hash() is deterministic without extra packages", {
   hash_a <- mrgsolve_code_hash(code)
   hash_b <- mrgsolve_code_hash(code)
   hash_c <- mrgsolve_code_hash(paste0(code, "\n"))
+  full_hash <- mrgsolve_code_hash(code, n_chars = 32L)
 
   expect_type(hash_a, "character")
   expect_match(hash_a, "^[0-9a-f]{8}$")
+  expect_match(full_hash, "^[0-9a-f]{32}$")
+  expect_identical(hash_a, substr(full_hash, 1L, 8L))
   expect_identical(hash_a, hash_b)
   expect_false(identical(hash_a, hash_c))
+})
+
+test_that("manual dose configuration fills an unavailable RATE by arm", {
+  schedule <- extract_dosing_from_tab(tibble::tibble(
+    ID = c(1L, 2L),
+    TIME = c(0, 0),
+    EVID = c(1L, 1L)
+  ))
+
+  expect_true(all(is.na(schedule$amt)))
+  expect_true(all(is.na(schedule$rate)))
+
+  events <- build_dosing_events(
+    schedule,
+    dose_config = list(
+      `1` = list(amt = 100, rate = 0),
+      `2` = list(amt = 200, rate = 25)
+    )
+  )
+
+  expect_equal(events$amt, c(100, 200))
+  expect_equal(events$rate, c(0, 25))
+})
+
+test_that("valid table RATE values take priority over manual configuration", {
+  schedule <- extract_dosing_from_tab(tibble::tibble(
+    ID = c(1L, 2L, 3L),
+    TIME = c(0, 0, 0),
+    EVID = c(1L, 1L, 1L),
+    RATE = c(0, 20, NA_real_)
+  ))
+
+  events <- build_dosing_events(
+    schedule,
+    dose_config = list(
+      `1` = list(amt = 100, rate = 10),
+      `2` = list(amt = 200, rate = 30),
+      `3` = list(amt = 300, rate = 40)
+    )
+  )
+
+  expect_equal(events$amt, c(100, 200, 300))
+  expect_equal(events$rate, c(0, 20, 40))
 })
 
 test_that("simulate_pk_profile() coerces mrgsims output without attaching mrgsolve", {

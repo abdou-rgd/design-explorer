@@ -14,18 +14,19 @@ extract_design_files <- function(files, tmp_prefix = "design") {
 
   if (nrow(files) == 1L &&
       grepl("\\.(tar\\.gz|tgz)$", files$name, ignore.case = TRUE)) {
-    tmp <- file.path(tempdir(),
-                     paste0(tmp_prefix, "_", format(Sys.time(), "%H%M%S")))
-    dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
-    tryCatch(
-      untar(files$datapath, exdir = tmp),
+    tmp <- tempfile(paste0(tmp_prefix, "-"), tmpdir = tempdir())
+    all_f <- tryCatch(
+      safe_extract_tar(
+        files$datapath,
+        exdir = tmp,
+        pattern = .DESIGN_ARCHIVE_PATTERN
+      ),
       error = function(e) {
         stop("Unable to extract archive '", files$name, "': ",
              conditionMessage(e), call. = FALSE)
       }
     )
-
-    all_f <- list.files(tmp, recursive = TRUE, full.names = TRUE)
+    all_f <- all_f[order(names(all_f))]
     all_n <- basename(all_f)
 
     for (et in exts) {
@@ -52,7 +53,6 @@ extract_design_files <- function(files, tmp_prefix = "design") {
   }
   paths
 }
-
 # -- Shared app data helpers --------------------------------------------------
 parse_mapping_text <- function(raw) {
   raw <- trimws(raw %||% "")
@@ -365,7 +365,7 @@ analysis_workspace <- function(title, ..., subtitle = NULL, actions = NULL,
   )
 }
 
-empty_state <- function(title, body, icon_name = "circle-info") {
+empty_state <- function(title, body, icon_name = "info-circle") {
   tags$div(
     class = "empty-state",
     tags$div(class = "empty-state__icon", icon(icon_name)),
@@ -603,4 +603,3 @@ make_health_funnel <- function(health, label = NULL) {
     tags$div(class = "health-funnel__steps", steps)
   )
 }
-

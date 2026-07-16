@@ -253,18 +253,8 @@ mod_examples_server <- function(id, session_main = NULL,
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    selected <- reactiveValues(
-      file_paths       = NULL,
-      labels           = NULL,
-      guide            = NULL,
-      compare_paths    = NULL,
-      compare_name     = NULL,
-      summary_data     = NULL,
-      ex_id            = NULL,
-      step_idx         = 1L,
-      n_steps          = 0L,
-      banner_dismissed = FALSE
-    )
+    selection <- reactiveVal(NULL)
+    selection_revision <- reactiveVal(0L)
 
     # -- load_step: closure over selected -----------------------------------
     load_step <- function(ex_id, step_idx) {
@@ -280,58 +270,55 @@ mod_examples_server <- function(id, session_main = NULL,
         guide  <- ex$guide
       }
 
-      selected$file_paths <- build_paths(ex$dir, prefix)
-      selected$labels     <- ex$labels
-      selected$guide      <- guide
-      selected$step_idx   <- step_idx
-      selected$n_steps    <- if (has_steps) length(ex$steps) else 0L
-      selected$banner_dismissed <- FALSE
-
       # Compare: intra-example (prev_step_prefix) or cross-example
       if (has_steps && !is.null(step$prev_step_prefix)) {
-        selected$compare_paths <- build_paths(ex$dir,
-                                              step$prev_step_prefix)
-        selected$compare_name  <- step$prev_step_prefix
+        compare_paths <- build_paths(ex$dir, step$prev_step_prefix)
+        compare_name <- step$prev_step_prefix
       } else if (!has_steps && !is.null(ex$compare_with)) {
         comp_ex <- .EXAMPLES[[ex$compare_with]]
-        selected$compare_paths <- build_paths(comp_ex$dir,
-                                              comp_ex$prefix)
-        selected$compare_name  <- comp_ex$title
+        compare_paths <- build_paths(comp_ex$dir, comp_ex$prefix)
+        compare_name <- comp_ex$title
       } else {
-        selected$compare_paths <- NULL
-        selected$compare_name  <- NULL
+        compare_paths <- NULL
+        compare_name <- NULL
       }
 
       # Handle summary.tab (robust design — example3 only)
       if (isTRUE(ex$has_summary) && !is.null(ex$summary_file)) {
         if (file.exists(ex$summary_file)) {
-          selected$summary_data <- tryCatch(
+          summary_data <- tryCatch(
             read_summary_tab(ex$summary_file),
             error = function(e) NULL
           )
+        } else {
+          summary_data <- NULL
         }
       } else {
-        selected$summary_data <- NULL
+        summary_data <- NULL
       }
 
-      # Track which example is active (set last to avoid
-      # re-triggering observers mid-update)
-      selected$ex_id <- ex_id
+      revision <- isolate(selection_revision()) + 1L
+      selection_revision(revision)
+      selection(list(
+        file_paths = build_paths(ex$dir, prefix),
+        labels = ex$labels,
+        guide = guide,
+        compare_paths = compare_paths,
+        compare_name = compare_name,
+        summary_data = summary_data,
+        ex_id = ex_id,
+        step_idx = step_idx,
+        n_steps = if (has_steps) length(ex$steps) else 0L,
+        banner_dismissed = FALSE,
+        table_no_range = ex$table_no_range,
+        revision = revision
+      ))
     }
 
     # -- Universal reset from app.R -----------------------------------------
     if (!is.null(reset_trigger)) {
       observeEvent(reset_trigger(), {
-        selected$file_paths      <- NULL
-        selected$labels          <- NULL
-        selected$guide           <- NULL
-        selected$compare_paths   <- NULL
-        selected$compare_name    <- NULL
-        selected$summary_data    <- NULL
-        selected$ex_id           <- NULL
-        selected$step_idx        <- 1L
-        selected$n_steps         <- 0L
-        selected$banner_dismissed <- FALSE
+        selection(NULL)
       })
     }
 
@@ -381,17 +368,22 @@ mod_examples_server <- function(id, session_main = NULL,
     })
 
     # -- Return reactives ---------------------------------------------------
-    list(
-      file_paths       = reactive(selected$file_paths),
-      labels           = reactive(selected$labels),
-      guide            = reactive(selected$guide),
-      compare_paths    = reactive(selected$compare_paths),
-      compare_name     = reactive(selected$compare_name),
-      summary_data     = reactive(selected$summary_data),
-      table_no_range   = reactive({
-        if (is.null(selected$ex_id)) return(NULL)
-        .EXAMPLES[[selected$ex_id]]$table_no_range
+    selected_field <- function(name) {
+      reactive({
+        value <- selection()
+        if (is.null(value)) NULL else value[[name]]
       })
+    }
+
+    list(
+      selection = reactive(selection()),
+      file_paths = selected_field("file_paths"),
+      labels = selected_field("labels"),
+      guide = selected_field("guide"),
+      compare_paths = selected_field("compare_paths"),
+      compare_name = selected_field("compare_name"),
+      summary_data = selected_field("summary_data"),
+      table_no_range = selected_field("table_no_range")
     )
   })
 }

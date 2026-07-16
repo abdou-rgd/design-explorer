@@ -6,7 +6,6 @@
 /audits/
 /logs/
 /.claude/
-/.github/
 /.vscode/
 
 # Markdown - AI/dev only

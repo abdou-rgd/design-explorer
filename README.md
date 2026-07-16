@@ -5,10 +5,18 @@ comparer des designs pharmacometriques, et analyser les diagnostics SSE/FIM.
 
 ## Lancer l'application
 
+Le projet cible exactement R 4.2.0. Le lock `renv` restaure les versions de
+paquets validees pour cet environnement; il ne faut pas installer les versions
+CRAN courantes a la place.
+
 ```r
 source("app/install_deps.R")
 shiny::runApp("app/")
 ```
+
+Apres la premiere restauration, les demarrages suivants peuvent se limiter a
+`shiny::runApp("app/")`: `.Rprofile` active automatiquement l'environnement du
+projet.
 
 ## Tests
 
@@ -17,7 +25,8 @@ Rscript tests/run_tests.R
 ```
 
 La suite couvre les parsers NONMEM, les metriques FIM, les diagnostics SSE,
-l'integration mrgsolve et les principaux contrats applicatifs.
+l'integration mrgsolve, la securite des archives et les principaux contrats
+applicatifs. La CI execute cette suite sous R 4.2.0.
 
 ## Structure
 
